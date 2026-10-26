@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.41",
+ "ledger_grep": "7.41 波 51",
+ "about": "r22 vs r13d の判定アリーナ（公平同士・両席 160 回・主 random×real・副 固定ミラー・参考 random×synth_roles2・r22 と r22o は同じ seed）",
+ "job": "arena-r22-w{KK}",
+ "branch": "claude/arena-r22-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 1.5,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r22:n1_results/nrel_r22.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "out_dir": "arena_r22",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3361000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r22_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "3381000 + B*1000",
+   "args": [],
+   "out": "r22_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "3401000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r22_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r22.npz (claude/train-r22)",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r22 shard {KK}"
+}

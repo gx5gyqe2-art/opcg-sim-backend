@@ -83,6 +83,8 @@ pub fn apply_target(
         ActionType::PlayCard => play_card(s, masters, action, target, owner, source_list),
         ActionType::Reveal => {
             reveal();
+            // 知識（§7.15）: 公開した札は両席が知る（ルールは読まない印）。
+            s.edit().set_card_known(target, crate::journal::KNOWN_BOTH);
             Ok(())
         }
         other => Err(EngineError::Unimplemented(format!(
@@ -105,6 +107,13 @@ pub fn apply_target(
 /// `move_card`（`is_rest` のリセット等が走る）は使わない。
 fn look(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> Result<bool, EngineError> {
     if action.status.as_deref() == Some("OPPONENT") {
+        // 知識（§7.15）: 盤面は変えないが、見た席は相手の山札の上 N 枚を知る。
+        let opp = actor.other();
+        let top: Vec<CardIdx> = s.state().player(opp).deck.iter().take(value.max(0) as usize).copied().collect();
+        let mut e = s.edit();
+        for card in top {
+            e.add_card_known(card, actor.know_bit());
+        }
         return Ok(true);
     }
     let mut count = value;
@@ -116,6 +125,9 @@ fn look(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> Result
     for _ in 0..count.max(0) {
         let card = e.card_zone_remove_at(actor, CardZone::Deck, 0);
         e.card_zone_push(actor, CardZone::Temp, card);
+        // 知識（§7.15）: 見た席が知る（残りを山札の上下へ戻しても持ち越す＝並べ替えの効果が公平化で
+        // 無意味にならない）。
+        e.add_card_known(card, actor.know_bit());
     }
     Ok(true)
 }
@@ -219,6 +231,13 @@ fn play_card(
     if masters.get(s.state().card(target).master).ty == CardType::Event {
         return Ok(());
     }
+    // 「このターン中、（元々のコストN以上の）キャラカードを登場できない」は効果による登場も止める
+    // （登場の手段を問わない。手札からの登場の検証 `rules::actions::play_card_action` と同じ規則）。
+    if masters.get(s.state().card(target).master).ty == CardType::Character
+        && blocks_character_play(s, masters, target, owner)
+    {
+        return Ok(());
+    }
     move_card(s, masters, target, Zone::Field, owner, Position::Bottom)?;
     s.edit()
         .set_card_bool(target, CardBoolField::IsNewlyPlayed, true);
@@ -248,11 +267,25 @@ fn play_card(
     Ok(())
 }
 
+/// 「キャラカードを登場できない」（`CANNOT_PLAY_CHARACTER`）が `owner` に有効で、`card` に効くか
+/// （`min_cost` 付きは元々のコスト＝`master.cost` がそれ以上のキャラだけ）。
+fn blocks_character_play(s: &Session, masters: &MasterTable, card: CardIdx, owner: Seat) -> bool {
+    match crate::rules::active_restriction(s.state(), owner, "CANNOT_PLAY_CHARACTER") {
+        None => false,
+        Some(rec) => match rec.min_cost {
+            None => true,
+            Some(n) => masters.get(s.state().card(card).master).cost >= n,
+        },
+    }
+}
+
 /// Python `per_target.play_card` の ON_PLAY 分岐。
 ///
 /// `triggers::resolve_on_play`（`play_card_action` 用）と違い、**「相手の登場時効果は無効になる」
 /// (OPP_ONPLAY) を見ない**——Python の効果による登場は `negate_onplay_until` を参照しない。
-/// 中断中は待ち行列へ積む（押し出し確定後・対話完了時に消化される）。
+/// 中断中と**効果の解決中**（`triggers::must_queue`＝【KO時】【レスト時】と同じ判定）は待ち行列へ積む
+/// （今解決中の効果を解決し切った後に消化される・WP `rs-trigger-order`。2026-10-22 までは効果の途中で
+/// その場で解決していた）。
 fn resolve_effect_on_play(
     s: &mut Session,
     masters: &MasterTable,
@@ -269,7 +302,7 @@ fn resolve_effect_on_play(
         if ability(masters, *id)?.trigger != TriggerType::OnPlay {
             continue;
         }
-        if s.state().active_interaction().is_some() {
+        if triggers::must_queue(s) {
             triggers::enqueue_trigger(s, owner, card, index, false);
         } else {
             crate::effects::resolver::game_resolve_ability(s, masters, owner, card, index, false)?;
@@ -435,7 +468,14 @@ mod tests {
         let mut action = testkit::action(ActionType::Look, 1);
         action.status = Some("OPPONENT".to_string());
         assert!(run(&mut s, &masters, &action, &[], 1));
-        assert_eq!(s.state(), &before, "公開だけ＝盤面は 1 欄も変わらない");
+        assert_eq!(
+            testkit::without_knowledge(s.state()),
+            testkit::without_knowledge(&before),
+            "公開だけ＝盤面は 1 欄も変わらない（知識の印を除く）"
+        );
+        // 知識（§7.15）: 見た席（P1）が相手の山札の上 1 枚を知る。
+        let top = s.state().player(Seat::P2).deck[0];
+        assert_eq!(s.state().card(top).known_by, Seat::P1.know_bit());
     }
 
     // --- SELECT -------------------------------------------------------------
@@ -466,7 +506,9 @@ mod tests {
         let before = s.state().clone();
 
         assert!(run(&mut s, &masters, &testkit::action(ActionType::Reveal, 1), &[c, h], 1));
-        assert_eq!(s.state(), &before);
+        assert_eq!(testkit::without_knowledge(s.state()), testkit::without_knowledge(&before));
+        // 知識（§7.15）: 公開した札（手札の h も）は両席が知る。
+        assert_eq!(s.state().card(h).known_by, crate::journal::KNOWN_BOTH);
     }
 
     // --- EXECUTE_EVENT ------------------------------------------------------

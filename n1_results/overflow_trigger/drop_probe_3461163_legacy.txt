@@ -1,0 +1,10 @@
+  final {'p1': {'leader': 'OP09-081', 'deck': 24, 'hand': 2, 'life': 5, 'field': 4, 'trash': 15}, 'p2': {'leader': 'OP07-097', 'deck': 26, 'hand': 2, 'life': 0, 'field': 4, 'trash': 17}}
+3461163 winner p1 turns 21 steps 243 acts {'p1': 97, 'p2': 95} MAX_STEPS 400 sec 30.0
+   (235, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (236, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (237, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (238, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (239, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', 'MAIN', False)
+   (240, 'p2', 21, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', 'BATTLE_COUNTER', True)
+   (241, 'p1', 21, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', 'MAIN', False)
+   (242, 'p2', 21, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', 'BATTLE_COUNTER', True)

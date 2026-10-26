@@ -16,6 +16,8 @@ use crate::encode::{
     N_TOK, ONPLAY_COLS, R_DIM, S_DIM, STATS_DIM,
 };
 use crate::state::EngineError;
+use crate::fxhash::FxHashMap;
+use std::rc::Rc;
 
 /// `n_eff.D_AB`（能力埋め込み幅）。
 pub const D_AB: usize = 24;
@@ -45,19 +47,87 @@ fn bad(msg: impl Into<String>) -> EngineError {
 
 // --- 小さな線形代数（すべて行優先 float32・加算は k 昇順）---------------------------
 
+/// `acc[j] += sum_k x[k] * w[k+off][j]`（W の行区間 [off, off+len(x)) だけを使う）。
+///
+/// 列を幅 96／64／32／16／8 の塊に分け、塊ごとに `acc` をレジスタに載せたまま k を回す（残りは 1 列ずつ）。
+/// **各列の演算は今までと同じ**: 0 の行は飛ばし、`acc[j] += x[k] * w[k][j]` を k の昇順に行う
+/// （列をまたいで足すことはない・積和の融合もしない）＝結果はビット一致。
+#[inline(always)]
+fn acc_rows(acc: &mut [f32], x: &[f32], w: &Mat, off: usize) {
+    let cols = w.cols;
+    debug_assert_eq!(acc.len(), cols);
+    let mut j0 = 0;
+    while cols - j0 >= 96 {
+        acc_block::<96>(acc, x, w, off, j0);
+        j0 += 96;
+    }
+    while cols - j0 >= 64 {
+        acc_block::<64>(acc, x, w, off, j0);
+        j0 += 64;
+    }
+    if cols - j0 >= 32 {
+        acc_block::<32>(acc, x, w, off, j0);
+        j0 += 32;
+    }
+    if cols - j0 >= 16 {
+        acc_block::<16>(acc, x, w, off, j0);
+        j0 += 16;
+    }
+    if cols - j0 >= 8 {
+        acc_block::<8>(acc, x, w, off, j0);
+        j0 += 8;
+    }
+    if j0 < cols {
+        for (k, xv) in x.iter().enumerate() {
+            if *xv == 0.0 {
+                continue; // 0 の行は加算順に影響しない（値も変わらない）
+            }
+            let row = &w.data[(k + off) * cols + j0..(k + off + 1) * cols];
+            for (yj, wj) in acc[j0..].iter_mut().zip(row) {
+                *yj += xv * wj;
+            }
+        }
+    }
+}
+
+/// [`acc_rows`] の列 [j0, j0+N) の塊。
+#[inline(always)]
+fn acc_block<const N: usize>(acc: &mut [f32], x: &[f32], w: &Mat, off: usize, j0: usize) {
+    let cols = w.cols;
+    let mut a = [0.0f32; N];
+    a.copy_from_slice(&acc[j0..j0 + N]);
+    let data = &w.data[off * cols..(off + x.len()) * cols];
+    for (k, xv) in x.iter().enumerate() {
+        let xv = *xv;
+        if xv == 0.0 {
+            continue; // 0 の行は加算順に影響しない（値も変わらない）
+        }
+        let row: &[f32; N] = data[k * cols + j0..k * cols + j0 + N].try_into().unwrap();
+        for j in 0..N {
+            a[j] += xv * row[j];
+        }
+    }
+    acc[j0..j0 + N].copy_from_slice(&a);
+}
+
 /// `y[j] = sum_k x[k] * w[k][j] + b[j]`（`x @ W + b`）。
 #[inline(always)]
 fn affine(x: &[f32], w: &Mat, b: &[f32]) -> Vec<f32> {
     let mut y = b.to_vec();
-    for (k, xv) in x.iter().enumerate().take(w.rows) {
-        if *xv == 0.0 {
-            continue; // 0 の行は加算順に影響しない（値も変わらない）
+    if y.len() != w.cols {
+        // 形の合わないバイアス（正しいネットでは起きない）は今までの 1 列ずつの形のまま（短い方に合わせる）
+        for (k, xv) in x.iter().enumerate().take(w.rows) {
+            if *xv == 0.0 {
+                continue;
+            }
+            let row = &w.data[k * w.cols..(k + 1) * w.cols];
+            for (yj, wj) in y.iter_mut().zip(row) {
+                *yj += xv * wj;
+            }
         }
-        let row = &w.data[k * w.cols..(k + 1) * w.cols];
-        for (yj, wj) in y.iter_mut().zip(row) {
-            *yj += xv * wj;
-        }
+        return y;
     }
+    acc_rows(&mut y, &x[..x.len().min(w.rows)], w, 0);
     y
 }
 
@@ -65,15 +135,7 @@ fn affine(x: &[f32], w: &Mat, b: &[f32]) -> Vec<f32> {
 #[inline(always)]
 fn matvec_rows(x: &[f32], w: &Mat, off: usize) -> Vec<f32> {
     let mut y = vec![0.0f32; w.cols];
-    for (k, xv) in x.iter().enumerate() {
-        if *xv == 0.0 {
-            continue;
-        }
-        let row = &w.data[(k + off) * w.cols..(k + off + 1) * w.cols];
-        for (yj, wj) in y.iter_mut().zip(row) {
-            *yj += xv * wj;
-        }
-    }
+    acc_rows(&mut y, x, w, off);
     y
 }
 
@@ -107,12 +169,19 @@ impl NRelWeights {
     /// （素性が全部 PAD＝P は一様）。列の pad と違って**重み 0 で無効化できない**変更なので、
     /// 版で分岐しないと「v13 のネットを v14 で読むと手が変わる」ことになる。
     pub fn cand_target(&self) -> bool {
-        self.enc_version >= crate::encode::ENC_VERSION
+        // v14 から（v15 は形も候補行も v14 と同じ＝境目は v14 のまま）。
+        self.enc_version >= crate::encode::ENC_VERSION_V14
     }
 
     /// `NRelNet.mask_sc`（scalars の遮断・`opp_pool`／`onplay`）。
     pub fn mask_sc(&self, sc: &[f32]) -> Vec<f32> {
         let mut out = sc.to_vec();
+        self.mask_sc_inplace(&mut out);
+        out
+    }
+
+    /// [`mask_sc`](Self::mask_sc) をその場で行う。
+    pub fn mask_sc_inplace(&self, out: &mut [f32]) {
         if self.ablated("opp_pool") {
             for c in OPP_POOL_COLS {
                 out[c] = 0.0;
@@ -123,7 +192,6 @@ impl NRelWeights {
                 out[c] = 0.0;
             }
         }
-        out
     }
 
     /// この重みが要求する符号化の指定（`NRelValueAdapter.encode_state` と同じ既定）。
@@ -131,6 +199,7 @@ impl NRelWeights {
         EncodeOptions {
             skip_relations: self.ablated("rel"),
             skip_onplay: self.ablated("onplay"),
+            deck_v14: self.deck_v14,
         }
     }
 }
@@ -200,16 +269,10 @@ fn check_encoding(enc: &Encoding) -> Result<(), EngineError> {
     Ok(())
 }
 
-/// `NRelNet.tokens_forward`（B=1・`_tokens_forward_1` と同値）。
-pub fn tokens_forward(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
-    tokens_forward_impl(w, tab, enc)
-}
-
-#[inline(always)]
-fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
+/// [`tokens_forward_impl`] の頭の検査（符号化の形）。
+fn tokens_check(w: &NRelWeights, enc: &Encoding) -> Result<(), EngineError> {
     check_encoding(enc)?;
-    let no_rel = w.ablated("rel");
-    if !no_rel {
+    if !w.ablated("rel") {
         if enc.rel_om.len() != N_OWN * N_OPP * R_DIM {
             return Err(bad(format!("net: rel_om が {} 要素（{} が要る）", enc.rel_om.len(), N_OWN * N_OPP * R_DIM)));
         }
@@ -217,77 +280,134 @@ fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<T
             return Err(bad(format!("net: rel_oo が {} 要素（{} が要る）", enc.rel_oo.len(), N_OWN * N_OWN * R_DIM)));
         }
     }
+    Ok(())
+}
+
+/// `NRelNet.tokens_forward`（B=1・`_tokens_forward_1` と同値）。
+pub fn tokens_forward(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
+    tokens_forward_impl(w, tab, enc)
+}
+
+#[inline(always)]
+fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
+    tokens_check(w, enc)?;
+    let no_rel = w.ablated("rel");
     let ntab = tab.len() / D_CARD_FEAT;
     let mut present = vec![0.0f32; N_TOK];
     let mut h = vec![0.0f32; N_TOK * D_H];
 
-    // 居る枠（ci > 0）だけを集める＝`_tokens_forward_1` の idx
-    let mut own: Vec<usize> = Vec::new(); // 22 枠 index
-    let mut opp: Vec<usize> = Vec::new();
-    let mut own_pos: Vec<usize> = Vec::new(); // 16 枠内の位置（rel の添字）
-    let mut opp_pos: Vec<usize> = Vec::new();
+    // 居る枠（ci > 0）だけを集める＝`_tokens_forward_1` の idx（作業場は固定長の配列＝割り当てない）
+    let mut own = [0usize; N_OWN]; // 22 枠 index
+    let mut opp = [0usize; N_OPP];
+    let mut own_pos = [0usize; N_OWN]; // 16 枠内の位置（rel の添字）
+    let mut opp_pos = [0usize; N_OPP];
+    let (mut no, mut np) = (0usize, 0usize);
     for (i, ci) in enc.card_idx.iter().enumerate() {
         if *ci == 0 {
             continue;
         }
         present[i] = 1.0;
         if let Some(p) = OWN_SLOTS.iter().position(|&s| s == i) {
-            own.push(i);
-            own_pos.push(p);
+            own[no] = i;
+            own_pos[no] = p;
+            no += 1;
         } else if let Some(p) = OPP_SLOTS.iter().position(|&s| s == i) {
-            opp.push(i);
-            opp_pos.push(p);
+            opp[np] = i;
+            opp_pos[np] = p;
+            np += 1;
         }
     }
-    if own.is_empty() && opp.is_empty() {
+    if no == 0 && np == 0 {
         return Ok(Tokens { h, present });
     }
+    let (own, opp) = (&own[..no], &opp[..np]);
 
     // t_i = relu(x_i Wt + bt)、x_i = [構造64, S20, ゾーン5]。自分の枠は対の頭の前半（r の自・c の両側）、
     // 相手の枠は r の相手側まで同じ枠で作る（[`tok_feat`]＝decide の中ならキャッシュ・値は同じ）。
-    let own_f: Vec<std::rc::Rc<TokFeat>> =
-        own.iter().map(|&i| tok_feat(w, tab, enc, i, true, ntab)).collect::<Result<_, _>>()?;
-    let opp_f: Vec<std::rc::Rc<TokFeat>> =
-        opp.iter().map(|&i| tok_feat(w, tab, enc, i, false, ntab)).collect::<Result<_, _>>()?;
-    let to: Vec<&[f32]> = own_f.iter().map(|f| f.t.as_slice()).collect();
-    let tp: Vec<&[f32]> = opp_f.iter().map(|f| f.t.as_slice()).collect();
-    let (no, np) = (to.len(), tp.len());
+    let mut own_f: [Option<Rc<TokFeat>>; N_OWN] = Default::default();
+    let mut opp_f: [Option<Rc<TokFeat>>; N_OPP] = Default::default();
+    for (f, &i) in own_f.iter_mut().zip(own) {
+        *f = Some(tok_feat(w, tab, enc, i, true, ntab)?);
+    }
+    for (f, &i) in opp_f.iter_mut().zip(opp) {
+        *f = Some(tok_feat(w, tab, enc, i, false, ntab)?);
+    }
+    let own_f: &[Option<Rc<TokFeat>>] = &own_f[..no];
+    let opp_f: &[Option<Rc<TokFeat>>] = &opp_f[..np];
+    fn feat(f: &Option<Rc<TokFeat>>) -> &TokFeat {
+        f.as_deref().expect("集めた枠")
+    }
 
-    // 自×相手 r_ij・自×自 c_ik（前半／後半の行区間に分けて 1 度ずつ掛ける）
-    let a_r: Vec<&[f32]> = own_f.iter().map(|f| f.r.as_slice()).collect();
-    let b_r: Vec<&[f32]> = opp_f.iter().map(|f| f.r.as_slice()).collect();
-    let a_c: Vec<&[f32]> = own_f.iter().map(|f| f.c_a.as_slice()).collect();
-    let b_c: Vec<&[f32]> = own_f.iter().map(|f| f.c_b.as_slice()).collect();
+    // 自×相手 r_ij・自×自 c_ik（前半／後半の行区間に分けて 1 度ずつ掛ける）。
+    // 次元 d ごとの演算は 1 要素ずつ書いたときと同じ式・同じ順（d をまたいで足すことはない）＝ビット一致。
+    // d を最内に置いて分岐を外へ出しただけ（広いレジスタで d を同時に回せる）。
+    let fix_r = |v: &[f32]| -> [f32; D_R] { v[..D_R].try_into().unwrap() };
+    let fix_c = |v: &[f32]| -> [f32; D_C] { v[..D_C].try_into().unwrap() };
+    let mut a_r = [[0.0f32; D_R]; N_OWN];
+    let mut a_c = [[0.0f32; D_C]; N_OWN];
+    let mut b_c = [[0.0f32; D_C]; N_OWN];
+    let mut b_r = [[0.0f32; D_R]; N_OPP];
+    for (i, f) in own_f.iter().enumerate() {
+        let f = feat(f);
+        a_r[i] = fix_r(&f.r);
+        a_c[i] = fix_c(&f.c_a);
+        b_c[i] = fix_c(&f.c_b);
+    }
+    for (j, f) in opp_f.iter().enumerate() {
+        b_r[j] = fix_r(&feat(f).r);
+    }
+    let br: [f32; D_R] = fix_r(&w.br);
+    let bc: [f32; D_C] = fix_c(&w.bc);
 
-    let mut mx_j = vec![[0.0f32; D_R]; no];
-    let mut mean_j = vec![[0.0f32; D_R]; no];
-    let mut mx_i = vec![[0.0f32; D_R]; np];
-    let mut mean_i = vec![[0.0f32; D_R]; np];
+    let mut mx_j = [[0.0f32; D_R]; N_OWN];
+    let mut mean_j = [[0.0f32; D_R]; N_OWN];
+    let mut mx_i = [[0.0f32; D_R]; N_OPP];
+    let mut mean_i = [[0.0f32; D_R]; N_OPP];
     if no > 0 && np > 0 {
-        let mut sum_i = vec![[0.0f32; D_R]; np];
+        let mut sum_i = [[0.0f32; D_R]; N_OPP];
         for i in 0..no {
             let mut sum_j = [0.0f32; D_R];
             for j in 0..np {
                 let mut r = [0.0f32; D_R];
-                for d in 0..D_R {
-                    let mut v = a_r[i][d] + b_r[j][d];
-                    if !no_rel {
-                        let off = (own_pos[i] * N_OPP + opp_pos[j]) * R_DIM;
+                if no_rel {
+                    for d in 0..D_R {
+                        let mut v = a_r[i][d] + b_r[j][d];
+                        v += br[d];
+                        r[d] = if v < 0.0 { 0.0 } else { v };
+                    }
+                } else {
+                    let off = (own_pos[i] * N_OPP + opp_pos[j]) * R_DIM;
+                    let rel = &enc.rel_om[off..off + R_DIM];
+                    for d in 0..D_R {
+                        let mut v = a_r[i][d] + b_r[j][d];
                         let mut s = 0.0f32;
-                        for (q, rv) in enc.rel_om[off..off + R_DIM].iter().enumerate() {
+                        for (q, rv) in rel.iter().enumerate() {
                             s += rv * w.wr.row(2 * D_T + q)[d];
                         }
                         v += s;
+                        v += br[d];
+                        r[d] = if v < 0.0 { 0.0 } else { v };
                     }
-                    v += w.br[d];
-                    r[d] = if v < 0.0 { 0.0 } else { v };
+                }
+                let si = &mut sum_i[j];
+                for d in 0..D_R {
                     sum_j[d] += r[d];
-                    sum_i[j][d] += r[d];
-                    if j == 0 || r[d] > mx_j[i][d] {
-                        mx_j[i][d] = r[d];
+                    si[d] += r[d];
+                }
+                let m = &mut mx_j[i];
+                if j == 0 {
+                    *m = r;
+                } else {
+                    for d in 0..D_R {
+                        m[d] = if r[d] > m[d] { r[d] } else { m[d] };
                     }
-                    if i == 0 || r[d] > mx_i[j][d] {
-                        mx_i[j][d] = r[d];
+                }
+                let m = &mut mx_i[j];
+                if i == 0 {
+                    *m = r;
+                } else {
+                    for d in 0..D_R {
+                        m[d] = if r[d] > m[d] { r[d] } else { m[d] };
                     }
                 }
             }
@@ -301,7 +421,7 @@ fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<T
             }
         }
     }
-    let mut mx_k = vec![[0.0f32; D_C]; no];
+    let mut mx_k = [[0.0f32; D_C]; N_OWN];
     if no > 1 {
         for i in 0..no {
             let mut first = true;
@@ -309,20 +429,33 @@ fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<T
                 if k == i {
                     continue; // 対角は −1e9（`c[arange, arange] = -1e9`）
                 }
-                for d in 0..D_C {
-                    let mut v = a_c[i][d] + b_c[k][d];
-                    if !no_rel {
-                        let off = (own_pos[i] * N_OWN + own_pos[k]) * R_DIM;
+                let mut c = [0.0f32; D_C];
+                if no_rel {
+                    for d in 0..D_C {
+                        let mut v = a_c[i][d] + b_c[k][d];
+                        v += bc[d];
+                        c[d] = if v < 0.0 { 0.0 } else { v };
+                    }
+                } else {
+                    let off = (own_pos[i] * N_OWN + own_pos[k]) * R_DIM;
+                    let rel = &enc.rel_oo[off..off + R_DIM];
+                    for d in 0..D_C {
+                        let mut v = a_c[i][d] + b_c[k][d];
                         let mut s = 0.0f32;
-                        for (q, rv) in enc.rel_oo[off..off + R_DIM].iter().enumerate() {
+                        for (q, rv) in rel.iter().enumerate() {
                             s += rv * w.wc.row(2 * D_T + q)[d];
                         }
                         v += s;
+                        v += bc[d];
+                        c[d] = if v < 0.0 { 0.0 } else { v };
                     }
-                    v += w.bc[d];
-                    let c = if v < 0.0 { 0.0 } else { v };
-                    if first || c > mx_k[i][d] {
-                        mx_k[i][d] = c;
+                }
+                let m = &mut mx_k[i];
+                if first {
+                    *m = c;
+                } else {
+                    for d in 0..D_C {
+                        m[d] = if c[d] > m[d] { c[d] } else { m[d] };
                     }
                 }
                 first = false;
@@ -333,14 +466,14 @@ fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<T
     // h_i = [t_i, max_j r_ij, mean_j r_ij, max_k c_ik]／h_j = [t_j, max_i, mean_i, 0]
     for (i, &slot) in own.iter().enumerate() {
         let dst = &mut h[slot * D_H..(slot + 1) * D_H];
-        dst[..D_T].copy_from_slice(to[i]);
+        dst[..D_T].copy_from_slice(&feat(&own_f[i]).t);
         dst[D_T..D_T + D_R].copy_from_slice(&mx_j[i]);
         dst[D_T + D_R..D_T + 2 * D_R].copy_from_slice(&mean_j[i]);
         dst[D_T + 2 * D_R..].copy_from_slice(&mx_k[i]);
     }
     for (j, &slot) in opp.iter().enumerate() {
         let dst = &mut h[slot * D_H..(slot + 1) * D_H];
-        dst[..D_T].copy_from_slice(tp[j]);
+        dst[..D_T].copy_from_slice(&feat(&opp_f[j]).t);
         dst[D_T..D_T + D_R].copy_from_slice(&mx_i[j]);
         dst[D_T + D_R..D_T + 2 * D_R].copy_from_slice(&mean_i[j]);
     }
@@ -362,27 +495,85 @@ pub struct TokFeat {
 /// `TokFeat` はこの鍵だけの関数（`tok_feat_compute`）＝同じ鍵なら同じ値。
 type TokKey = (usize, usize, bool, u32, u8, [u32; S_DIM]);
 
+type TokMap = FxHashMap<TokKey, std::rc::Rc<TokFeat>>;
+
+
+/// 幹のキャッシュ: 鍵（[`trunk_key_into`] の語の列）のハッシュ → (鍵, 幹)。[`trunk_impl`] は鍵の語だけの関数
+/// ＝同じ鍵なら同じ幹（同じ演算を同じ順で行った結果そのもの）。一致は鍵の語の全一致で確かめる。
+type TrunkGen = FxHashMap<u64, Vec<(Box<[u32]>, Rc<Trunk>)>>;
+
+#[derive(Default)]
+struct TrunkCache {
+    cur: TrunkGen,
+    old: TrunkGen,
+    n_cur: usize,
+    /// 鍵を組む作業場（引くたびに使い回す）
+    scratch: Vec<u32>,
+}
+
+/// 幹のキャッシュの 1 世代の上限（件数）。新しい世代が満ちたら古い世代を捨てて入れ替える
+/// （最近の盤面を残す）。引ける値は変わらない＝結果は同じ・メモリだけの都合（1 件 ≈ 15 KB）。
+const TRUNK_GEN_MAX: usize = 4096;
+
 thread_local! {
-    static TOK_CACHE: std::cell::RefCell<Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>> =
-        const { std::cell::RefCell::new(None) };
+    static TOK_CACHE: std::cell::RefCell<Option<TokMap>> = const { std::cell::RefCell::new(None) };
+    static TRUNK_CACHE: std::cell::RefCell<Option<TrunkCache>> = const { std::cell::RefCell::new(None) };
 }
 
 /// decide（とその世界のスレッド）の入口で張る（`docs/reports/2026-10-17_game_speed.md` §2）。落とすと元へ戻す。
-/// 張っていないスレッド（decide の外の `net_eval` など）は毎回計算する。
+/// 張っていないスレッド（decide の外の `net_eval` など）は毎回計算する。トークンの前半と幹の両方を張る。
 pub struct TokCacheScope {
-    prev: Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>,
+    prev: Option<TokMap>,
+    prev_trunk: Option<TrunkCache>,
 }
 
 pub fn tok_cache_scope() -> TokCacheScope {
-    let prev = TOK_CACHE.with(|c| c.borrow_mut().replace(std::collections::HashMap::new()));
-    TokCacheScope { prev }
+    let prev = TOK_CACHE.with(|c| c.borrow_mut().replace(TokMap::default()));
+    let prev_trunk = TRUNK_CACHE.with(|c| c.borrow_mut().replace(TrunkCache::default()));
+    TokCacheScope { prev, prev_trunk }
 }
 
 impl Drop for TokCacheScope {
     fn drop(&mut self) {
         let prev = self.prev.take();
         TOK_CACHE.with(|c| *c.borrow_mut() = prev);
+        let prev_trunk = self.prev_trunk.take();
+        TRUNK_CACHE.with(|c| *c.borrow_mut() = prev_trunk);
     }
+}
+
+/// 幹が読む欄（`scalars`・`card_idx`・`tok`、関係を使うネットなら `rel_om`・`rel_oo`）をビット列にして
+/// `k` に書く（欄ごとに長さを先に置く＝欄の境目がずれた別の符号化と混ざらない）。先頭はネットとカード表の置き場。
+fn trunk_key_into(w: &NRelWeights, tab: &[f32], enc: &Encoding, k: &mut Vec<u32>) {
+    k.clear();
+    let wp = w as *const NRelWeights as usize as u64;
+    let tp = tab.as_ptr() as usize as u64;
+    k.extend_from_slice(&[wp as u32, (wp >> 32) as u32, tp as u32, (tp >> 32) as u32, tab.len() as u32]);
+    k.push(enc.card_idx.len() as u32);
+    k.extend_from_slice(&enc.card_idx);
+    let mut put = |v: &[f32]| {
+        k.push(v.len() as u32);
+        k.extend(v.iter().map(|x| x.to_bits()));
+    };
+    put(&enc.scalars);
+    put(&enc.tok);
+    if !w.ablated("rel") {
+        put(&enc.rel_om);
+        put(&enc.rel_oo);
+    }
+}
+
+fn hash_words(k: &[u32]) -> u64 {
+    use std::hash::Hasher;
+    let mut h = crate::fxhash::FxHasher::default();
+    let mut it = k.chunks_exact(2);
+    for c in &mut it {
+        h.write_u64(c[0] as u64 | ((c[1] as u64) << 32));
+    }
+    for x in it.remainder() {
+        h.write_u32(*x);
+    }
+    h.finish()
 }
 
 #[inline(always)]
@@ -461,23 +652,27 @@ pub fn body(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
 
 #[inline(always)]
 fn body_impl(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
-    let sc = w.mask_sc(sc);
     let n = tk.present.iter().sum::<f32>().max(1.0);
-    let mut z = vec![0.0f32; D_Z];
-    z[..D_SC].copy_from_slice(&sc);
-    for d in 0..D_H {
-        let mut s = 0.0f32;
-        let mut mx = -1e9f32;
-        for i in 0..N_TOK {
-            let v = tk.h[i * D_H + d];
-            s += v; // 居ない枠は 0（Python も h に 0 が入っている）
-            let m = if tk.present[i] > 0.0 { v } else { -1e9 };
-            if m > mx {
-                mx = m;
-            }
+    // z は固定長の作業場（割り当てない）。scalars の遮断は `mask_sc` と同じ列を 0 にする
+    let mut z = [0.0f32; D_Z];
+    z[..D_SC].copy_from_slice(sc);
+    w.mask_sc_inplace(&mut z[..D_SC]);
+    // 枠 i を外、次元 d を内に回す（d ごとの和と最大は今までどおり i の昇順＝ビット一致）
+    let mut s = [0.0f32; D_H];
+    let mut mx = [-1e9f32; D_H];
+    for i in 0..N_TOK {
+        let row: &[f32; D_H] = tk.h[i * D_H..(i + 1) * D_H].try_into().unwrap();
+        let pres = tk.present[i] > 0.0;
+        for d in 0..D_H {
+            let v = row[d];
+            s[d] += v; // 居ない枠は 0（Python も h に 0 が入っている）
+            let m = if pres { v } else { -1e9 };
+            mx[d] = if m > mx[d] { m } else { mx[d] };
         }
-        z[D_SC + d] = s / n;
-        z[D_SC + D_H + d] = if mx < -1e8 { 0.0 } else { mx };
+    }
+    for d in 0..D_H {
+        z[D_SC + d] = s[d] / n;
+        z[D_SC + D_H + d] = if mx[d] < -1e8 { 0.0 } else { mx[d] };
     }
     let mut r1 = affine(&z, &w.w1, &w.b1);
     relu_inplace(&mut r1);
@@ -492,9 +687,75 @@ fn body_impl(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
 pub struct Trunk {
     pub tk: Tokens,
     pub e: Vec<f32>,
+    /// 方策の頭の候補ごとの logit（鍵＝[`cand_key`]）。候補の logit は幹（`e`・`tk.h`）と、関係を使うネットなら
+    /// `rel_om`（幹のキャッシュの鍵に入っている＝同じ幹なら同じ値）と、候補の行だけの関数＝同じ鍵なら同じ値。
+    memo: std::cell::RefCell<FxHashMap<Box<[u32]>, f32>>,
 }
 
-pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+/// 候補 1 行の鍵（ネットの置き場・主体／対象の枠・素性と予算のビット列）を `k` に書く
+/// （作業場を使い回す＝memo を引くだけなら割り当てない）。
+///
+/// [`cand_rows`] が作った候補は行の材料の短い識別（[`Candidate::id`]）を鍵にする（同じ材料なら同じ行＝同じ logit）。
+/// 長さが違う（2+16 語と 4+139+3 語）ので素性そのものの鍵と取り違えることはない。
+fn cand_key_into(w: &NRelWeights, c: &Candidate, k: &mut Vec<u32>) {
+    let wp = w as *const NRelWeights as usize as u64;
+    k.clear();
+    if let Some(id) = &c.id {
+        k.extend_from_slice(&[wp as u32, (wp >> 32) as u32]);
+        k.extend_from_slice(id);
+        return;
+    }
+    k.extend_from_slice(&[wp as u32, (wp >> 32) as u32, c.si as u32, c.ti as u32]);
+    k.extend(c.feats.iter().map(|x| x.to_bits()));
+    k.extend(c.budget.iter().map(|x| x.to_bits()));
+}
+
+/// decide の中（[`tok_cache_scope`] を張ったスレッド）では、同じ符号化の幹を使い回す
+/// （探索は同じ盤面を何度も評価する: 戦闘箱の枝・静止探索の手番ごとの方策・葉の価値）。
+/// 張っていなければ毎回計算する（今までどおり）。
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Rc<Trunk>, EngineError> {
+    // 張っていれば鍵を組んで引く（作業場は借りたまま、計算の間は返しておく）。
+    let probe = TRUNK_CACHE.with(|c| {
+        let mut b = c.borrow_mut();
+        let cache = b.as_mut()?;
+        let mut k = std::mem::take(&mut cache.scratch);
+        trunk_key_into(w, tab, enc, &mut k);
+        let h = hash_words(&k);
+        let hit = [&cache.cur, &cache.old].into_iter().find_map(|m| {
+            m.get(&h)?.iter().find(|(key, _)| **key == *k).map(|(_, t)| t.clone())
+        });
+        Some((h, k, hit))
+    });
+    let Some((h, k, hit)) = probe else {
+        return trunk_compute(w, tab, enc).map(Rc::new);
+    };
+    if let Some(t) = hit {
+        TRUNK_CACHE.with(|c| {
+            if let Some(cache) = c.borrow_mut().as_mut() {
+                cache.scratch = k;
+            }
+        });
+        crate::prof::add(crate::prof::N_TRUNK_HIT, 1);
+        return Ok(t);
+    }
+    let out = trunk_compute(w, tab, enc).map(Rc::new);
+    TRUNK_CACHE.with(|c| {
+        if let Some(cache) = c.borrow_mut().as_mut() {
+            if let Ok(t) = &out {
+                if cache.n_cur >= TRUNK_GEN_MAX {
+                    cache.old = std::mem::take(&mut cache.cur);
+                    cache.n_cur = 0;
+                }
+                cache.cur.entry(h).or_default().push((k.as_slice().into(), t.clone()));
+                cache.n_cur += 1;
+            }
+            cache.scratch = k;
+        }
+    });
+    out
+}
+
+fn trunk_compute(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
     #[cfg(target_arch = "x86_64")]
     if avx2() {
         // SAFETY: AVX2 が使えることを実行時に確かめた（`avx2`）。
@@ -533,7 +794,7 @@ fn trunk_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, Eng
         let _prof = crate::prof::enter(crate::prof::Cat::FwdBody);
         body_impl(w, &enc.scalars, &tk)
     };
-    Ok(Trunk { tk, e })
+    Ok(Trunk { tk, e, memo: Default::default() })
 }
 
 /// 価値の頭（tanh 済み）。
@@ -601,39 +862,62 @@ fn priors_from_impl(
     let (tk, e) = (&t.tk, &t.e);
     let no_rel = w.ablated("rel");
     let mut logits = Vec::with_capacity(cands.len());
+    let mut key: Vec<u32> = Vec::with_capacity(4 + F_CAND + D_BUDGET);
     for c in cands {
         if c.feats.len() != F_CAND {
             return Err(bad(format!("net: 候補素性が {} 列（{F_CAND} が要る）", c.feats.len())));
         }
-        let mut u = Vec::with_capacity(super::D_PIN);
-        u.extend_from_slice(e);
+        crate::prof::add(crate::prof::N_CAND, 1);
+        cand_key_into(w, c, &mut key);
+        if let Some(l) = t.memo.borrow().get(key.as_slice()) {
+            crate::prof::add(crate::prof::N_CAND_MEMO_HIT, 1);
+            logits.push(*l);
+            continue;
+        }
+        // 候補入力 u = [e, h_si, h_ti, R(si,ti), 素性, 予算]（長さ D_PIN・固定長の作業場に組む）
+        let n_e = e.len();
+        if n_e + 2 * D_H + R_DIM + F_CAND + D_BUDGET != super::D_PIN {
+            return Err(bad(format!(
+                "net: 候補入力が {} 列（{} が要る）",
+                n_e + 2 * D_H + R_DIM + F_CAND + D_BUDGET,
+                super::D_PIN
+            )));
+        }
+        let mut u = [0.0f32; super::D_PIN];
+        u[..n_e].copy_from_slice(e);
         // 主体 h_si / 対象 h_ti（枠が無い＝−1 は 0 ベクトル）
-        for idx in [c.si, c.ti] {
+        for (q, idx) in [c.si, c.ti].into_iter().enumerate() {
             if idx >= 0 && (idx as usize) < N_TOK {
-                u.extend_from_slice(&tk.h[idx as usize * D_H..(idx as usize + 1) * D_H]);
-            } else {
-                u.resize(u.len() + D_H, 0.0);
+                u[n_e + q * D_H..n_e + (q + 1) * D_H]
+                    .copy_from_slice(&tk.h[idx as usize * D_H..(idx as usize + 1) * D_H]);
             }
         }
+        let mut o = n_e + 2 * D_H;
         // R(si, ti)＝si∈自・ti∈相手のときだけ rel_om（遮断時は 0）
-        let mut rr = vec![0.0f32; R_DIM];
         if !no_rel && c.si >= 0 && c.ti >= 0 {
             let oi = OWN_SLOTS.iter().position(|&s| s == c.si as usize);
             let oj = OPP_SLOTS.iter().position(|&s| s == c.ti as usize);
             if let (Some(oi), Some(oj)) = (oi, oj) {
                 let off = (oi * N_OPP + oj) * R_DIM;
-                rr.copy_from_slice(&enc.rel_om[off..off + R_DIM]);
+                u[o..o + R_DIM].copy_from_slice(&enc.rel_om[off..off + R_DIM]);
             }
         }
-        u.extend_from_slice(&rr);
-        u.extend_from_slice(&c.feats);
-        u.extend_from_slice(&c.budget);
-        if u.len() != super::D_PIN {
-            return Err(bad(format!("net: 候補入力が {} 列（{} が要る）", u.len(), super::D_PIN)));
-        }
+        o += R_DIM;
+        u[o..o + F_CAND].copy_from_slice(&c.feats);
+        o += F_CAND;
+        u[o..].copy_from_slice(&c.budget);
         let mut rp = affine(&u, &w.wp1, &w.bp1);
         relu_inplace(&mut rp);
-        logits.push(affine(&rp, &w.wp2, &w.bp2)[0]);
+        let l = if w.wp2.cols == 1 && w.bp2.len() == 1 {
+            // `affine(&rp, &w.wp2, &w.bp2)[0]` と同じ演算（1 列＝k の昇順に足す）を割り当てなしで
+            let mut y = [w.bp2[0]];
+            acc_rows(&mut y, &rp[..rp.len().min(w.wp2.rows)], &w.wp2, 0);
+            y[0]
+        } else {
+            affine(&rp, &w.wp2, &w.bp2)[0]
+        };
+        t.memo.borrow_mut().insert(key.as_slice().into(), l);
+        logits.push(l);
     }
     Ok(seg_softmax(&logits))
 }
@@ -662,6 +946,9 @@ pub fn seg_softmax(logits: &[f32]) -> Vec<f32> {
     }
     ex.iter().map(|v| (v / s) as f32).collect()
 }
+
+/// [`Candidate`] の短い識別の長さ（[`cand_rows`] が入れる）。
+pub const CAND_ID_LEN: usize = 16;
 
 /// `n_eff._cand_row` が要るカードごとの静的値（vocab index で引く）。
 ///
@@ -703,10 +990,8 @@ pub fn cand_rows(
     let mut out = Vec::with_capacity(refs.len());
     for r in refs {
         let mut feats = vec![0.0f32; F_CAND];
-        match ATYPES.iter().position(|a| *a == r.action_type) {
-            Some(i) => feats[i] = 1.0,
-            None => feats[NA - 1] = 1.0,
-        }
+        let atype_pos = ATYPES.iter().position(|a| *a == r.action_type).unwrap_or(NA - 1);
+        feats[atype_pos] = 1.0;
         let ci = r.card_id.map(|id| vocab.idx(id) as usize).unwrap_or(0);
         let ti = if r.has_target {
             r.target_card_id.map(|id| vocab.idx(id) as usize).unwrap_or(0)
@@ -747,18 +1032,27 @@ pub fn cand_rows(
             if don_next - ret >= max_play { 1.0 } else { 0.0 },
             ((cost + kk as f32) / 10.0).min(1.5),
         ];
-        out.push(Candidate { feats, si: r.si, ti: r.ti, budget });
+        // 行は (カード表・静的値の置き場, 型の位置, ci, 対象の ci, 対象の有無, k, si, ti, 予算) だけの関数
+        let tp = tab.as_ptr() as usize as u64;
+        let sp = stat as *const CardStatics as usize as u64;
+        let kb = kk.to_bits();
+        let id = [
+            tp as u32, (tp >> 32) as u32, tab.len() as u32, sp as u32, (sp >> 32) as u32,
+            atype_pos as u32, ci as u32, ti as u32, r.has_target as u32, kb as u32, (kb >> 32) as u32,
+            r.si as u32, r.ti as u32, budget[0].to_bits(), budget[1].to_bits(), budget[2].to_bits(),
+        ];
+        out.push(Candidate { feats, si: r.si, ti: r.ti, budget, id: Some(id) });
     }
     Ok(out)
 }
 
 /// 符号化の追加列（`R["extra"]`）。無ければ scalars の末尾 29 列（同じ値）。
-fn extra_of(enc: &Encoding) -> Result<Vec<f32>, EngineError> {
+fn extra_of(enc: &Encoding) -> Result<&[f32], EngineError> {
     if enc.extra.len() == EXTRA_DIM {
-        return Ok(enc.extra.clone());
+        return Ok(&enc.extra);
     }
     if enc.extra.is_empty() {
-        return Ok(enc.scalars[D_SC - EXTRA_DIM..].to_vec());
+        return Ok(&enc.scalars[D_SC - EXTRA_DIM..]);
     }
     Err(bad(format!("net: extra が {} 列（{EXTRA_DIM} か 0 が要る）", enc.extra.len())))
 }
@@ -1049,8 +1343,8 @@ mod tests {
         enc.card_idx[0] = 1;
         enc.card_idx[1] = 2;
         let cands = vec![
-            Candidate { feats: vec![0.0; F_CAND], si: 0, ti: 1, budget: [0.0; D_BUDGET] },
-            Candidate { feats: { let mut f = vec![0.0; F_CAND]; f[0] = 1.0; f }, si: -1, ti: -1, budget: [0.0; D_BUDGET] },
+            Candidate { feats: vec![0.0; F_CAND], si: 0, ti: 1, budget: [0.0; D_BUDGET], id: None },
+            Candidate { feats: { let mut f = vec![0.0; F_CAND]; f[0] = 1.0; f }, si: -1, ti: -1, budget: [0.0; D_BUDGET], id: None },
         ];
         let p = priors(&w, &tab, &enc, &cands).unwrap();
         assert_eq!(p.len(), 2);

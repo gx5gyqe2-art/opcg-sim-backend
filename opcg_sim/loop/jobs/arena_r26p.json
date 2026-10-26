@@ -1,0 +1,67 @@
+{
+ "kind": "arena",
+ "section": "§7.60",
+ "ledger_grep": "7.60 r26 の本番の設定",
+ "about": "r26 vs r24・両席とも出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）・random×real",
+ "job": "arena-r26p-w{KK}",
+ "branch": "claude/arena-r26p-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r26:n1_results/nrel_r26.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "out_dir": "arena_r26p",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "2",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "4031000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r26p_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r26.npz (claude/train-r26)",
+  "baseline": "nrel_r24.npz",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
+ "commit_message": "arena r26p shard {KK}"
+}

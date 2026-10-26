@@ -1,0 +1,144 @@
+[
+ {
+  "seed": 3013026,
+  "step": 144,
+  "live": "{\"kind\": \"game\", \"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"payload\": {\"selected_uuids\": ",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "legacy": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "no_tree": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree_only": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree4x": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  }
+ },
+ {
+  "seed": 3013119,
+  "step": 169,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "PASS": 3,
+   "SELECT_COUNTER:13617cd9": 3,
+   "SELECT_COUNTER:f5fedb66": 2
+  },
+  "legacy": {
+   "PASS": 7,
+   "SELECT_COUNTER:f5fedb66": 1
+  },
+  "no_tree": {
+   "PASS": 7,
+   "SELECT_COUNTER:f5fedb66": 1
+  },
+  "tree_only": {
+   "PASS": 3,
+   "SELECT_COUNTER:13617cd9": 4,
+   "SELECT_COUNTER:f5fedb66": 1
+  },
+  "tree4x": {
+   "PASS": 5,
+   "SELECT_COUNTER:13617cd9": 3
+  }
+ },
+ {
+  "seed": 3013147,
+  "step": 122,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "PASS": 7,
+   "SELECT_COUNTER:b5ca4746": 1
+  },
+  "legacy": {
+   "PASS": 8
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 6,
+   "SELECT_COUNTER:653d1727": 1,
+   "SELECT_COUNTER:b5ca4746": 1
+  },
+  "tree4x": {
+   "PASS": 8
+  }
+ },
+ {
+  "seed": 3013194,
+  "step": 89,
+  "live": "{\"kind\": \"game\", \"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"payload\": {\"selected_uuids\": ",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "legacy": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "no_tree": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree_only": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree4x": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  }
+ },
+ {
+  "seed": 3013217,
+  "step": 157,
+  "live": "{\"kind\": \"game\", \"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"payload\": {\"selected_uuids\": ",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "legacy": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "no_tree": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree_only": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  },
+  "tree4x": {
+   "RESOLVE_EFFECT_SELECTION": 8
+  }
+ },
+ {
+  "seed": 3013280,
+  "step": 148,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": null,
+  "life": null,
+  "fixed": {
+   "PASS": 8
+  },
+  "legacy": {
+   "PASS": 8
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 8
+  },
+  "tree4x": {
+   "PASS": 8
+  }
+ }
+]

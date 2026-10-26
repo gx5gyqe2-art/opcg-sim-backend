@@ -1,0 +1,52 @@
+{
+ "kind": "arena",
+ "section": "§7.42",
+ "ledger_grep": "7.42 WP `worker-jobs`",
+ "about": "試し: アリーナ 2 ペア（1 ペアずつ 2 区切り・32 回）",
+ "job": "trial-arena-w{KK}",
+ "branch": "claude/worker-job-trial-arena-w{KK}",
+ "base": {
+  "branch": "claude/worker-jobs"
+ },
+ "shards": 1,
+ "hours": 0.3,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/worker-job-trial-train:n1_results/nrel_trial.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "out_dir": "arena_trial",
+ "pairs": 2,
+ "chunk_pairs": 1,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "32",
+  "--cand-sims",
+  "32"
+ ],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "9950000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "trial_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_trial.npz",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 32",
+  "pairs": 2
+ },
+ "commit_message": "trial arena shard {KK}"
+}

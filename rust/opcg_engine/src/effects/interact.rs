@@ -590,6 +590,9 @@ pub fn resolve_interaction(
         InteractionKind::ConfirmTrigger => {
             return super::triggers::resolve_confirm_trigger(s, masters, &cont, payload)
         }
+        InteractionKind::OrderTriggers => {
+            return super::triggers::resolve_order_triggers(s, masters, &cont, payload)
+        }
         _ => {}
     }
 
@@ -849,7 +852,9 @@ pub fn resolve_interaction(
             resolver.process_stack(s, masters, actor, Some(source_card))?;
             history = resolver.action_history;
         }
-        InteractionKind::FieldOverflowTrash | InteractionKind::ConfirmTrigger => unreachable!(),
+        InteractionKind::FieldOverflowTrash
+        | InteractionKind::ConfirmTrigger
+        | InteractionKind::OrderTriggers => unreachable!(),
     }
 
     // Python `resolve_interaction` の共通末尾: 再開経路で実行したアクションも `action_events` へ
@@ -878,10 +883,10 @@ pub fn after_resolve(s: &mut Session, masters: &MasterTable) -> Result<(), Engin
         s.edit().set_phase(crate::model::Phase::Mulligan);
         s.edit().clear_mulligan_done();
     }
-    // ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発を消化する。
-    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
-        super::triggers::advance_pending_triggers(s, masters)?;
-    }
+    // 中断していた効果の残り（退避した継続）を先に解決し切り、それからライフ公開【トリガー】/
+    // ON_LIFE_DECREASE・効果による登場の【登場時】等のペンディング誘発を消化する
+    // （親の効果 → 子の誘発の順・WP `rs-trigger-order`。2026-10-22 までは誘発が先だった）。
+    super::triggers::settle_pending(s, masters)?;
     // バトルトリガー解決中の中断から復帰した場合、残りの解決＋フェイズ遷移を再開する。
     if s.state().active_interaction().is_none()
         && s.state().active_battle.is_some()
@@ -945,11 +950,13 @@ fn resolve_field_overflow(
     if s.state().player(owner).field.len() > crate::rules::FIELD_LIMIT {
         crate::rules::actions::suspend_for_field_overflow(s, owner);
     }
-    // 超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
-    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
-        super::triggers::advance_pending_triggers(s, masters)?;
-    }
-    Ok(())
+    // 押し出しで中断した効果の残り（例: 「その後、このターン中、キャラカードを登場できない」）を
+    // 先に解決し切り、それから超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
+    // 他の中断と同じ共通末尾を通す（WP `rs-overflow-trigger`・§7.44 の (A)）: 【アタック時】の効果の
+    // 登場で押し出しになったとき、戦闘の誘発の再開とブロック／カウンターの段への遷移はここでしか
+    // 起きない（2026-10-24 までは `settle_pending` だけで、フェイズが MAIN に戻り攻撃が残っていた）。
+    // ターン開始の誘発の中の押し出しの後のリフレッシュ以降の再開も同じ。
+    after_resolve(s, masters)
 }
 
 /// 能力表の global index → そのカード内の index（`ability_used_this_turn` のキー）。
@@ -1041,23 +1048,29 @@ pub fn selection_entries(
     uuids: &[String],
 ) -> Vec<SelectionEntry> {
     let opp = pid.other();
-    let mut index: Vec<(String, &'static str, &'static str, Option<CardIdx>)> = Vec::new();
-    let seen = |index: &Vec<(String, &'static str, &'static str, Option<CardIdx>)>,
-                    u: &str| index.iter().any(|(k, _, _, _)| k == u);
+    // 走査は参照のまま（ゾーンの並びも uuid も複製しない）。並び・先勝ちは今までと同じ
+    // （「候補に入っているか」「もう載せたか」は集合で引く＝線形の比較と同じ答え）。
+    let mut index: crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)> =
+        crate::fxhash::FxHashMap::default();
+    let want: std::collections::HashSet<&str, crate::fxhash::FxBuild> =
+        uuids.iter().map(String::as_str).collect();
+    let wanted = |u: &str| want.contains(u);
+    let seen = |index: &crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)>,
+                u: &str| index.contains_key(u);
     for (owner, side) in [(pid, "own"), (opp, "opp")] {
         for (zname, zone) in SELECTION_ZONES {
-            let cards: Vec<CardIdx> = match zone {
-                CardZone::Hand => state.player(owner).hand.clone(),
-                CardZone::Deck => state.player(owner).deck.clone(),
-                CardZone::Trash => state.player(owner).trash.clone(),
-                CardZone::Field => state.player(owner).field.clone(),
-                CardZone::Life => state.player(owner).life.clone(),
-                CardZone::Temp => Vec::new(),
+            let cards: &[CardIdx] = match zone {
+                CardZone::Hand => &state.player(owner).hand,
+                CardZone::Deck => &state.player(owner).deck,
+                CardZone::Trash => &state.player(owner).trash,
+                CardZone::Field => &state.player(owner).field,
+                CardZone::Life => &state.player(owner).life,
+                CardZone::Temp => &[],
             };
-            for c in cards {
-                let u = state.card(c).uuid.clone();
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, side, zname, Some(c)));
+            for &c in cards {
+                let u = state.card(c).uuid.as_str();
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1066,9 +1079,9 @@ pub fn selection_entries(
             ("stage", state.player(owner).stage),
         ] {
             if let Some(c) = slot {
-                let u = state.card(c).uuid.clone();
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, side, zname, Some(c)));
+                let u = state.card(c).uuid.as_str();
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1080,19 +1093,19 @@ pub fn selection_entries(
         if it.player == pid {
             for t in &it.candidates {
                 let (u, card) = match *t {
-                    TargetRef::Card(c) => (state.card(c).uuid.clone(), Some(c)),
-                    TargetRef::Don(d) => (state.don(d).uuid.clone(), None),
+                    TargetRef::Card(c) => (state.card(c).uuid.as_str(), Some(c)),
+                    TargetRef::Don(d) => (state.don(d).uuid.as_str(), None),
                 };
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, "own", "temp", card));
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, ("own", "temp", card));
                 }
             }
         }
     }
     uuids
         .iter()
-        .map(|u| match index.iter().find(|(k, _, _, _)| k == u) {
-            Some((_, side, zone, card)) => SelectionEntry {
+        .map(|u| match index.get(u.as_str()) {
+            Some((side, zone, card)) => SelectionEntry {
                 uuid: u.clone(),
                 side: Some(side),
                 zone: Some(zone),
@@ -1233,7 +1246,8 @@ pub fn choose_selection(
     max_n: i32,
     intent: SelectionIntent,
 ) -> Option<Vec<String>> {
-    if entries.is_empty() || max_n < 1 {
+    // 解決順の既定は積んだ順＝先頭（呼び手の `uuids[..take]`）。
+    if entries.is_empty() || max_n < 1 || intent == SelectionIntent::Order {
         return None;
     }
     if entries.iter().any(|e| e.side.is_none() || e.zone.is_none()) {
@@ -1271,7 +1285,9 @@ pub fn choose_selection(
     if all_own && zones_in(&["hand", "field", "leader", "stage"]) {
         return Some(match intent {
             SelectionIntent::Benefit => by_value_desc(n_max),
-            SelectionIntent::Cost | SelectionIntent::Unknown => by_value_asc(n_min),
+            SelectionIntent::Cost | SelectionIntent::Unknown | SelectionIntent::Order => {
+                by_value_asc(n_min)
+            }
         });
     }
     if all_opp {
@@ -1316,9 +1332,47 @@ pub fn default_interaction_payload(
     let intent = match pending.get("intent").and_then(Value::as_str) {
         Some("BENEFIT") => SelectionIntent::Benefit,
         Some("COST") => SelectionIntent::Cost,
+        Some("ORDER") => SelectionIntent::Order,
         _ => SelectionIntent::Unknown,
     };
+    default_payload_from(state, masters, uuids, min_n, max_n, pid, intent)
+}
 
+/// [`default_interaction_payload`] の、要求の dict を組まずに**進行中の中断**から読む版
+/// （探索のドレイン用・WP `rs-speed-d`）。
+///
+/// 要求の対話分岐（`rules::pending::get_pending_request`）が出す値をそのまま使う:
+/// `selectable_uuids`＝`selectable`（無ければ `candidates`）の uuid・`constraints`＝
+/// `{"min","max"}`（無ければ `null`）・`player_id`＝`player`・`intent`＝`intent.name()`。
+pub fn default_interaction_payload_of(
+    state: &GameState,
+    masters: &MasterTable,
+    it: &crate::model::Interaction,
+) -> Value {
+    let uuids: Vec<String> = it
+        .selectable
+        .as_ref()
+        .unwrap_or(&it.candidates)
+        .iter()
+        .map(|t| state.target_uuid(*t).to_owned())
+        .collect();
+    let (min_n, max_n) = match it.constraints {
+        Some((mn, mx)) => (mn, mx),
+        None => (0, uuids.len() as i32),
+    };
+    default_payload_from(state, masters, uuids, min_n, max_n, Some(it.player), it.intent)
+}
+
+/// 既定解決の本体（要求から読んだ値を受ける）。
+fn default_payload_from(
+    state: &GameState,
+    masters: &MasterTable,
+    uuids: Vec<String>,
+    min_n: i32,
+    max_n: i32,
+    pid: Option<Seat>,
+    intent: SelectionIntent,
+) -> Value {
     let mut selected: Option<Vec<String>> = None;
     if !uuids.is_empty() && max_n >= 1 {
         if let Some(pid) = pid {

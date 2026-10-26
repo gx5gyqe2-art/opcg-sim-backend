@@ -16,7 +16,6 @@ use crate::encode::{
 };
 use crate::state::EngineError;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 pub const D_STRUCT: usize = 64;
@@ -64,8 +63,8 @@ pub struct NRelWeights {
     pub wp1: Mat, pub bp1: Vec<f32>,
     pub wp2: Mat, pub bp2: Vec<f32>,
     pub hidden: usize,
-    /// meta の `ablate`（"rel"／"opp_pool"／"onplay"）。
-    pub ablate: HashSet<String>,
+    /// meta の `ablate`（"rel"／"opp_pool"／"onplay"）。高々数件＝順序木（引くのは文字列の比較だけ・ハッシュを回さない）。
+    pub ablate: std::collections::BTreeSet<String>,
     /// meta（JSON 文字列そのまま）。
     pub meta_json: String,
     /// `vocab_ids`（index 1.. の card_id）。
@@ -73,6 +72,9 @@ pub struct NRelWeights {
     /// npz の meta `enc_version`（無ければ 13）。**読んだままの版**＝pad した後も 13 のまま。
     /// 候補行の対象（§20.9 の A）はこの版で分岐する＝v13 のネットは 1 bit も変わらない。
     pub enc_version: u32,
+    /// **測定専用**（WP `enc-v15`）: meta の `"enc_deck": "v14"`＝自分の残り山札の 16 列を v14 の作りで
+    /// 符号化して読む（v15 と v14 の符号化を同じ wheel で対戦させるため。[`crate::encode::EncodeOptions::deck_v14`]）。
+    pub deck_v14: bool,
 }
 
 /// 方策の候補 1 件（Python `_cand_rows`＋`nrel_priors` の budget）。
@@ -86,6 +88,9 @@ pub struct Candidate {
     pub ti: i32,
     /// 予算 3 列
     pub budget: [f32; 3],
+    /// 行を作った材料の短い識別（[`nrel::cand_rows`] だけが入れる・`None`＝素性と予算そのものを鍵にする）。
+    /// 方策の頭の memo の鍵に使う＝**入れた後に `feats`／`budget` を書き換えない**こと（材料が同じなら行も同じ）。
+    pub(crate) id: Option<[u32; nrel::CAND_ID_LEN]>,
 }
 
 /// npz（zip の stored/deflate＋npy）を読む（実装は `npz.rs`・依存は `miniz_oxide` のみ）。
@@ -111,9 +116,11 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
         None => String::new(),
     };
     // meta の `ablate`（JSON 文字列。壊れていても落とさない＝Python の `except` と同じ）
-    let mut ablate = HashSet::new();
+    let mut ablate = std::collections::BTreeSet::new();
     let mut enc_version = ENC_VERSION_V13;
+    let mut deck_v14 = false;
     if let Ok(Value::Object(m)) = serde_json::from_str::<Value>(&meta_json) {
+        deck_v14 = m.get("enc_deck").and_then(Value::as_str) == Some("v14");
         if let Some(Value::Array(a)) = m.get("ablate") {
             for v in a {
                 if let Some(s) = v.as_str() {
@@ -149,6 +156,7 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
         meta_json,
         vocab_ids,
         enc_version,
+        deck_v14,
     })
 }
 
@@ -188,7 +196,7 @@ pub fn value(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<f32, Engine
 pub use nrel::Trunk;
 
 /// トークンと本体（`value`／`priors` の前半・`nrel::trunk`）。
-pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<std::rc::Rc<Trunk>, EngineError> {
     nrel::trunk(w, tab, enc)
 }
 

@@ -35,7 +35,7 @@
 //! （`_nfc` 正規化済みの前提＝効果 JSON の `raw_text` は Python が NFC で書き出す）。
 
 use crate::journal::{Session, TriggerQueue};
-use crate::model::{CardIdx, CardType, MasterTable, PendingTrigger, Seat, Zone};
+use crate::model::{CardIdx, CardType, MasterTable, PendingTrigger, Seat, TriggerBundle, Zone};
 use crate::ops;
 use crate::state::EngineError;
 
@@ -83,12 +83,212 @@ pub fn enqueue_trigger_with_subject(
         optional,
         confirmed: false,
         subject,
+        bundle: TriggerBundle::Fresh,
     });
     s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
 }
 
 /// Python `_advance_pending_triggers`（積んだ誘発を順に消化する）。
+///
+/// **効果の解決中は消化しない**（WP `rs-trigger-order`）: 効果の実行スタックを処理している間
+/// （[`Session::resolving_depth`] > 0）と、対話で中断した効果の残りが退避されている間
+/// （`deferred_continuations` が空でない）は、誘発は待ち行列に留まり、今解決中の効果を解決し
+/// 切ってから解決する（総合ルール 8-6-1「効果の処理中に自動効果の発動条件が満たされた場合、
+/// その自動効果は処理中の効果の処理が終わった後に発動する」の趣旨）。例外はライフの【トリガー】
+/// （ダメージの処理の一部としてその場で発動する＝効果によるダメージでも親の残りより先）。
 pub fn advance_pending_triggers(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
+    let prev = s.set_draining(true);
+    let r = advance_pending_triggers_inner(s, masters);
+    s.set_draining(prev);
+    r
+}
+
+/// ライフの【トリガー】（効果の解決中でもその場で発動する誘発）か。
+fn is_life_trigger(masters: &MasterTable, s: &Session, item: &PendingTrigger) -> bool {
+    super::ability_of(masters, s.state(), item.card, item.ability as usize)
+        .map(|(_, ab)| ab.trigger == TriggerType::Trigger)
+        .unwrap_or(false)
+}
+
+/// 効果の解決中（または中断した効果の残りが退避中）＝ライフの【トリガー】以外は待たせる。
+fn holding_triggers(s: &Session) -> bool {
+    s.resolving_depth() > 0 || !s.state().deferred_continuations.is_empty()
+}
+
+/// 効果の中で起きた誘発（自分の【KO時】・【レスト時】・効果による登場の【登場時】）を、その場で解決せず
+/// 待ち行列へ積むべきか＝効果の解決中（[`holding_triggers`]）か、対話で中断している間。
+/// 効果の外（戦闘の結果の KO・行動の境目）では偽＝従来どおりその場で解決する
+/// （WP `rs-trigger-order`／`rs-trigger-order-2`）。
+pub fn must_queue(s: &Session) -> bool {
+    s.state().active_interaction().is_some() || holding_triggers(s)
+}
+
+// ---------------------------------------------------------------------------
+// 同時に誘発した束（WP `rs-trigger-simul`）
+// ---------------------------------------------------------------------------
+
+fn trigger_queue(s: &Session, which: TriggerQueue) -> &Vec<PendingTrigger> {
+    match which {
+        TriggerQueue::Pending => &s.state().pending_triggers,
+        TriggerQueue::Battle => &s.state().battle_triggers,
+    }
+}
+
+/// 待ち行列の先頭の束を総合ルールの順に並べ、同じプレイヤーの効果が 2 つ以上なら順を選ぶ対話を立てる
+/// （対話を立てたら `true`）。
+///
+/// **束**＝先頭から続く [`TriggerBundle::Fresh`] の並び＝前の消化が始まってから今の消化が始まるまでに
+/// 積まれた誘発（一番外の効果・行動・戦闘の段の 1 つの区切りの中で条件を満たしたもの）。束の中は
+/// ライフの【トリガー】（ダメージの処理の一部）→ 手番のプレイヤーの効果 → 非手番のプレイヤーの効果の順
+/// （各組の中は積んだ順＝既定の答え）。束を解決している間に新しく誘発した効果は束の後ろに積まれ、
+/// 次の束になる。
+///
+/// 先頭が `Choose`（順を選ぶ組）なら、先頭から続く同じプレイヤーの `Choose` の並びのうち**別の札が 2 枚以上**
+/// あるときだけ ORDER_TRIGGERS（先に解決する効果の札を 1 枚選ぶ）を立てる。選んだ 1 件が `Fixed` で先頭へ
+/// 移り、残りは解決の後でまた選ぶ（1 件ずつ選べば全ての順を選べる）。
+pub fn order_front_bundle(
+    s: &mut Session,
+    masters: &MasterTable,
+    which: TriggerQueue,
+) -> Result<bool, EngineError> {
+    let queue = trigger_queue(s, which);
+    if queue.first().map(|t| t.bundle) == Some(TriggerBundle::Fresh) {
+        let n_fresh = queue
+            .iter()
+            .take_while(|t| t.bundle == TriggerBundle::Fresh)
+            .count();
+        let turn = s.state().turn_player;
+        let (bundle, rest) = queue.split_at(n_fresh);
+        let mut life: Vec<PendingTrigger> = Vec::new();
+        let mut groups: [Vec<PendingTrigger>; 2] = [Vec::new(), Vec::new()];
+        for item in bundle {
+            if is_life_trigger(masters, s, item) {
+                life.push(item.clone());
+            } else {
+                groups[usize::from(item.player != turn)].push(item.clone());
+            }
+        }
+        let rest = rest.to_vec();
+        let mut ordered: Vec<PendingTrigger> = Vec::with_capacity(n_fresh + rest.len());
+        for mut item in life {
+            item.bundle = TriggerBundle::Fixed;
+            ordered.push(item);
+        }
+        for group in groups {
+            let mark = if distinct_cards(&group) >= 2 {
+                TriggerBundle::Choose
+            } else {
+                TriggerBundle::Fixed
+            };
+            for mut item in group {
+                item.bundle = mark;
+                ordered.push(item);
+            }
+        }
+        ordered.extend(rest);
+        s.edit().set_trigger_queue(which, ordered);
+    }
+    let queue = trigger_queue(s, which);
+    let Some(front) = queue.first() else {
+        return Ok(false);
+    };
+    if front.bundle != TriggerBundle::Choose {
+        return Ok(false);
+    }
+    let player = front.player;
+    let run = queue
+        .iter()
+        .take_while(|t| t.bundle == TriggerBundle::Choose && t.player == player)
+        .count();
+    if distinct_cards(&queue[..run]) < 2 {
+        let mut queue = queue.clone();
+        for item in &mut queue[..run] {
+            item.bundle = TriggerBundle::Fixed;
+        }
+        s.edit().set_trigger_queue(which, queue);
+        return Ok(false);
+    }
+    let mut cards: Vec<CardIdx> = Vec::new();
+    for item in &queue[..run] {
+        if !cards.contains(&item.card) {
+            cards.push(item.card);
+        }
+    }
+    let cont = Box::new(crate::model::Continuation {
+        order_queue: Some(which),
+        ..Default::default()
+    });
+    s.edit().set_interaction(crate::model::Interaction {
+        kind: crate::model::InteractionKind::OrderTriggers,
+        player,
+        message: "同時に発動した効果のうち、先に解決する効果のカードを選んでください".to_owned(),
+        candidates: cards.into_iter().map(crate::model::TargetRef::Card).collect(),
+        selectable: None,
+        constraints: Some((1, 1)),
+        can_skip: false,
+        source_card: None,
+        owner: player,
+        options: Vec::new(),
+        allow_position: false,
+        allow_reorder: false,
+        continuation: Some(cont),
+        intent: crate::model::SelectionIntent::Order,
+    });
+    Ok(true)
+}
+
+fn distinct_cards(items: &[PendingTrigger]) -> usize {
+    let mut seen: Vec<CardIdx> = Vec::new();
+    for item in items {
+        if !seen.contains(&item.card) {
+            seen.push(item.card);
+        }
+    }
+    seen.len()
+}
+
+/// ORDER_TRIGGERS の解決: 選んだ札の（組の中で最初の）効果を `Fixed` にして先頭へ移し、消化を再開する。
+/// 選択が無い・候補に無いときは先頭（積んだ順）。
+pub fn resolve_order_triggers(
+    s: &mut Session,
+    masters: &MasterTable,
+    cont: &crate::model::Continuation,
+    payload: &serde_json::Value,
+) -> Result<(), EngineError> {
+    s.edit().pop_interaction();
+    let which = cont.order_queue.unwrap_or(TriggerQueue::Pending);
+    let chosen = payload
+        .get("selected_uuids")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|a| a.first())
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let mut queue = trigger_queue(s, which).clone();
+    if let Some(front) = queue.first() {
+        let player = front.player;
+        let run = queue
+            .iter()
+            .take_while(|t| t.bundle == TriggerBundle::Choose && t.player == player)
+            .count();
+        let pos = chosen
+            .and_then(|u| {
+                queue[..run]
+                    .iter()
+                    .position(|t| s.state().card(t.card).uuid == u)
+            })
+            .unwrap_or(0);
+        let mut item = queue.remove(pos);
+        item.bundle = TriggerBundle::Fixed;
+        queue.insert(0, item);
+        s.edit().set_trigger_queue(which, queue);
+    }
+    after_trigger_queue_interaction(s, masters)
+}
+
+fn advance_pending_triggers_inner(
     s: &mut Session,
     masters: &MasterTable,
 ) -> Result<(), EngineError> {
@@ -96,13 +296,25 @@ pub fn advance_pending_triggers(
         if s.state().active_interaction().is_some() {
             return Ok(()); // 別の対話が進行中: 解決後に再開される
         }
-        let item = s.state().pending_triggers[0].clone();
+        let pos = if holding_triggers(s) {
+            let queue = &s.state().pending_triggers;
+            match queue.iter().position(|t| is_life_trigger(masters, s, t)) {
+                Some(p) => p,
+                None => return Ok(()), // 効果の終わりに消化される
+            }
+        } else {
+            if order_front_bundle(s, masters, TriggerQueue::Pending)? {
+                return Ok(()); // 解決順の選択 → resolve_order_triggers が再開
+            }
+            0
+        };
+        let item = s.state().pending_triggers[pos].clone();
         if item.optional && !item.confirmed {
             suspend_for_trigger_confirm(s, masters, &item)?;
             return Ok(());
         }
         let mut queue = s.state().pending_triggers.clone();
-        queue.remove(0);
+        queue.remove(pos);
         s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
         relocate_activated_trigger_card(s, masters, &item)?;
         super::resolver::game_resolve_ability_with_subject(
@@ -116,6 +328,40 @@ pub fn advance_pending_triggers(
         if s.state().active_interaction().is_some() {
             return Ok(()); // 効果解決が対象選択等で中断 → resolve_interaction が再開
         }
+    }
+    Ok(())
+}
+
+/// 効果を解決し切った後の消化（`resolver::game_resolve_ability` の末尾・イベントを写した後）。一番外の効果が中断せずに
+/// 終わり、退避した残りも無く、消化の最中でもないときだけ待ち行列を消化する。
+pub fn drain_after_effect(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    if s.resolving_depth() > 0
+        || s.draining()
+        || s.state().in_passive_recalc
+        || s.state().active_interaction().is_some()
+        || !s.state().deferred_continuations.is_empty()
+        || s.state().pending_triggers.is_empty()
+    {
+        return Ok(());
+    }
+    advance_pending_triggers(s, masters)
+}
+
+/// 対話が片付いた後・行動の境目の消化: 先に**中断していた効果の残り**（退避した継続）を
+/// 解決し切り、それから待ち行列の誘発を消化する（親の効果 → 子の誘発の順）。
+pub fn settle_pending(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    // 退避中の残りがある間はライフの【トリガー】だけが先に進む（`advance_pending_triggers`）。
+    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
+        advance_pending_triggers(s, masters)?;
+    }
+    if s.resolving_depth() == 0
+        && s.state().active_interaction().is_none()
+        && !s.state().deferred_continuations.is_empty()
+    {
+        super::interact::resume_deferred_continuations(s, masters, 64)?;
+    }
+    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
+        advance_pending_triggers(s, masters)?;
     }
     Ok(())
 }
@@ -219,7 +465,16 @@ pub fn resolve_confirm_trigger(
             s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
         }
     }
-    advance_pending_triggers(s, masters)?;
+    after_trigger_queue_interaction(s, masters)
+}
+
+/// 待ち行列の対話（CONFIRM_TRIGGER・ORDER_TRIGGERS）が片付いた後の再開。
+fn after_trigger_queue_interaction(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
+    // 確認した誘発（ライフの【トリガー】ならダメージを与えた効果の残りより先）→ 退避した残り → 他の誘発。
+    settle_pending(s, masters)?;
     // ターン開始時誘発の解決で保留していたリフレッシュフェイズ以降を再開する。
     if s.state().active_interaction().is_none()
         && s.state().pending_triggers.is_empty()
@@ -358,6 +613,12 @@ pub fn ko_trigger_matches(
 }
 
 /// Python `_resolve_on_ko`。
+///
+/// 自身の【KO時】は、**効果の中で KO されたとき**（[`must_queue`]＝効果の解決中・対話の中断中）は
+/// 待ち行列に積み、親の効果を解決し切ってから解決する（WP `rs-trigger-order-2`・2026-10-22 までは
+/// KO の場で解決し、親の「その後」の手順より先に子が走っていた）。**戦闘の結果の KO**（効果の外＝
+/// 深さ 0・対話なし）は従来どおりその場で解決する（自身の【KO時】 → 他カードのリスナーの順は、
+/// 待ち行列を通しても同じ順になる＝積む順を揃えてある）。
 pub fn resolve_on_ko(
     s: &mut Session,
     masters: &MasterTable,
@@ -369,6 +630,22 @@ pub fn resolve_on_ko(
     // このターンに当該プレイヤーのキャラが KO された事実を記録する。
     let name = format!("CHAR_KOED_{}", owner.name());
     ops::record_turn_event(s, &name, 1);
+    // 自身の【KO時】（要因・タイミングの修飾は KO の時点で判定する）。
+    let mut own: Vec<usize> = Vec::new();
+    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+    for (index, id) in ids.iter().enumerate() {
+        let ab = ability(masters, *id)?;
+        if ab.trigger == TriggerType::OnKo && ko_trigger_matches(s, ab, owner, cause, effect_controller) {
+            own.push(index);
+        }
+    }
+    let queued = must_queue(s);
+    if queued {
+        // 効果の中の KO: 親の効果の後。他カードのリスナーより先に積む（その場で解決していた旧順と同じ並び）。
+        for index in &own {
+            enqueue_trigger(s, owner, card, *index, false);
+        }
+    }
     // 他カードの「…キャラがKOされた時」リスナーを積む（自身の【KO時】とは独立）。
     enqueue_ko_listeners(s, masters, card, owner)?;
     // 「このキャラのバトルによって相手のキャラをKOした時」: バトルで KO したアタッカー自身の誘発。
@@ -390,16 +667,11 @@ pub fn resolve_on_ko(
             }
         }
     }
-    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
-    for (index, id) in ids.iter().enumerate() {
-        let ab = ability(masters, *id)?;
-        if ab.trigger != TriggerType::OnKo {
-            continue;
+    if !queued {
+        // 効果の外（戦闘の結果の KO）: 従来どおりその場で解決する。
+        for index in own {
+            game_resolve_ability(s, masters, owner, card, index, false)?;
         }
-        if !ko_trigger_matches(s, ab, owner, cause, effect_controller) {
-            continue;
-        }
-        game_resolve_ability(s, masters, owner, card, index, false)?;
     }
     Ok(())
 }
@@ -445,6 +717,9 @@ pub fn rest_subject_matches(
 }
 
 /// Python `_fire_on_rest_triggers`（レストになった時の誘発を探して解決する）。
+///
+/// 効果の中でレストになったとき（[`must_queue`]）は待ち行列に積み、親の効果を解決し切ってから解決する
+/// （WP `rs-trigger-order-2`・2026-10-22 まではレストの場で解決していた）。主語・要因の判定はレストの時点で行う。
 pub fn fire_on_rest_triggers(
     s: &mut Session,
     masters: &MasterTable,
@@ -480,6 +755,13 @@ pub fn fire_on_rest_triggers(
                 }
             }
         }
+    }
+    if must_queue(s) {
+        // 効果の中のレスト: 親の効果を解決し切ってから（待ち行列・WP `rs-trigger-order-2`）。
+        for (owner, host, index) in pending {
+            enqueue_trigger(s, owner, host, index, false);
+        }
+        return Ok(());
     }
     for (owner, host, index) in pending {
         game_resolve_ability(s, masters, owner, host, index, false)?;
@@ -1258,6 +1540,7 @@ pub fn enqueue_battle_triggers(
                 optional: false,
                 confirmed: false,
                 subject: None,
+                bundle: TriggerBundle::Fresh,
             });
         } else if ab.trigger == TriggerType::OnRest
             && rest_subject_matches(
@@ -1272,6 +1555,7 @@ pub fn enqueue_battle_triggers(
                 optional: false,
                 confirmed: false,
                 subject: None,
+                bundle: TriggerBundle::Fresh,
             });
         }
     }
@@ -1340,6 +1624,7 @@ pub fn enqueue_battle_triggers(
             optional,
             confirmed: false,
             subject: None,
+            bundle: TriggerBundle::Fresh,
         });
     }
     // Python: `opp_cards = ([target_owner.leader] if leader else []) + target_owner.field`
@@ -1363,6 +1648,7 @@ pub fn enqueue_battle_triggers(
                     optional: false,
                     confirmed: false,
                     subject: None,
+                    bundle: TriggerBundle::Fresh,
                 });
             }
         }
@@ -1464,7 +1750,9 @@ pub fn own_onplay_negated(s: &Session, masters: &MasterTable, seat: Seat) -> boo
 /// リーダー＋場＋ステージ（Python の `_units(pl)`）。
 fn units_with_stage(s: &Session, seat: Seat) -> Vec<CardIdx> {
     let p = s.state().player(seat);
-    let mut out: Vec<CardIdx> = p.leader.into_iter().collect();
+    // 並びと中身は同じ（先に長さぶんを取っておくだけ）。
+    let mut out: Vec<CardIdx> = Vec::with_capacity(2 + p.field.len());
+    out.extend(p.leader);
     out.extend(p.field.iter().copied());
     out.extend(p.stage);
     out

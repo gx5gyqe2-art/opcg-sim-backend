@@ -1314,9 +1314,9 @@
   },
   "EB03-058": {
    "ast_sha": "5b13350c8e226ff7",
-   "note": "自分のターン中+ライフ2枚以下でドロー1／トリガー リーダー名ベガパンク条件でこのカード登場。全句一致 [厳格レビュー]",
-   "probe_sha": "1b3e7d204db2ab83",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "e882514d89b287f7",
+   "reviewed": "2026-10-22",
    "text_sha": "a3dbcb6fc61ebb84",
    "verdict": "ok"
   },
@@ -2570,9 +2570,9 @@
   },
   "OP01-106": {
    "ast_sha": "a43074cea98657c6",
-   "note": "全句対応 [厳格レビュー]",
-   "probe_sha": "c87d644859dc0b4b",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "ce4ce66465ef5eae",
+   "reviewed": "2026-10-22",
    "text_sha": "3625595013f5a476",
    "verdict": "ok"
   },
@@ -3698,9 +3698,9 @@
   },
   "OP03-030": {
    "ast_sha": "aa09dad9d0e57c45",
-   "note": "全句対応・QUALIFIER_GAPなし [厳格レビュー]",
-   "probe_sha": "5809cee54d04e20c",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "aed78253215b2c7c",
+   "reviewed": "2026-10-22",
    "text_sha": "d3d16a42a1289c44",
    "verdict": "ok"
   },
@@ -4290,9 +4290,9 @@
   },
   "OP03-116": {
    "ast_sha": "6a55d3c8d081bc42",
-   "note": "DRAW3→手札2枚捨て(強制)／トリガー 登場。一致 [厳格レビュー]",
-   "probe_sha": "0262976f626629e2",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "883b3f54a82219e3",
+   "reviewed": "2026-10-22",
    "text_sha": "069173a115501fc2",
    "verdict": "ok"
   },
@@ -4826,9 +4826,9 @@
   },
   "OP04-064": {
    "ast_sha": "da6b13d1dcfd7297",
-   "note": "全句対応を確認 [厳格レビュー]",
-   "probe_sha": "a356952bddee12bf",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "d0115d00f36b0c0d",
+   "reviewed": "2026-10-22",
    "text_sha": "c6d124f0ba93218a",
    "verdict": "ok"
   },
@@ -4842,9 +4842,9 @@
   },
   "OP04-066": {
    "ast_sha": "9bda693848907fc9",
-   "note": "本文の各句と解析・エンジン挙動が一致（再レビュー） [厳格レビュー]",
-   "probe_sha": "e8b151fe6b23090c",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "85d130a438e1afad",
+   "reviewed": "2026-10-22",
    "text_sha": "38b32ceef6fc443a",
    "verdict": "ok"
   },
@@ -5106,9 +5106,9 @@
   },
   "OP04-101": {
    "ast_sha": "b77bcd5ccbe914d0",
-   "note": "全句対応を確認 [厳格レビュー]",
-   "probe_sha": "4d9e1c53c588215f",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【登場時】のドローが「その後…KOする」の後に解決（親の効果を解決し切ってから誘発）",
+   "probe_sha": "4ec358ad6a1853aa",
+   "reviewed": "2026-10-22",
    "text_sha": "8b1f68ce3c7b6ec8",
    "verdict": "ok"
   },
@@ -6042,9 +6042,9 @@
   },
   "OP05-106": {
    "ast_sha": "b3c5db184b98af38",
-   "note": "登場時 LOOK5→シュラ以外 空島 1枚まで手札→残りARRANGE下 / トリガー self 登場 一致 [厳格レビュー]",
-   "probe_sha": "c23407e8e3c00db5",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "1f59313060674f25",
+   "reviewed": "2026-10-22",
    "text_sha": "e20037365b184a0d",
    "verdict": "ok"
   },
@@ -6434,9 +6434,9 @@
   },
   "OP06-041": {
    "ast_sha": "d589db89494c64e2",
-   "note": "登場時 相手キャラすべてレスト=REST ALL一致; トリガー登場=PLAY_CARD self一致 [厳格レビュー]",
-   "probe_sha": "d05cc158ba2350a3",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "3731473a9911a7e7",
+   "reviewed": "2026-10-22",
    "text_sha": "5b6d6349902417a8",
    "verdict": "ok"
   },
@@ -7786,9 +7786,9 @@
   },
   "OP07-100": {
    "ast_sha": "4e538eb7c4fddaca",
-   "note": "全句対応・QG無しまたは決着済み [厳格レビュー]",
-   "probe_sha": "73412b3fc8aa515e",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "b2fb448b84884fba",
+   "reviewed": "2026-10-22",
    "text_sha": "9a2efc7d906c54d3",
    "verdict": "ok"
   },
@@ -7866,9 +7866,9 @@
   },
   "OP07-111": {
    "ast_sha": "54cd2670bf8c0077",
-   "note": "全句対応・QG無しまたは決着済み [厳格レビュー]",
-   "probe_sha": "0096bd60af031ebe",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "59b89d28568849fa",
+   "reviewed": "2026-10-22",
    "text_sha": "2a32f0d56543e63e",
    "verdict": "ok"
   },
@@ -9610,9 +9610,9 @@
   },
   "OP09-110": {
    "ast_sha": "d6fa03bffd2f8e01",
-   "note": "全句対応 [厳格レビュー]",
-   "probe_sha": "8de7adad5d7edcf0",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "710ee5e2e7d81d35",
+   "reviewed": "2026-10-22",
    "text_sha": "db9875ad6c3c265d",
    "verdict": "ok"
   },
@@ -9626,9 +9626,9 @@
   },
   "OP09-112": {
    "ast_sha": "8d9b7ed325013857",
-   "note": "全句対応 [厳格レビュー]",
-   "probe_sha": "286799d7784ba540",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "c47edc6b6804274c",
+   "reviewed": "2026-10-22",
    "text_sha": "ccd22fc573e708c7",
    "verdict": "ok"
   },
@@ -13706,9 +13706,9 @@
   },
   "OP14-107": {
    "ast_sha": "dde7ef2c78566bb2",
-   "note": "全句対応。QG(あれば)は起動の任意性/他欄で決着 [厳格レビュー]",
-   "probe_sha": "e2fcfb6e7adabe6e",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "efb0941fd89729a6",
+   "reviewed": "2026-10-22",
    "text_sha": "7977872939c5bb1c",
    "verdict": "ok"
   },
@@ -13754,9 +13754,9 @@
   },
   "OP14-113": {
    "ast_sha": "e51a7801feaadb9d",
-   "note": "全句対応。QG(あれば)は起動の任意性/他欄で決着 [厳格レビュー]",
-   "probe_sha": "fe5b367bd9ec0586",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "1d7bff5f8fcf0143",
+   "reviewed": "2026-10-22",
    "text_sha": "87c21bd054a4fea3",
    "verdict": "ok"
   },
@@ -13834,9 +13834,9 @@
   },
   "OP15-003": {
    "ast_sha": "8385fe718d08da57",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "09c77a9560c06814",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "2c038f07ee0aa196",
+   "reviewed": "2026-10-25",
    "text_sha": "b16f7da4032d09e6",
    "verdict": "ok"
   },
@@ -13938,9 +13938,9 @@
   },
   "OP15-017": {
    "ast_sha": "30c758129d4376b4",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "c9c2c09b2614b025",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "1eb955a601a5618f",
+   "reviewed": "2026-10-25",
    "text_sha": "7da79fd732cc5a13",
    "verdict": "ok"
   },
@@ -13986,9 +13986,9 @@
   },
   "OP15-023": {
    "ast_sha": "5cf1666e74931384",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "7242c5469d65285f",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "af580a94ce1677d2",
+   "reviewed": "2026-10-25",
    "text_sha": "89880caf1eb32dce",
    "verdict": "ok"
   },
@@ -15330,9 +15330,9 @@
   },
   "OP16-084": {
    "ast_sha": "49601e39d65ee1ee",
-   "note": "全句一致。コスト自身トラッシュのcost_min=20は自キャラのコスト条件として正（FIRED_EMPTYはプローブの自キャラ<20による）・条件はコスト後でBranchに残る [厳格レビュー]",
-   "probe_sha": "6bb62d5011041d43",
-   "reviewed": "2026-10-01",
+   "note": "全句一致。コスト自身トラッシュのcost_min=20は自キャラのコスト条件として正。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で今のコストが 20 未満なら起動が合法手に出なくなったため（プローブの自キャラはコスト<20）。任意（できる）はコストの cost_optional 相当＝起動しないことで表現 [厳格レビュー]",
+   "probe_sha": "1eb955a601a5618f",
+   "reviewed": "2026-10-25",
    "text_sha": "0fe9ce57dc488743",
    "verdict": "ok"
   },
@@ -15490,9 +15490,9 @@
   },
   "OP16-105": {
    "ast_sha": "6d0f80f8344500c6",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
-   "probe_sha": "4d03bb103d979bd2",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 2 枚目の登場で押し出しが立っても 3 枚目の登場が実行される（旧: 押し出しで親の残りが消えて NOT_FIRED）",
+   "probe_sha": "038aab3a6b801b76",
+   "reviewed": "2026-10-22",
    "text_sha": "8d99923486eaaa45",
    "verdict": "ok"
   },
@@ -17482,9 +17482,9 @@
   },
   "PRB02-012": {
    "ast_sha": "eec8a0173fb0e46b",
-   "note": "全句対応 [厳格レビュー]",
-   "probe_sha": "5809cee54d04e20c",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "aed78253215b2c7c",
+   "reviewed": "2026-10-22",
    "text_sha": "c6d11b4d2581a5d1",
    "verdict": "ok"
   },
@@ -17802,9 +17802,9 @@
   },
   "ST03-010": {
    "ast_sha": "db1d3805c59591f7",
-   "note": "全句対応・QUALIFIER_GAP決着済み（上か下は DECK_BOTTOM dest_position=CHOOSE→ARRANGE_DECK で表現） [厳格レビュー]",
-   "probe_sha": "59c107a72baebebe",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "8fe1c8eb83bba43e",
+   "reviewed": "2026-10-22",
    "text_sha": "14abec868cb32b68",
    "verdict": "ok"
   },
@@ -18762,9 +18762,9 @@
   },
   "ST13-006": {
    "ast_sha": "60f22c8abff83273",
-   "note": "手札からコスト2のサボ/エース/ルフィ各1枚まで=PLAY_CARD 3ノード 一致 [厳格レビュー]",
-   "probe_sha": "4d03bb103d979bd2",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 2 枚目の登場で押し出しが立っても 3 枚目の登場が実行される（旧: 押し出しで親の残りが消えて NOT_FIRED）",
+   "probe_sha": "038aab3a6b801b76",
+   "reviewed": "2026-10-22",
    "text_sha": "e515b4dedfdff2ae",
    "verdict": "ok"
   },
@@ -19690,9 +19690,9 @@
   },
   "ST29-004": {
    "ast_sha": "46eb098b474de961",
-   "note": "登場時 上4枚→麦わらの一味1枚まで手札→残り下／トリガー 手札1枚捨て(任意コスト)→このカード登場(ref self)。一致 [厳格レビュー]",
-   "probe_sha": "1e16a3bc137514e8",
-   "reviewed": "2026-10-01",
+   "note": "rs-trigger-order 再レビュー: 【トリガー】で登場した札の【登場時】が親の登場の後に解決・記録される（盤面は同じ・イベントの順だけ）",
+   "probe_sha": "6fc900780bb66741",
+   "reviewed": "2026-10-22",
    "text_sha": "182d25355c084cbd",
    "verdict": "ok"
   },

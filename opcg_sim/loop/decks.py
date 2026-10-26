@@ -9,10 +9,11 @@ Rust の `opcg_engine.Game` は **card_id の列**を取り、その並びがそ
   synth     … `deck_synth.synth_deck`（テーマ整合・依存閉包・守り札比率）
   synth_dig … `deck_dig` で掘りカードを差し込んだ synth（残ドン掘りの対照実験用）
   synth_roles … `deck_roles` で除去の「型」を色ごとに差し込んだ synth（教材の対照・§20.8.1）
+  synth_roles2 … `deck_synth2`（実デッキの量＝積み方・コスト帯・役割に寄せた v2・WP synth-decks-v2）
 """
 import os
 import random
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from opcg_sim.loop import deck_synth
 from opcg_sim.src.utils.loader import CardLoader
@@ -118,7 +119,7 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
                with_kinds: bool = False):
     """1 局ぶんの両席デッキ `((l1, d1), (l2, d2))`（card_id）。
 
-    `decks`: "singleton"／"synth"／"synth_dig"／"synth_roles"。`la`／`lb` が None なら既定リーダー
+    `decks`: "singleton"／"synth"／"synth_dig"／"synth_roles"／"synth_roles2"／"user"／"official"／"real"。`la`／`lb` が None なら既定リーダー
     （singleton の 1 枚目）＝従来のミラー。
 
     `with_kinds=True` なら `((l1, d1), (l2, d2), (k1, k2))` を返す（`k` は `deck_roles` の型 dict・
@@ -135,6 +136,19 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
         # （ホールドアウトのリーク防止・`heldout_decks.json` の規約と同じ扱い）。
         pair = user_deck_pair(seed)
         return (pair + (kinds,)) if with_kinds else pair
+    if decks in ("official", "real"):
+        # 実デッキ帯の拡張（2026-10-22）: official＝公式サイトの構築例 111 本（`official_decks_20261022.json`）、
+        # real＝ユーザの 4 本＋構築例 111 本。リーダーはデッキ側が決める（`la`／`lb` は無視）。
+        # **2026-10-22 ユーザ決定「b でお願いします」で訓練の教材にも使う**（実デッキでリーダーをほぼ網羅できたため・
+        # 波 49 から）。判定の主条件もこの帯（`real`）。
+        pair = real_deck_pair(seed, decks)
+        return (pair + (kinds,)) if with_kinds else pair
+    if decks == "synth_roles2":
+        from opcg_sim.loop import deck_synth2
+        l1, c1, k1 = deck_synth2.synth_deck2(db, la, seed=seed, owner="p1")
+        l2, c2, k2 = deck_synth2.synth_deck2(db, lb or la, seed=seed + 1, owner="p2")
+        pair = ((_ids([l1])[0], _ids(c1)), (_ids([l2])[0], _ids(c2)))
+        return (pair + ((k1, k2),)) if with_kinds else pair
     l1, c1 = deck_synth.synth_deck(db, la, seed=seed, owner="p1")
     l2, c2 = deck_synth.synth_deck(db, lb or la, seed=seed + 1, owner="p2")
     if decks == "synth_dig":
@@ -150,29 +164,55 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
     return (pair + (kinds,)) if with_kinds else pair
 
 
-_USER_DECKS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                           "tests", "fixtures", "decks", "user_decks_20260728.json")
-_USER_CACHE: List[Tuple[str, List[str]]] = []
+_FIXTURE_DECKS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                              "tests", "fixtures", "decks")
+_USER_DECKS = os.path.join(_FIXTURE_DECKS, "user_decks_20260728.json")
+_OFFICIAL_DECKS = os.path.join(_FIXTURE_DECKS, "official_decks_20261022.json")
+_DECK_CACHE: Dict[str, List[Tuple[str, List[str]]]] = {}
+
+
+def _load_deck_file(path: str) -> List[Tuple[str, List[str]]]:
+    """`{name: {leader, cards: {card_id: n}}}` の JSON を `(leader_id, [card_id]×50)` の列に（ファイル順・キャッシュ）。
+    `_` で始まる鍵（`_meta` 等）は読まない。"""
+    if path not in _DECK_CACHE:
+        import json
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+        out: List[Tuple[str, List[str]]] = []
+        for name, d in raw.items():
+            if name.startswith("_"):
+                continue
+            cards: List[str] = []
+            for cid, n in d["cards"].items():
+                cards.extend([cid] * int(n))
+            out.append((d["leader"], cards))
+        _DECK_CACHE[path] = out
+    return list(_DECK_CACHE[path])
 
 
 def user_decks() -> List[Tuple[str, List[str]]]:
     """実デッキ（ユーザの 4 本）を `(leader_id, [card_id]×50)` の列で返す（ファイル順・キャッシュ）。"""
-    if not _USER_CACHE:
-        import json
-        with open(_USER_DECKS, encoding="utf-8") as f:
-            raw = json.load(f)
-        for _name, d in raw.items():
-            cards: List[str] = []
-            for cid, n in d["cards"].items():
-                cards.extend([cid] * int(n))
-            _USER_CACHE.append((d["leader"], cards))
-    return list(_USER_CACHE)
+    return _load_deck_file(_USER_DECKS)
 
 
-def user_deck_pair(seed: int):
-    """seed から実デッキを 2 本引く（順序つき・同じデッキ同士も可）。"""
-    ds = user_decks()
+def official_decks() -> List[Tuple[str, List[str]]]:
+    """公式サイトの構築例 111 本（2026-10-22 取得・ホールドアウト）。"""
+    return _load_deck_file(_OFFICIAL_DECKS)
+
+
+def _pair_from(ds, seed: int):
     rng = random.Random(seed * 7919 + 17)
     a, b = rng.randrange(len(ds)), rng.randrange(len(ds))
     (l1, c1), (l2, c2) = ds[a], ds[b]
     return ((l1, list(c1)), (l2, list(c2)))
+
+
+def user_deck_pair(seed: int):
+    """seed から実デッキを 2 本引く（順序つき・同じデッキ同士も可）。"""
+    return _pair_from(user_decks(), seed)
+
+
+def real_deck_pair(seed: int, which: str = "real"):
+    """seed から実デッキ帯の 2 本を引く。`official`＝構築例だけ・`real`＝ユーザの 4 本＋構築例（一様）。"""
+    ds = official_decks() if which == "official" else user_decks() + official_decks()
+    return _pair_from(ds, seed)

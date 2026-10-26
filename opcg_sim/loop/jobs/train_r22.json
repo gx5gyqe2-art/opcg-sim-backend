@@ -1,0 +1,103 @@
+{
+ "kind": "train",
+ "section": "§7.41",
+ "ledger_grep": "7.41 波 51",
+ "about": "r22（π 波 51・価値 波 51）と対照 r22o（π 波 50・価値 波 50＋49）の訓練 → 評価帯（波 51 holdout）。どちらも warm-start r13d・順に回す（メモリ 14GB）",
+ "job": "train-r22",
+ "branch": "claude/train-r22",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 6,
+ "waves": [
+  {
+   "branch": "claude/n51-w{ww}",
+   "shards": 32,
+   "dest": "~/n51",
+   "glob": "~/n51/n_records/n51_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n50-w{ww}",
+   "shards": 16,
+   "dest": "~/n50",
+   "glob": "~/n50/n_records/n50_w*_p[0-3]",
+   "expect": 64
+  },
+  {
+   "branch": "claude/n49-w{ww}",
+   "shards": 16,
+   "dest": "~/n49",
+   "glob": "~/n49/n_records/n49_w*_p[0-3]",
+   "expect": 64
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r13d.npz"
+ ],
+ "runs": [
+  {
+   "name": "r22",
+   "in": [
+    "~/n51/n_records/n51_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r22.npz",
+   "log": "~/train_r22.log"
+  },
+  {
+   "name": "r22o",
+   "in": [
+    "~/n50/n_records/n50_w*_p[0-3]"
+   ],
+   "z_in": [
+    "~/n49/n_records/n49_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r22o.npz",
+   "log": "~/train_r22o.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n51/n_records/n51_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r13d.npz",
+    "~/nrel_r22o.npz",
+    "~/nrel_r22.npz",
+    "~/nrel_r22o.ep0.npz",
+    "~/nrel_r22o.ep1.npz",
+    "~/nrel_r22.ep0.npz",
+    "~/nrel_r22.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r22.json",
+   "log": "~/band_r22.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "commit_message": "r22 と r22o のセット（訓練・評価帯）"
+}

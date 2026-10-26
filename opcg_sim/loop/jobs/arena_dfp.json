@@ -1,0 +1,75 @@
+{
+ "kind": "arena",
+ "section": "§7.52",
+ "ledger_grep": "7.52 守りの窓の相手から見た詰みの証明の本番アリーナ",
+ "about": "守りの証明（defense_proof・自分の視点の配り方）を入れた形 vs 今の形（両席 r23・出荷の設定・random×real・作業ブランチ rs-defense-proof のコード）",
+ "job": "arena-dfp-w{KK}",
+ "branch": "claude/arena-dfp-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r23.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r23.npz"
+ },
+ "out_dir": "arena_dfp",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "2",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root",
+  "--cand-defense-proof"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3721000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "dfp_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r23.npz + defense_proof (view mine)",
+  "baseline": "nrel_r23.npz",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84,
+  "code": "claude/rs-defense-proof"
+ },
+ "commit_message": "arena dfp shard {KK}",
+ "require": [
+  {
+   "file": "opcg_sim/loop/arena.py",
+   "grep": "cand-defense-proof"
+  }
+ ]
+}

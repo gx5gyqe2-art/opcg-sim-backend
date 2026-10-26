@@ -291,7 +291,22 @@ class RsGame:
               leaf_rollout: Optional[str] = None,
               select_branch: Optional[bool] = None,
               setup_box_keep_bare: Optional[bool] = None,
-              budget: Optional[int] = None):
+              budget: Optional[int] = None,
+              rethink_ratio: Optional[float] = None,
+              rethink_worlds: Optional[int] = None,
+              omniscient: Optional[bool] = None,
+              reveal: Optional[str] = None,
+              opp_blind: Optional[bool] = None,
+              lethal_proof: Optional[str] = None,
+              lethal_nodes: Optional[int] = None,
+              commit_sig_legacy: Optional[bool] = None,
+              lethal_deal_legacy: Optional[bool] = None,
+              commit_hidden_legacy: Optional[bool] = None,
+              window_carry_legacy: Optional[bool] = None,
+              window_worlds_legacy: Optional[bool] = None,
+              window_tree_legacy: Optional[bool] = None,
+              window_worlds: Optional[int] = None,
+              confirm_trigger_legacy: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -319,6 +334,44 @@ class RsGame:
         `select_branch`（省略可・§20.7.8 の 5）＝診断つまみ。全箱共通の「自分の対象選択を
         枝にする」規則だけを on/off する（`None`＝`setup_box` に従う＝今までどおり）。
         `budget`（省略可）＝戦闘箱の枝予算（1 decide あたり・0＝無制限・省略＝Rust 既定 8000）。
+        `rethink_ratio`／`rethink_worlds`（省略可・`docs/search_efficiency_plan.md` §7.4）＝迷う局面
+        だけ世界 K 本で読み直す（根の 2 位の訪問数 ÷ 1 位 ≥ `rethink_ratio` なら同じ seed で
+        `worlds=rethink_worlds`〔既定 4〕を読み直して差し替える・アリーナの席と同じ
+        `opcg_sim.loop.engine.decide_with_rethink`）。trace に `rethink: {r, fired, first_move,
+        final_move}` が入る。**省略（None）すれば 1 本の読みのまま**（trace の欄も増えない）。
+        `omniscient`（省略可・`docs/search_efficiency_plan.md` §7.10・**測定専用**）＝全部見える探索。
+        True なら探索の中で世界を引き直さず本当の盤面（相手の手札・両者の山札の並び）で読む
+        （`worlds` は 1 扱い）。ゲームとしては不正な読み＝アリーナの天井の切り分けにだけ使う。
+        **省略（None）すれば今までと同じ**（対戦 API は渡さない）。
+        `reveal`（省略可・§7.11・§7.15）＝探索の世界の見える範囲。**省略（None）＝Rust の既定 `"fair"`**
+        （2026-10-21 から・自分に見えない物〔相手の手札＋山札＋裏向きライフ・自分の山札＋裏向きライフ〕を
+        全部混ぜ直し、自分が知っている札〔公開された・手札に戻した・見て並べた〕は位置を固定する）。
+        測定用に `"peek"`（2026-10-21 までの既定＝自分の山札と裏向きライフを本物のまま読む）・`"opp_hand"`
+        （相手の手札は本当のまま・相手の山札だけ混ぜ直す）。`omniscient` と同時に渡すと Rust がエラーにする。
+        `opp_blind`（省略可・§7.14・**測定専用**）＝木の中の相手の番のノードだけ、こちらの手札＋山札＋
+        裏向きライフを混ぜ直した複製で評価する（合法手と手の適用は本当の世界のまま）。**省略すれば今までと同じ**。
+        `lethal_proof`（省略可・§7.21）＝詰みの証明（"off"／"root"／"root_reply"）。"root" は自分のメインで
+        このターンに届きうるとき、公平な配り方の全部で勝てる最初の 1 手が在ればそれを打つ（`kind="lethal"`）。
+        "root_reply" は加えて、根の直後の相手の応手の節点で「この応手なら次にこちらの勝ちが証明できる」子を
+        相手から見て負けに固定する。**省略（None）／"off"＝渡さない＝今までと同じ**（対戦 API は
+        `PLAY_LETHAL_PROOF` を渡す・既定 "off"）。
+        `lethal_nodes`（省略可・§7.49・**測定用**）＝根の詰みの証明の節点の上限。**省略（None）＝渡さない＝Rust の既定**
+        （`search/lethal.rs::LETHAL_ROOT_NODES`＝20,000）。`lethal_proof` が off なら効かない。
+        `commit_sig_legacy`（省略可・WP `rs-commit-sig`・**測定専用**）＝箱の commit の照合に旧い手の署名
+        （戦闘の手の札が落ちる・2026-10-22 までの形）を使う。本番アリーナの基準席用。**省略（None）／False＝渡さない**。
+        `lethal_deal_legacy`（省略可・§7.33・**測定用**）＝詰みの証明の守りの強い配り方を旧い形にする（カウンター
+        イベントを相手が払えるかを見ずに手札へ積む）。**省略（None）／False＝渡さない＝Rust の既定**（相手の
+        アクティブのドン!!で払える枚数までだけ数える）。`lethal_proof` が off なら効かない。
+        `commit_hidden_legacy`（省略可・§7.39・WP `rs-commit-hidden`・**測定専用**）＝箱の commit の続きに、commit した
+        時点で見えていなかった札（山札・裏向きのライフ・相手の手札）から選ぶ段も積む旧い形（引き直した世界の中身で
+        選んだ札を本当の盤面で照合して打つ）。本番アリーナの基準席用。**省略（None）／False＝渡さない＝Rust の既定**
+        （その段から先を積まず、そこで読み直す）。
+        `window_carry_legacy`／`window_worlds_legacy`／`window_tree_legacy`（省略可・§7.42・WP `rs-window-read`・
+        **測定専用**）＝窓・対話の決め方の旧い形（続きを積む／窓の世界 1 本／ライフが少ない戦闘の応手を静的な値で比べる）。
+        `window_worlds`（省略可）＝窓の根畳みの世界の本数。**省略（None）／False＝渡さない＝Rust の既定**。
+        `confirm_trigger_legacy`（省略可・§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**）＝トリガーの発動確認
+        （ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけにする旧い形。本番アリーナの基準席用。
+        **省略（None）／False＝渡さない＝Rust の既定**（発動する／しないの 2 手を読む）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -326,7 +379,18 @@ class RsGame:
                                 setup_box=setup_box, leaf_rollout=leaf_rollout,
                                 select_branch=select_branch,
                                 setup_box_keep_bare=setup_box_keep_bare,
-                                budget=budget)
+                                budget=budget, rethink_ratio=rethink_ratio,
+                                rethink_worlds=rethink_worlds, omniscient=omniscient,
+                                reveal=reveal, opp_blind=opp_blind, lethal_proof=lethal_proof,
+                                lethal_nodes=lethal_nodes,
+                                commit_sig_legacy=commit_sig_legacy,
+                                lethal_deal_legacy=lethal_deal_legacy,
+                                commit_hidden_legacy=commit_hidden_legacy,
+                                window_carry_legacy=window_carry_legacy,
+                                window_worlds_legacy=window_worlds_legacy,
+                                window_tree_legacy=window_tree_legacy,
+                                window_worlds=window_worlds,
+                                confirm_trigger_legacy=confirm_trigger_legacy)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -338,7 +402,22 @@ class RsGame:
                leaf_rollout: Optional[str] = None,
                select_branch: Optional[bool] = None,
                setup_box_keep_bare: Optional[bool] = None,
-               budget: Optional[int] = None):
+               budget: Optional[int] = None,
+               rethink_ratio: Optional[float] = None,
+               rethink_worlds: Optional[int] = None,
+               omniscient: Optional[bool] = None,
+               reveal: Optional[str] = None,
+               opp_blind: Optional[bool] = None,
+               lethal_proof: Optional[str] = None,
+               lethal_nodes: Optional[int] = None,
+               commit_sig_legacy: Optional[bool] = None,
+               lethal_deal_legacy: Optional[bool] = None,
+               commit_hidden_legacy: Optional[bool] = None,
+               window_carry_legacy: Optional[bool] = None,
+               window_worlds_legacy: Optional[bool] = None,
+               window_tree_legacy: Optional[bool] = None,
+               window_worlds: Optional[int] = None,
+               confirm_trigger_legacy: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -391,7 +470,52 @@ class RsGame:
         # 戦闘箱の枝予算。None＝渡さない＝Rust 側の既定（8000）・0＝無制限。
         if budget is not None:
             opts["budget"] = int(budget)
-        out = json.loads(self._game.decide(player_id, json.dumps(opts)))
+        # 全部見える探索（§7.10・測定専用）。None／False＝渡さない＝Rust 側の既定（false）。
+        if omniscient:
+            opts["omniscient"] = True
+        # 世界の見える範囲（§7.11・§7.15）。None＝渡さない＝Rust の既定（fair）。
+        if reveal is not None:
+            opts["reveal"] = str(reveal)
+        # 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。None／False＝渡さない。
+        if opp_blind:
+            opts["opp_blind"] = True
+        # 詰みの証明（§7.21）。None／"off"＝渡さない＝Rust の既定（off）。
+        if lethal_proof and lethal_proof != "off":
+            opts["lethal_proof"] = str(lethal_proof)
+        # 根の詰みの証明の節点の上限（§7.49・測定用）。None＝渡さない＝Rust の既定（20,000）。
+        if lethal_nodes is not None:
+            opts["lethal_nodes"] = int(lethal_nodes)
+        # 旧い手の署名（WP `rs-commit-sig`・測定専用）。None／False＝渡さない＝Rust の既定（修正後）。
+        if commit_sig_legacy:
+            opts["commit_sig_legacy"] = True
+        # 守りの強い配り方の旧い形（§7.33・測定用）。None／False＝渡さない＝Rust の既定（払える枚数まで）。
+        if lethal_deal_legacy:
+            opts["lethal_deal_legacy"] = True
+        # 見えていなかった札を選ぶ続きも積む旧い形（§7.39・測定専用）。None／False＝渡さない＝Rust の既定（読み直す）。
+        if commit_hidden_legacy:
+            opts["commit_hidden_legacy"] = True
+        # 窓・対話の決め方の旧い形（§7.42・測定専用）。None／False＝渡さない＝Rust の既定（修正後）。
+        if window_carry_legacy:
+            opts["window_carry_legacy"] = True
+        if window_worlds_legacy:
+            opts["window_worlds_legacy"] = True
+        if window_tree_legacy:
+            opts["window_tree_legacy"] = True
+        if window_worlds is not None:
+            opts["window_worlds"] = int(window_worlds)
+        # トリガーを断らない旧い形（§7.44 の (B)・測定専用）。None／False＝渡さない＝Rust の既定（2 手）。
+        if confirm_trigger_legacy:
+            opts["confirm_trigger_legacy"] = True
+        # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
+        from opcg_sim.loop import engine as _LE
+        # 読むのは盤面の複製（`Game.fork`＝状態をそのまま写す・探索は状態しか読まない＝手は 1 bit も
+        # 変わらない）。対戦 API は思考を裏のスレッドで回すので（`services/cpu_think.py`）、その間も
+        # 本体へ状況の問い合わせ（`pending_json` 等）が来る＝本体を探索に貸したままにしない。
+        g = self._game.fork()
+        out = _LE.decide_with_rethink(lambda o: g.decide(player_id, o), json.dumps(opts),
+                                      rethink_ratio,
+                                      _LE.PLAY_RETHINK_WORLDS if rethink_worlds is None
+                                      else int(rethink_worlds))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
                        "resact_pending": bool(out.get("resact_pending"))}
@@ -492,15 +616,38 @@ class RsGame:
         # 葉の打ち切りの実績（§20.7.9 の計測・`leaf_rollout="turn_end"` の decide だけ欄が出る）。
         if out.get("rollout") is not None:
             tr["rollout"] = out["rollout"]
+        # 迷う局面だけの読み直し（§7.4・`rethink_ratio` を渡した decide だけ欄が出る）。
+        rt = out.get("rethink")
+        if rt is not None:
+            tr["rethink"] = {
+                "r": (None if rt.get("r") is None else round(float(rt["r"]), 4)),
+                "fired": bool(rt.get("fired")),
+                "first_move": self.describe_move(rt["first_move"]) if rt.get("first_move") else None,
+                "final_move": self.describe_move(rt["final_move"]) if rt.get("final_move") else None,
+            }
         return tr
 
     @staticmethod
     def _sig(mv: Dict[str, Any]):
         """`learned/plan.move_sig` と同じ鍵（Rust の `sig` と JSON で突き合わせる）。"""
+        # 札は payload.uuid、無ければ最上位の card_uuid（戦闘の手）・区別の欄（WP `rs-commit-sig`）。
         p = mv.get("payload") or {}
-        return [mv.get("action_type") or p.get("action_type"), p.get("uuid"),
-                list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
-                p.get("accepted")]
+        card = p.get("uuid")
+        if card is None:
+            card = mv.get("card_uuid")
+        sig = [mv.get("action_type") or p.get("action_type"), card,
+               list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
+               p.get("accepted")]
+        ext = {}
+        if p.get("position") is not None and p.get("position") != "BOTTOM":
+            ext["position"] = p["position"]
+        if isinstance(p.get("selects"), list) and len(p["selects"]) >= 2:
+            ext["selects"] = p["selects"]
+        if isinstance(p.get("index"), int) and not isinstance(p.get("index"), bool) and p["index"] != 0:
+            ext["index"] = p["index"]
+        if ext:
+            sig.append(ext)
+        return sig
 
     # --- 思考トレース／リプレイの記録（opt-in・観測専用）---------------------
 

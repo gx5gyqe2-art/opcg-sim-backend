@@ -1,0 +1,496 @@
+[
+ {
+  "seed": 3301005,
+  "step": 107,
+  "board": {
+   "me": {
+    "leader": "OP14-079(R)",
+    "field": [
+     "OP14-087",
+     "OP14-084(R)",
+     "OP14-092(R)+D3",
+     "OP14-094"
+    ],
+    "hand": [
+     "OP14-085",
+     "OP14-087",
+     "OP14-120",
+     "OP14-086",
+     "OP14-096"
+    ],
+    "life": 0,
+    "deck": 23,
+    "trash": 18,
+    "don_active": 1,
+    "don_rested": 5
+   },
+   "opp": {
+    "leader": "OP16-001(R)+D1",
+    "field": [
+     "OP16-015",
+     "OP16-011(R)",
+     "OP16-003(R)"
+    ],
+    "hand": [
+     "OP16-021",
+     "OP16-005",
+     "OP13-016",
+     "OP16-017",
+     "OP13-007",
+     "OP16-004",
+     "OP16-016"
+    ],
+    "life": 1,
+    "deck": 34,
+    "trash": 5,
+    "don_active": 9,
+    "don_rested": 0
+   }
+  },
+  "static_root": {
+   "me": {
+    "r13d": -0.754,
+    "r22": -0.852
+   },
+   "opp": {
+    "r13d": 0.903,
+    "r22": 0.895
+   }
+  },
+  "pass": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "exact_child": {
+    "res": null,
+    "nodes": 82833,
+    "sec": 120.001
+   },
+   "follow": [
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-085\"}"
+    ],
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-096\"}"
+    ],
+    [
+     "p1",
+     "SEARCH_AND_SELECT",
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP14-079\"], \"selected_slots\": [4], \"index\": 0, \"position\": \"BOTTOM\"}"
+    ],
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"PASS\"}"
+    ]
+   ],
+   "end_winner": null,
+   "end_board": {
+    "me": {
+     "leader": "OP14-079(R)",
+     "field": [
+      "OP14-087",
+      "OP14-084(R)",
+      "OP14-092(R)+D3",
+      "OP14-094"
+     ],
+     "hand": [
+      "OP14-087",
+      "OP14-120",
+      "OP14-086"
+     ],
+     "life": 0,
+     "deck": 23,
+     "trash": 20,
+     "don_active": 0,
+     "don_rested": 6
+    },
+    "opp": {
+     "leader": "OP16-001(R)+D1",
+     "field": [
+      "OP16-015",
+      "OP16-011(R)",
+      "OP16-003(R)"
+     ],
+     "hand": [
+      "OP16-021",
+      "OP16-005",
+      "OP13-016",
+      "OP16-017",
+      "OP13-007",
+      "OP16-004",
+      "OP16-016"
+     ],
+     "life": 1,
+     "deck": 34,
+     "trash": 5,
+     "don_active": 9,
+     "don_rested": 0
+    }
+   },
+   "end_static": {
+    "me": {
+     "r13d": -0.894,
+     "r22": -0.917
+    },
+    "opp": {
+     "r13d": 0.843,
+     "r22": 0.898
+    }
+   },
+   "end_exact": {
+    "res": null,
+    "nodes": 81087,
+    "sec": 120.002
+   },
+   "end_deep": {
+    "best": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP16-015\"}",
+    "v_mover": 0.916,
+    "kind": "main",
+    "v_me": -0.916
+   },
+   "ref": {
+    "k": 32,
+    "win": 0.062,
+    "lost_this_turn": 26
+   },
+   "sec": 254.4
+  },
+  "block": {
+   "move": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"OP14-094\"}",
+   "exact_child": {
+    "res": null,
+    "nodes": 65175,
+    "sec": 120.004
+   },
+   "follow": [
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-085\"}"
+    ],
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-086\"}"
+    ],
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-087\"}"
+    ],
+    [
+     "p1",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"PASS\"}"
+    ]
+   ],
+   "end_winner": null,
+   "end_board": {
+    "me": {
+     "leader": "OP14-079(R)",
+     "field": [
+      "OP14-087",
+      "OP14-084(R)",
+      "OP14-092(R)+D3"
+     ],
+     "hand": [
+      "OP14-120",
+      "OP14-096"
+     ],
+     "life": 0,
+     "deck": 23,
+     "trash": 22,
+     "don_active": 1,
+     "don_rested": 5
+    },
+    "opp": {
+     "leader": "OP16-001(R)+D1",
+     "field": [
+      "OP16-015",
+      "OP16-011(R)",
+      "OP16-003(R)"
+     ],
+     "hand": [
+      "OP16-021",
+      "OP16-005",
+      "OP13-016",
+      "OP16-017",
+      "OP13-007",
+      "OP16-004",
+      "OP16-016"
+     ],
+     "life": 1,
+     "deck": 34,
+     "trash": 5,
+     "don_active": 9,
+     "don_rested": 0
+    }
+   },
+   "end_static": {
+    "me": {
+     "r13d": -0.978,
+     "r22": -0.988
+    },
+    "opp": {
+     "r13d": 0.997,
+     "r22": 0.998
+    }
+   },
+   "end_exact": {
+    "res": true,
+    "nodes": 42826,
+    "sec": 78.902
+   },
+   "end_deep": {
+    "best": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP16-015\"}",
+    "v_mover": 0.991,
+    "kind": "main",
+    "v_me": -0.991
+   },
+   "ref": {
+    "k": 32,
+    "win": 0.469,
+    "lost_this_turn": 10
+   },
+   "sec": 221.0
+  }
+ },
+ {
+  "seed": 3301025,
+  "step": 117,
+  "board": {
+   "opp": {
+    "leader": "OP02-025(R)+D2",
+    "field": [
+     "OP01-041",
+     "ST02-013"
+    ],
+    "hand": [
+     "OP02-030",
+     "OP01-121",
+     "ST02-013"
+    ],
+    "life": 3,
+    "deck": 32,
+    "trash": 10,
+    "don_active": 1,
+    "don_rested": 7
+   },
+   "me": {
+    "leader": "EB03-001(R)+D2",
+    "field": [
+     "EB03-006(R)",
+     "OP13-012(R)+D3",
+     "OP09-009(R)",
+     "EB03-024",
+     "OP13-012"
+    ],
+    "hand": [
+     "EB03-006",
+     "EB03-025",
+     "EB03-026",
+     "OP06-007",
+     "OP13-011"
+    ],
+    "life": 0,
+    "deck": 34,
+    "trash": 6,
+    "don_active": 0,
+    "don_rested": 5
+   }
+  },
+  "static_root": {
+   "me": {
+    "r13d": 0.043,
+    "r22": -0.16
+   },
+   "opp": {
+    "r13d": -0.553,
+    "r22": -0.143
+   }
+  },
+  "pass": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "exact_child": {
+    "res": false,
+    "nodes": 32,
+    "sec": 0.018
+   },
+   "follow": [
+    [
+     "p2",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-025\"}"
+    ],
+    [
+     "p2",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP13-011\"}"
+    ],
+    [
+     "p2",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"PASS\"}"
+    ]
+   ],
+   "end_winner": null,
+   "end_board": {
+    "opp": {
+     "leader": "OP02-025(R)+D2",
+     "field": [
+      "OP01-041",
+      "ST02-013"
+     ],
+     "hand": [
+      "OP02-030",
+      "OP01-121",
+      "ST02-013"
+     ],
+     "life": 3,
+     "deck": 32,
+     "trash": 10,
+     "don_active": 1,
+     "don_rested": 7
+    },
+    "me": {
+     "leader": "EB03-001(R)+D2",
+     "field": [
+      "EB03-006(R)",
+      "OP13-012(R)+D3",
+      "OP09-009(R)",
+      "EB03-024",
+      "OP13-012"
+     ],
+     "hand": [
+      "EB03-006",
+      "EB03-026",
+      "OP06-007"
+     ],
+     "life": 0,
+     "deck": 34,
+     "trash": 8,
+     "don_active": 0,
+     "don_rested": 5
+    }
+   },
+   "end_static": {
+    "me": {
+     "r13d": -0.265,
+     "r22": -0.557
+    },
+    "opp": {
+     "r13d": -0.452,
+     "r22": 0.124
+    }
+   },
+   "end_exact": {
+    "res": false,
+    "nodes": 29,
+    "sec": 0.015
+   },
+   "end_deep": {
+    "best": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"OP01-041\"}",
+    "v_mover": -0.579,
+    "kind": "main",
+    "v_me": 0.579
+   },
+   "ref": {
+    "k": 32,
+    "win": 0.188,
+    "lost_this_turn": 0
+   },
+   "sec": 17.1
+  },
+  "block": {
+   "move": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+   "exact_child": {
+    "res": false,
+    "nodes": 29,
+    "sec": 0.015
+   },
+   "follow": [
+    [
+     "p2",
+     "SELECT_COUNTER",
+     "{\"action_type\": \"PASS\"}"
+    ],
+    [
+     "p2",
+     "CONFIRM_OPTIONAL",
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+    ]
+   ],
+   "end_winner": null,
+   "end_board": {
+    "opp": {
+     "leader": "OP02-025(R)+D2",
+     "field": [
+      "OP01-041",
+      "ST02-013"
+     ],
+     "hand": [
+      "OP02-030",
+      "OP01-121",
+      "ST02-013"
+     ],
+     "life": 3,
+     "deck": 32,
+     "trash": 10,
+     "don_active": 1,
+     "don_rested": 7
+    },
+    "me": {
+     "leader": "EB03-001(R)+D2",
+     "field": [
+      "EB03-006(R)",
+      "OP13-012(R)+D3",
+      "OP09-009(R)",
+      "EB03-024(R)",
+      "OP13-012"
+     ],
+     "hand": [
+      "EB03-025",
+      "EB03-026",
+      "OP06-007",
+      "OP13-011"
+     ],
+     "life": 0,
+     "deck": 34,
+     "trash": 7,
+     "don_active": 0,
+     "don_rested": 5
+    }
+   },
+   "end_static": {
+    "me": {
+     "r13d": -0.563,
+     "r22": -0.739
+    },
+    "opp": {
+     "r13d": 0.28,
+     "r22": 0.544
+    }
+   },
+   "end_exact": {
+    "res": false,
+    "nodes": 45,
+    "sec": 0.016
+   },
+   "end_deep": {
+    "best": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"OP01-041\"}",
+    "v_mover": -0.604,
+    "kind": "main",
+    "v_me": 0.604
+   },
+   "ref": {
+    "k": 32,
+    "win": 0.781,
+    "lost_this_turn": 0
+   },
+   "sec": 20.5
+  }
+ }
+]

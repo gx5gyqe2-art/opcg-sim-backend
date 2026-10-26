@@ -71,10 +71,16 @@ SCALARS_V13 = SCALARS_V12 + _NREL_EXTRA_V13
 # v14（2026-09-11・計画 §20.9）: v13 + グローバル追加列の 4 本（`deck_removal_fixed`／
 # `opp_pool_removal_fixed`／`deck_bounce`／`opp_pool_bounce`）。append-only ＝ v13 は前方一致。
 SCALARS_V14 = SCALARS_V12 + _NREL_EXTRA_DIM
+# v15（2026-10-22・WP `enc-v15`・`search_efficiency_plan.md` §7.19）: **形は v14 と同じ**。自分の残り山札の
+# 集計 16 列（`_deck_aggregate`・`_deck_apex`・`n_rel_feat._deck_roles`）の意味だけを「山札＋伏せたライフから作る
+# 期待値」に替えた。**列数で版を逆引きできるのは v14 まで**（v15 と v14 は同じ列数）。
+# 16 列は版の引数に依らず常に v15 の作り（NRel は v12 の土台＋`encode_rel` で組むため・Rust も版で分けない）。
+SCALARS_V15 = SCALARS_V14
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
                        9: SCALARS_V9, 10: SCALARS_V10, 11: SCALARS_V11,
-                       12: SCALARS_V12, 13: SCALARS_V13, 14: SCALARS_V14}
+                       12: SCALARS_V12, 13: SCALARS_V13, 14: SCALARS_V14,
+                       15: SCALARS_V15}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -185,37 +191,47 @@ def _vidx(vocab, c):
 _BLOCKER_KW = "ブロッカー"
 
 
-def _deck_aggregate(deck):
-    """me.deck（残ライブラリ）の守り/資源集約 5 値を返す。空デッキ・属性欠落に安全（探索クローン上で
+def _deck_aggregate(me):
+    """自デッキ残（v15: 山札＋伏せたライフ）の守り/資源集約 5 値を返す。空デッキ・属性欠落に安全（探索クローン上で
     呼ばれるため決して例外を投げない）。正規化は有界（温スタートの恒等性は新W1行ゼロで保証されるので
-    値域は学習安定性のためだけ・50=デッキ上限で割る/密度は分数）。"""
-    n = 0
-    counter_total = 0.0
-    counter_cards = 0
-    blockers = 0
-    events = 0
-    highcost_char = 0
-    for c in deck:
-        m = getattr(c, "master", None)
-        if m is None:
-            continue
-        n += 1
-        cv = getattr(m, "counter", 0) or 0
-        counter_total += cv
-        if cv > 0:
-            counter_cards += 1
-        try:
-            if _BLOCKER_KW in (m.keywords or ()):
-                blockers += 1
-        except Exception:
-            pass
-        t = getattr(m, "type", None)
-        tname = getattr(t, "name", None)
-        if tname == "EVENT":
-            events += 1
-        elif tname == "CHARACTER" and (getattr(m, "cost", 0) or 0) >= 7:
-            highcost_char += 1
-    density = (counter_cards / n) if n else 0.0
+    値域は学習安定性のためだけ・50=デッキ上限で割る/密度は分数）。
+
+    符号化 v15（2026-10-22・`search_efficiency_plan.md` §7.19）: 数える列は「山札に何枚入っているか」の期待値
+    （`n_rel_feat.own_remaining`／`expect_combine`・Rust `encode::OwnRemaining`）、密度はそれ ÷ 山札の枚数。
+    v14 までは山札だけを数えていた（本物の盤面では伏せたライフの中身が漏れ、fair の世界では世界ごとに揺れた）。"""
+    from opcg_sim.learned.n_rel_feat import expect_combine, own_remaining
+    rem = own_remaining(me)
+    known, unknown, _nu, n_deck = rem
+    sums = []
+    for cards in (known, unknown):
+        counter_total = 0
+        counter_cards = 0
+        blockers = 0
+        events = 0
+        highcost_char = 0
+        for c in cards:
+            m = getattr(c, "master", None)
+            if m is None:
+                continue
+            cv = getattr(m, "counter", 0) or 0
+            counter_total += cv
+            if cv > 0:
+                counter_cards += 1
+            try:
+                if _BLOCKER_KW in (m.keywords or ()):
+                    blockers += 1
+            except Exception:
+                pass
+            t = getattr(m, "type", None)
+            tname = getattr(t, "name", None)
+            if tname == "EVENT":
+                events += 1
+            elif tname == "CHARACTER" and (getattr(m, "cost", 0) or 0) >= 7:
+                highcost_char += 1
+        sums.append((counter_total, counter_cards, blockers, events, highcost_char))
+    counter_total, counter_cards, blockers, events, highcost_char = (
+        expect_combine(rem, k, u) for k, u in zip(*sums))
+    density = (counter_cards / n_deck) if n_deck else 0.0
     return [
         counter_total / (50.0 * 2000.0),   # 残カウンター総量（守りの総火力）
         density,                            # カウンター札密度（次に守り札を引く確率の代理）
@@ -230,12 +246,16 @@ def _deck_aggregate(deck):
 # 落とすが、既存特徴の意味は append-only 契約のため変更しない）。掘り（don!!-1 ドロー）の価値は
 # 「山に眠る頂点の高さ」に比例する——これが無いと 1コスト掘りキャラの登場時効果が無差別になる
 # （h1@2 実測 2026-08-10: 掘る線と無行動の線で value Δ=+0.011）。
-def _deck_apex(deck):
-    """me.deck（残ライブラリ）のキャラ頂点 2 値（最大パワー/10000・最大コスト/10）。
-    空デッキ・属性欠落に安全（探索クローン上で呼ばれるため決して例外を投げない）。"""
+def _deck_apex(me):
+    """自デッキ残のキャラ頂点 2 値（最大パワー/10000・最大コスト/10）。
+    空デッキ・属性欠落に安全（探索クローン上で呼ばれるため決して例外を投げない）。
+
+    v15: 山札にあると分かっている札と知らない札（山札＋伏せたライフ）の全部の最大＝山札に居うる頂点。"""
+    from opcg_sim.learned.n_rel_feat import own_remaining
+    known, unknown, _nu, _n = own_remaining(me)
     max_power = 0.0
     max_cost = 0.0
-    for c in deck:
+    for c in known + unknown:
         m = getattr(c, "master", None)
         if m is None:
             continue
@@ -388,7 +408,7 @@ def encode(manager, me_name, vocab, version=1, skip_onplay=False):
     if version >= 4:
         # v4（cpu_v5_plan.md §4-3・D3/C5）: 自デッキ残の集約（守り/資源）を末尾追加。相手デッキは
         # 非公開ゆえ自分のみ（公平性契約）。カード個別でない汎用量＝counter/keyword/type の集計。
-        vals += _deck_aggregate(getattr(me, "deck", ()) or ())
+        vals += _deck_aggregate(me)
     if version >= 5:
         # v5（cpu_v10）: 相手場の脅威集約3＋自分の展開余力1。相手場は公開情報（公平性契約に適合）。
         vals += _opp_field_aggregate(getattr(opp, "field", ()) or ())
@@ -432,7 +452,7 @@ def encode(manager, me_name, vocab, version=1, skip_onplay=False):
         # (b) 自デッキ残キャラの頂点2値（_deck_apex）: 掘りに行く先の価値。
         vals += [len(getattr(me, "don_deck", ()) or ()) / 10.0,
                  len(getattr(opp, "don_deck", ()) or ()) / 10.0]
-        vals += _deck_apex(getattr(me, "deck", ()) or ())
+        vals += _deck_apex(me)
     if 10 <= version <= 11:
         # v10（2026-08-12・v52b）: リーサル距離Δ3値＝台本レースのエンジン実測（lethal.py）。
         # 乖離族（見かけと実質が乖離・ライフ差が逆向きに壊れる盤面）で唯一正の説明力を持つ

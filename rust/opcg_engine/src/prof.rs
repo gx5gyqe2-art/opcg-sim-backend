@@ -34,9 +34,18 @@ pub enum Cat {
     FwdPolicy = 12,
     /// 登場時の試し打ちの入口（盤面の写し＋保留中の要求の読み）
     EncOnplayProbe = 13,
+    /// 詰みの証明（`search::lethal`）の内訳: 置換表の鍵・要求の手の列挙（対話の分岐）・巻き戻し
+    LethalKey = 14,
+    LethalExpand = 15,
+    LethalRollback = 16,
+    /// 詰みの証明の内訳: 手の適用（エンジン）・攻撃の数の上界
+    LethalApply = 17,
+    LethalBound = 18,
+    /// 置換表の鍵のうち対話の節点（中断の中身も混ぜる）
+    LethalKeyDialog = 19,
 }
 
-const N: usize = 14;
+const N: usize = 20;
 const NAMES: [&str; N] = [
     "search_other",
     "forward",
@@ -52,9 +61,15 @@ const NAMES: [&str; N] = [
     "fwd_body",
     "fwd_policy",
     "enc_onplay_probe",
+    "lethal_key",
+    "lethal_expand",
+    "lethal_rollback",
+    "lethal_apply",
+    "lethal_bound",
+    "lethal_key_dialog",
 ];
 /// 区分外の累計: decide の壁時計・py_game.decide の壁時計・decide の回数・forward の回数（value／priors）。
-const N_EXTRA: usize = 6;
+const N_EXTRA: usize = 9;
 const EXTRA: [&str; N_EXTRA] = [
     "decide_wall",
     "py_decide_wall",
@@ -62,6 +77,9 @@ const EXTRA: [&str; N_EXTRA] = [
     "n_value",
     "n_priors",
     "n_value_reused",
+    "n_trunk_hit",
+    "n_cand",
+    "n_cand_memo_hit",
 ];
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -154,6 +172,10 @@ pub const DECIDES: usize = 2;
 pub const N_VALUE: usize = 3;
 pub const N_PRIORS: usize = 4;
 pub const N_VALUE_REUSED: usize = 5;
+pub const N_TRUNK_HIT: usize = 6;
+/// 方策の頭が見た候補の数・そのうち幹の memo で引けた数。
+pub const N_CAND: usize = 7;
+pub const N_CAND_MEMO_HIT: usize = 8;
 
 /// 累計を JSON で返して 0 に戻す（ns・回数）。
 pub fn take() -> serde_json::Value {

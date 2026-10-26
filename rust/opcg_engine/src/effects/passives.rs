@@ -51,12 +51,16 @@ pub fn apply_passive_effects(
     // Step 1: 両プレイヤーのバフ・一時キーワードをリセット（値が変わるときだけ書く）。
     for seat in [player, opponent] {
         for card in units(s, seat) {
-            let keywords = masters.get(s.state().card(card).master).keywords.clone();
+            let master_kw = &masters.get(s.state().card(card).master).keywords;
+            // 書き込みは値が同じなら何もしない＝同じときは写しを作らない（結果は同じ）。
+            let keywords = (s.state().card(card).current_keywords != *master_kw).then(|| master_kw.clone());
             let mut e = s.edit();
             e.set_card_i32(card, CardI32Field::CostBuff, 0);
             e.set_card_i32(card, CardI32Field::PassivePower, 0);
             e.set_card_opt_i32(card, CardOptI32Field::PassivePowerOverride, None);
-            e.set_card_strs(card, CardStrsField::CurrentKeywords, keywords);
+            if let Some(keywords) = keywords {
+                e.set_card_strs(card, CardStrsField::CurrentKeywords, keywords);
+            }
         }
         for card in s.state().player(seat).hand.clone() {
             let mut e = s.edit();
@@ -114,26 +118,45 @@ fn resolve_trigger_over(
     trigger: TriggerType,
 ) -> Result<(), EngineError> {
     for card in units(s, owner) {
-        let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+        // 能力の列はマスター表（不変）から借りる（盤面の書き換えとは別の借用）。
+        let ids = &masters.get(s.state().card(card).master).ability_ids;
         for (index, id) in ids.iter().enumerate() {
             let ab = ability(masters, *id)?;
             if ab.trigger != trigger {
                 continue;
             }
-            if is_reactive_passive(ab) {
-                continue; // 「…された時」型はイベント誘発であり再計算で実行しない
-            }
-            if super::actions::rules::is_rest_replacement(ab) {
-                // 「〜になる場合、代わりに〜」の置換（PRB02-006）は**置換であって継続効果では
-                // ない**＝再計算で実行しない（実体はレストの現場の `active_rest_replacement`）。
-                // 再計算で実行すると、条件が偽にならないまま対象選択で中断し続けて要求が
-                // 無限に往復する（§20.8.1-1 の発見 2・seed 930028 の void）。
+            if recalc_skip(&masters.abilities, *id, ab) {
                 continue;
             }
             game_resolve_ability(s, masters, actor, card, index, false)?;
         }
     }
     Ok(())
+}
+
+/// 再計算で実行しない能力か（[`recalc_skips`] の 1 件・表の印を引く）。
+fn recalc_skip(table: &super::ast::AbilityTable, id: u32, ab: &super::ast::Ability) -> bool {
+    let marks = table
+        .recalc_skip
+        .get_or_init(|| table.abilities.iter().map(recalc_skips).collect());
+    match marks.get(id as usize) {
+        // 印を作った後に足された能力（単体テストだけ）はその場で判定する。
+        Some(m) if marks.len() == table.abilities.len() => *m,
+        _ => recalc_skips(ab),
+    }
+}
+
+/// 継続効果の再計算（`resolve_trigger_over`）で実行しない能力か。
+///
+/// - 「…された時」型（[`is_reactive_passive`]）はイベント誘発であり再計算で実行しない。
+/// - 「〜になる場合、代わりに〜」の置換（PRB02-006）は**置換であって継続効果では
+///   ない**＝再計算で実行しない（実体はレストの現場の `active_rest_replacement`）。
+///   再計算で実行すると、条件が偽にならないまま対象選択で中断し続けて要求が
+///   無限に往復する（§20.8.1-1 の発見 2・seed 930028 の void）。
+///
+/// どちらも能力（マスター）だけで決まる＝表ごとに 1 度だけ作る（[`recalc_skip`]）。
+pub fn recalc_skips(ab: &super::ast::Ability) -> bool {
+    is_reactive_passive(ab) || super::actions::rules::is_rest_replacement(ab)
 }
 
 /// Python `_is_reactive_passive`（無タグの反応型かどうか）。
@@ -143,12 +166,17 @@ fn resolve_trigger_over(
 pub fn is_reactive_passive(ab: &super::ast::Ability) -> bool {
     let first = ab.effect.as_ref().and_then(find_first_action);
     let raw = first.map(|a| a.raw_text.as_str()).unwrap_or("");
-    let combined = format!("{raw} {}", ab.raw_text);
-    reactive_re_search(&combined)
+    // Python は `f"{raw} {ab.raw_text}"` を探す。句はどれも空白を含まない＝つなぎ目をまたいでは一致しない
+    // ので、2 つを別々に探すのと同じ（文字列を組まない）。
+    reactive_re_search(raw) || reactive_re_search(&ab.raw_text)
 }
 
 /// `(された|した|受けた|なった|離れた)時、` を含むか（Python の正規表現と同値）。
 fn reactive_re_search(text: &str) -> bool {
+    // 句はどれも「時、」で終わる＝それを含まなければどれとも一致しない（先に 1 回だけ探す）。
+    if !text.contains("時、") {
+        return false;
+    }
     for pat in [
         "された時、",
         "した時、",
@@ -246,7 +274,9 @@ pub fn apply_hand_self_cost(
 /// リーダー＋場＋ステージ（Python の走査対象）。
 fn units(s: &Session, seat: Seat) -> Vec<CardIdx> {
     let p = s.state().player(seat);
-    let mut out: Vec<CardIdx> = p.leader.into_iter().collect();
+    // 並びと中身は同じ（先に長さぶんを取っておくだけ）。
+    let mut out: Vec<CardIdx> = Vec::with_capacity(2 + p.field.len());
+    out.extend(p.leader);
     out.extend(p.field.iter().copied());
     out.extend(p.stage);
     out

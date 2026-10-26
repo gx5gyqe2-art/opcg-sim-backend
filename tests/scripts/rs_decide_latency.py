@@ -1,0 +1,201 @@
+"""1 手の決定時間の分布（`docs/search_efficiency_plan.md` §1・Phase 0）。
+
+両席を同じ設定で打ち、観測者で `decide` の間隔を測る。1 コアに固定して測るときは
+`taskset -c 0 python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20`。
+出力は JSON 1 行（条件・手数・平均／中央／90／99／最大）。
+"""
+import argparse
+import json
+import os
+import statistics
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+os.environ.setdefault("OPCG_LOG_SILENT", "1")
+
+from opcg_sim.loop import decks as D, driver as DR, engine as E  # noqa: E402
+
+
+def _dfp_summary(rows):
+    """守りの証明（§7.51）を回した窓の数・手を替えた数・全部証明された数・節点の平均と最大。"""
+    nodes = sorted(r["nodes"] for r in rows)
+    return {"windows": len(rows), "changed": sum(r["pick"] != r["was"] for r in rows),
+            "all_proven": sum(bool(r["all_proven"]) for r in rows),
+            "nodes_mean": round(statistics.mean(nodes), 1), "nodes_p99": nodes[int(len(nodes) * 0.99)],
+            "nodes_max": nodes[-1]}
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sims", type=int, default=E.PLAY_SIMS)
+    ap.add_argument("--worlds", type=int, default=1)
+    ap.add_argument("--world-threads", type=int, default=None,
+                    help="世界を同時に回すスレッドの上限（§7.55・省略＝Rust の既定 0＝世界ごとに 1 本・打つ手は不変）")
+    ap.add_argument("--budget", type=int, default=E.PLAY_BUDGET, help="戦闘箱の枝予算（0＝無制限・-1＝Rust 既定）")
+    ap.add_argument("--games", type=int, default=20)
+    ap.add_argument("--seed-base", type=int, default=2999900)
+    ap.add_argument("--net", default=None)
+    ap.add_argument("--decks", default="synth_roles")
+    ap.add_argument("--omniscient", action="store_true",
+                    help="両席とも全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）")
+    ap.add_argument("--reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="両席とも探索の世界の見える範囲（§7.11・§7.15・省略＝既定の fair・peek は旧既定）")
+    ap.add_argument("--opp-blind", action="store_true",
+                    help="両席とも木の中の相手にこちらの手札を見せない（§7.14・測定専用）")
+    ap.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                    help="両席とも詰みの証明（§7.21）。出力に発動の頻度と根の判定の節点・秒の分布を足す"
+                         "（秒は同じ盤面で `Game.lethal_json` を測り直す＝1 手の時間からは外す）")
+    ap.add_argument("--lethal-nodes", type=int, default=None,
+                    help="両席とも根の詰みの証明の節点の上限（§7.49・省略＝Rust の既定 20,000）。秒の測り直しも同じ上限")
+    ap.add_argument("--commit-hidden-legacy", action="store_true",
+                    help="両席とも、見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用）。"
+                         "出力の kinds（決め方ごとの手数）と並べて読み直しの増分を見る")
+    ap.add_argument("--window-legacy", action="store_true",
+                    help="両席とも §7.42 の旧い形 3 つ（窓・対話の続きを積む・窓の世界 1 本・ライフが少ない戦闘の応手を静的な値で）")
+    ap.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形（測定専用）")
+    ap.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形（測定専用）")
+    ap.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形（測定専用）")
+    ap.add_argument("--confirm-trigger-legacy", action="store_true",
+                    help="両席とも、トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・測定専用）")
+    ap.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
+    ap.add_argument("--extra", default=None,
+                    help="decide の opts に足す JSON（例 '{\"window_tree_life\": 2}'・§7.42 の対象の広げ方の費用を見る）")
+    ap.add_argument("--knowledge", action="store_true",
+                    help="決定点ごとに打つ席の「知っている札」（§7.15・`Game.knowledge_json`）を数え、分布を出力に足す")
+    a = ap.parse_args(argv)
+    E.engine()
+    db = D.load_db()
+    kw = {}
+    if a.budget >= 0:
+        kw["budget"] = a.budget
+    if a.worlds > 1:
+        kw["worlds"] = a.worlds
+    if a.world_threads is not None:
+        kw["world_threads"] = a.world_threads
+    if a.omniscient:
+        kw["omniscient"] = True
+    if a.reveal:
+        kw["reveal"] = a.reveal
+    if a.opp_blind:
+        kw["opp_blind"] = True
+    if a.lethal_proof and a.lethal_proof != "off":
+        kw["lethal_proof"] = a.lethal_proof
+    if a.lethal_nodes:
+        kw["lethal_nodes"] = a.lethal_nodes
+    if a.commit_hidden_legacy:
+        kw["commit_hidden_legacy"] = True
+    for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
+        if getattr(a, "window_legacy", False) or getattr(a, _k, False):
+            kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_worlds", None):
+        kw["window_worlds"] = a.window_worlds
+    if a.confirm_trigger_legacy:
+        kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない旧い形）
+    if a.extra:
+        kw.update(json.loads(a.extra))
+    spec = E.SeatSpec(a.net, sims=a.sims, **kw)
+    ts = []
+    last = [0.0]
+    know = []
+    leth = []
+    kinds = {}
+    dfp = []
+
+    def obs(game, name, turn, step, out, move):
+        now = time.perf_counter()
+        ts.append(now - last[0])
+        kinds[out.get("kind")] = kinds.get(out.get("kind"), 0) + 1
+        if out.get("defense_proof"):
+            dfp.append(out["defense_proof"])   # 守りの証明（§7.51）を回した窓
+        if a.knowledge:
+            know.append(json.loads(game.knowledge_json(name)))
+        if a.lethal_proof:
+            pend = json.loads(game.pending_json())
+            row = {"main": pend.get("action") == "MAIN_ACTION" and game.turn_player() == name,
+                   "kind": out.get("kind"), "lethal": out.get("lethal")}
+            if (out.get("lethal") or {}).get("root"):
+                r = json.loads(game.lethal_json(name, json.dumps({"search_seed": E.search_seed(seed_now[0], turn, name),
+                                                             **({"max_nodes": a.lethal_nodes} if a.lethal_nodes else {})})))
+                row["root_sec"] = r.get("sec")
+            leth.append(row)
+        last[0] = time.perf_counter()
+
+    t0 = time.perf_counter()
+    seed_now = [0]
+    for g in range(a.games):
+        seed = a.seed_base + g
+        seed_now[0] = seed
+        la, lb = D.leader_pair(db, seed, "random")
+        p1, p2 = D.build_pair(db, la, lb, seed, a.decks)
+        last[0] = time.perf_counter()
+        DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=obs)
+    ts.sort()
+    n = len(ts)
+    print(json.dumps({"sims": a.sims, "worlds": a.worlds, "budget": a.budget,
+                      **({"world_threads": a.world_threads} if a.world_threads is not None else {}),
+                      **({"omniscient": True} if a.omniscient else {}),
+                      **({"reveal": a.reveal} if a.reveal else {}),
+                      **({"opp_blind": True} if a.opp_blind else {}),
+                      **({"commit_hidden_legacy": True} if a.commit_hidden_legacy else {}),
+                      **{k: v for k, v in kw.items() if k.startswith("window_")},
+                      **({"confirm_trigger_legacy": True} if a.confirm_trigger_legacy else {}),
+                      **({"extra": json.loads(a.extra)} if a.extra else {}),
+                      "games": a.games, "moves": n, "kinds": kinds,
+                      "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),
+                      "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
+                      "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
+                      "affinity": sorted(os.sched_getaffinity(0)),
+                      **({"lethal_nodes": a.lethal_nodes} if a.lethal_nodes else {}),
+                      **({"lethal_proof": a.lethal_proof, "lethal": _lethal_summary(leth)} if a.lethal_proof else {}),
+                      **({"knowledge": _knowledge_summary(know)} if a.knowledge else {}),
+                      **({"defense_proof": _dfp_summary(dfp)} if dfp else {})}))
+
+
+def _q(vals, f):
+    return vals[min(len(vals) - 1, int(len(vals) * f))] if vals else None
+
+
+def _lethal_summary(rows):
+    """詰みの証明（§7.21）: 判断点のうち根の判定をした割合・証明した割合・根の節点と秒の分布・応手の証明の実績。"""
+    main = [r for r in rows if r["main"]]
+    tried = [r for r in rows if (r["lethal"] or {}).get("root")]
+    nodes = sorted(r["lethal"]["root"]["nodes"] for r in tried)
+    secs = sorted(r["root_sec"] for r in tried if r.get("root_sec") is not None)
+    st = {}
+    for r in tried:
+        k = r["lethal"]["root"]["status"]
+        st[k] = st.get(k, 0) + 1
+    rep = [r["lethal"]["reply"] for r in rows if (r["lethal"] or {}).get("reply")]
+    return {"decisions": len(rows), "main_points": len(main), "root_tried": len(tried),
+            "root_tried_per_main": round(len(tried) / max(1, len(main)), 4),
+            "root_status": st, "fired": st.get("win", 0),
+            "fired_per_main": round(st.get("win", 0) / max(1, len(main)), 4),
+            "root_nodes": {"mean": round(sum(nodes) / max(1, len(nodes)), 1), "p50": _q(nodes, .5),
+                           "p90": _q(nodes, .9), "max": nodes[-1] if nodes else None},
+            "root_sec": {"mean": round(sum(secs) / max(1, len(secs)), 4), "p50": _q(secs, .5),
+                         "p90": _q(secs, .9), "p99": _q(secs, .99), "max": secs[-1] if secs else None},
+            "reply": {k: sum(r[k] for r in rep) for k in ("checked", "children", "proven", "nodes")} if rep else None}
+
+
+def _knowledge_summary(rows):
+    """決定点ごとの「知っている札」の枚数の分布（§7.15）。total＝隠れた領域で知っている札の合計。"""
+    keys = ("opp_hand", "opp_deck", "opp_life", "my_deck", "my_life", "deck_top")
+    out = {"points": len(rows)}
+    for k in keys + ("total",):
+        vals = sorted(sum(r[x] for x in keys[:5]) if k == "total" else r[k] for r in rows)
+        if not vals:
+            continue
+        hist = {}
+        for v in vals:
+            hist[str(v)] = hist.get(str(v), 0) + 1
+        out[k] = {"mean": round(statistics.mean(vals), 3), "p50": vals[len(vals) // 2],
+                  "p90": vals[int(len(vals) * 0.9)], "max": vals[-1],
+                  "share_nonzero": round(sum(1 for v in vals if v) / len(vals), 3), "hist": hist}
+    out["opp_hand_share_known"] = round(
+        sum(r["opp_hand"] for r in rows) / max(1, sum(r["opp_hand_n"] for r in rows)), 4)
+    return out
+
+
+if __name__ == "__main__":
+    main()

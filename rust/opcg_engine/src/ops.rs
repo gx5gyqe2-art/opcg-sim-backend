@@ -177,6 +177,27 @@ pub fn reset_turn_status(
     refresh_keywords(s, masters, card);
 }
 
+/// [`reset_turn_status`] から「次のリフレッシュフェイズでアクティブにならない」（`flags["FREEZE"]`）だけを残す版。
+///
+/// FREEZE は**そのカードの持ち主の次のリフレッシュ**（[`crate::rules::turn::refresh_all`]）で読んで消すもの。
+/// ターン終了の一時効果の解除（`turn::reset_player_status`）と戦闘後の後処理（`battle::finish_attack`）は
+/// その前に走るので、ここで消すと**自分のカードへの FREEZE**（OP04-090「このキャラをアクティブにする。その後、
+/// 次の自分のリフレッシュフェイズでアクティブにならない」）と**相手のターン中に付けた FREEZE**（OP15-023 の【KO時】等）、
+/// **FREEZE を付けた後にアタックされて残ったキャラ**の FREEZE が効かなかった（2026-10-25 まで・WP `defect-hunt-2`）。
+pub fn reset_turn_status_keep_freeze(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    keep_don: bool,
+    clear_usage: bool,
+) {
+    let frozen = s.state().card(card).flags.iter().any(|f| f == "FREEZE");
+    reset_turn_status(s, masters, card, keep_don, clear_usage);
+    if frozen {
+        s.edit().set_card_strs(card, CardStrsField::Flags, vec!["FREEZE".to_string()]);
+    }
+}
+
 // --- ゾーン移動 ---------------------------------------------------------------
 
 fn dest_card_zone(zone: Zone) -> Result<Option<CardZone>, EngineError> {
@@ -273,13 +294,11 @@ pub fn move_card(
         Some((owner, Some(zone))) => {
             s.edit().card_zone_remove_value(owner, zone, card);
         }
-        Some((owner, None)) => {
-            // リーダーは 1. で弾いているのでステージ枠のみ。
-            if s.state().player(owner).stage == Some(card) {
-                s.edit().set_slot(owner, CardSlot::Stage, None);
-            }
+        // リーダーは 1. で弾いているのでステージ枠のみ。
+        Some((owner, None)) if s.state().player(owner).stage == Some(card) => {
+            s.edit().set_slot(owner, CardSlot::Stage, None);
         }
-        None => {}
+        Some((_, None)) | None => {}
     }
 
     // 6. 離脱イベント（誘発の待ち行列に積むのは P2/P3）。

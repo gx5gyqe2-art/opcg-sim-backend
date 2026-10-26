@@ -19,7 +19,6 @@ use crate::effects::ast::{EffectNode, GameAction};
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
-use std::collections::HashMap;
 
 /// `encoder.scalars_dim(14)`＝94（v12）＋33（`n_rel_feat.EXTRA_DIM`）。
 ///
@@ -47,7 +46,14 @@ pub const EXTRA_DIM: usize = 33;
 /// v13 のグローバル追加列（29）。
 pub const EXTRA_DIM_V13: usize = 29;
 /// 符号化の世代（`n_rel.NR_ENC_VERSION`）。npz の meta `enc_version` と突き合わせる。
-pub const ENC_VERSION: u32 = 14;
+///
+/// **v15**（2026-10-22・WP `enc-v15`・`docs/search_efficiency_plan.md` §7.19）は形が v14 と同じで、
+/// 自分の残り山札の集計 16 列（`deck_aggregate` 5・`deck_apex` 2・EXTRA の自デッキの役割 7＋直した除去・
+/// バウンス）の**意味だけ**を「山札＋伏せたライフから作る期待値」に替えた（[`OwnRemaining`]）。
+/// v14 のネット（r13d 等）はそのまま読む（pad も不要）。
+pub const ENC_VERSION: u32 = 15;
+/// v14（候補行に対象を載せる規則が入った版・[`crate::net::NRelWeights::cand_target`] の境目）。
+pub const ENC_VERSION_V14: u32 = 14;
 pub const ENC_VERSION_V13: u32 = 13;
 /// `n_eff.STATS_DIM`（stats 8＋印字キーワード 8）／`MAX_AB`／`ABILITY_DIM`（23＋62×2＋4＋8＋7＋1）。
 pub const STATS_DIM: usize = 16;
@@ -92,12 +98,12 @@ pub fn walk_all<'a>(node: Option<&'a EffectNode>, out: &mut Vec<&'a GameAction>)
 #[derive(Debug, Clone, Default)]
 pub struct Vocab {
     pub ids: Vec<String>,
-    pub index: HashMap<String, u32>,
+    pub index: crate::fxhash::FxHashMap<String, u32>,
 }
 
 impl Vocab {
     pub fn from_ids(ids: &[String]) -> Vocab {
-        let mut index = HashMap::new();
+        let mut index = crate::fxhash::FxHashMap::default();
         for (i, id) in ids.iter().enumerate() {
             index.insert(id.clone(), (i + 1) as u32); // Python `vocab_from_ids`: 1 始まり・0 は PAD
         }
@@ -152,6 +158,81 @@ pub struct EncodeOptions {
     pub skip_relations: bool,
     /// `skip_onplay=True`（ablate onplay）。登場時スキャンを省き列を 0 にする。
     pub skip_onplay: bool,
+    /// **測定専用**（WP `enc-v15`）: 自分の残り山札の 16 列を v14 の作り（本物の山札だけを数える＝
+    /// 伏せたライフの中身が漏れる）で出す。npz の meta `"enc_deck": "v14"`／符号化 opts の `deck_v14`。
+    pub deck_v14: bool,
+}
+
+/// 自分の「残りの札」（山札＋伏せたライフ）の分け方（符号化 v15・§7.19）。
+///
+/// 山札と伏せたライフの並び・分け方は自分に見えない。そこで 16 列を「山札に何枚入っているか」の
+/// **期待値**で作る: 山札にあると分かっている札（`known_by` に自分の bit）は 1 枚として、知らない札
+/// （山札と伏せたライフの知らない枠に居る札）は `山札の知らない枠 ÷ 知らない札の総数` の重みで数える。
+/// 伏せたライフにあると分かっている札・表向きのライフは山札に入らない（数えない）。
+///
+/// 本物・`peek`・`fair` のどの世界でも同じ値になる: `fair` は知らない札を知らない枠の中でだけ
+/// 混ぜ直す（知っている札は位置ごと固定）ので、知らない札の集合と枠の数は世界に依らない。
+/// 足し込むのは整数（カウンター値・枚数・役割の 0/1）だけ＝足す順に依らず厳密で、割るのは最後の 1 回。
+#[derive(Debug, Clone, Default)]
+pub struct OwnRemaining {
+    /// 山札にあると分かっている札（v14 の作りでは山札の全部）
+    pub known: Vec<crate::model::CardIdx>,
+    /// 知らない札（山札の知らない枠＋伏せたライフの知らない枠に居る札）
+    pub unknown: Vec<crate::model::CardIdx>,
+    /// 山札の知らない枠の数
+    pub n_unknown_deck: usize,
+    /// 山札の枚数（密度の分母・公開）
+    pub n_deck: usize,
+}
+
+impl OwnRemaining {
+    /// `deck_v14` なら v14 の作り（山札の全部を確定で数える）。
+    pub fn of(state: &GameState, me: Seat, deck_v14: bool) -> OwnRemaining {
+        let p = state.player(me);
+        if deck_v14 {
+            return OwnRemaining {
+                known: p.deck.clone(),
+                unknown: Vec::new(),
+                n_unknown_deck: 0,
+                n_deck: p.deck.len(),
+            };
+        }
+        let bit = me.know_bit();
+        let knows = |c: &crate::model::CardIdx| state.card(*c).known_by & bit != 0;
+        let mut known = Vec::new();
+        let mut unknown = Vec::new();
+        for c in &p.deck {
+            if knows(c) {
+                known.push(*c);
+            } else {
+                unknown.push(*c);
+            }
+        }
+        let n_unknown_deck = unknown.len();
+        unknown.extend(p.life.iter().copied().filter(|c| !state.card(*c).is_face_up && !knows(c)));
+        OwnRemaining { known, unknown, n_unknown_deck, n_deck: p.deck.len() }
+    }
+
+    /// 知っている札の和 `k` と知らない札の和 `u` から期待値 `k + u × n_unknown_deck ÷ |unknown|`。
+    /// `k`・`u` は整数の和であること（足す順に依らない）。
+    pub fn combine(&self, k: f64, u: f64) -> f64 {
+        if self.unknown.is_empty() {
+            return k;
+        }
+        k + u * self.n_unknown_deck as f64 / self.unknown.len() as f64
+    }
+
+    /// `f` の期待値（`f` は整数値を返すこと）。
+    pub fn expect(&self, mut f: impl FnMut(crate::model::CardIdx) -> f64) -> f64 {
+        let k: f64 = self.known.iter().map(|c| f(*c)).sum();
+        let u: f64 = self.unknown.iter().map(|c| f(*c)).sum();
+        self.combine(k, u)
+    }
+
+    /// 山札に居うる札の全部（頂点＝最大パワー・最大コストを取る対象）。
+    pub fn candidates(&self) -> impl Iterator<Item = &crate::model::CardIdx> {
+        self.known.iter().chain(self.unknown.iter())
+    }
 }
 
 /// `n_eff.build_eff_tables(db, vocab)`。実体は [`cardtab::build_eff_tables`]。

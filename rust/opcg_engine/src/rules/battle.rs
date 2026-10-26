@@ -17,7 +17,7 @@ use crate::state::EngineError;
 
 use super::passive::apply_passive_effects;
 use super::{
-    card_type, has_flag, has_keyword, has_timed_flag, KW_ATTACK_ACTIVE, KW_BANISH, KW_BLOCKER,
+    card_type, has_flag, has_keyword, has_timed_flag, KW_ATTACK_ACTIVE, KW_BANISH,
     KW_DOUBLE_ATTACK, KW_RUSH, KW_RUSH_CHAR, KW_UNBLOCKABLE,
 };
 
@@ -27,19 +27,10 @@ fn bad(msg: impl Into<String>) -> EngineError {
 
 /// Python `has_blocker`（ブロッカーを 1 枚でも構えているか）。
 ///
-/// `get_pending_request` のブロッカー候補列挙とは条件が 1 つ違う（こちらは
-/// `BLOCKER_DISABLED` も見る）。Python のまま移す。
+/// 候補の列挙（[`super::pending::blocker_candidates`]）と同じ判定（2026-10-25 から 1 つにした・
+/// リーダーの【ブロッカー】も数える・WP `defect-hunt-2`）。
 pub fn has_blocker(s: &Session, seat: Seat) -> bool {
-    let st = s.state();
-    if super::blocking_suppressed(st) {
-        return false;
-    }
-    st.player(seat).field.iter().any(|c| {
-        !st.card(*c).is_rest
-            && has_keyword(st, *c, KW_BLOCKER)
-            && !st.card(*c).flags.iter().any(|f| f == "BLOCKER_DISABLED")
-            && !has_timed_flag(st, *c, "CANNOT_REST")
-    })
+    !super::pending::blocker_candidates(s.state(), seat).is_empty()
 }
 
 /// Python `declare_attack`。検証は全て同じ順序・同じメッセージで行う。
@@ -158,6 +149,10 @@ pub fn advance_battle_triggers(
         return Ok(());
     }
     while !s.state().battle_triggers.is_empty() {
+        // 同時に誘発した束は手番側 → 非手番側・同じプレイヤーの 2 つ以上は本人が順を選ぶ（WP `rs-trigger-simul`）。
+        if crate::effects::triggers::order_front_bundle(s, masters, TriggerQueue::Battle)? {
+            return Ok(()); // 解決順の選択: 解決後に resolve_interaction から再開される
+        }
         let mut queue = s.state().battle_triggers.clone();
         let item = queue.remove(0);
         s.edit().set_trigger_queue(TriggerQueue::Battle, queue);
@@ -222,7 +217,7 @@ pub fn handle_block(
     }
     s.edit().set_phase(Phase::BattleCounter);
     if blocker.is_some() {
-        triggers::advance_pending_triggers(s, masters)?;
+        triggers::settle_pending(s, masters)?;
     }
     Ok(())
 }
@@ -274,7 +269,7 @@ pub fn apply_counter(
             seat,
             Position::Bottom,
         )?;
-        triggers::advance_pending_triggers(s, masters)?;
+        triggers::settle_pending(s, masters)?;
         return Ok(());
     }
     let value = super::current_counter(s.state(), masters, counter_card);
@@ -452,7 +447,7 @@ pub fn finish_attack(
 ) -> Result<(), EngineError> {
     // バトルの当事者（終了時の誘発と、ライフ離脱の行き先＝バニッシュの判定に使う）。
     let battle = s.state().active_battle.clone();
-    ops::reset_turn_status(s, masters, target, true, false);
+    ops::reset_turn_status_keep_freeze(s, masters, target, true, false);
     s.edit().set_active_battle(None);
     s.edit().set_phase(Phase::Main);
     check_victory(s, masters)?;
@@ -482,7 +477,7 @@ pub fn finish_attack(
             triggers::enqueue_battle_end_listeners(s, masters, b.attacker, b.target)?;
         }
     }
-    triggers::advance_pending_triggers(s, masters)
+    triggers::settle_pending(s, masters)
 }
 
 /// Python `check_victory`（デッキアウト。§11.8 #6 で `masters` を通し、デッキアウト敗北→勝利

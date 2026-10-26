@@ -1,0 +1,86 @@
+{
+ "kind": "train",
+ "section": "§7.50",
+ "ledger_grep": "7.50 波 53",
+ "about": "r24（warm-start r23・π 波 53・価値 波 53＋52）の訓練 → 評価帯（波 53 holdout）",
+ "job": "train-r24",
+ "branch": "claude/train-r24",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n53-w{ww}",
+   "shards": 32,
+   "dest": "~/n53",
+   "glob": "~/n53/n_records/n53_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n52-w{ww}",
+   "shards": 32,
+   "dest": "~/n52",
+   "glob": "~/n52/n_records/n52_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r23.npz"
+ ],
+ "runs": [
+  {
+   "name": "r24",
+   "in": [
+    "~/n53/n_records/n53_w*_p[0-3]"
+   ],
+   "z_in": [
+    "~/n52/n_records/n52_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r24.npz",
+   "log": "~/train_r24.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n53/n_records/n53_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r22.npz",
+    "opcg_sim/data/learned/nrel_r23.npz",
+    "~/nrel_r24.npz",
+    "~/nrel_r24.ep0.npz",
+    "~/nrel_r24.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r24.json",
+   "log": "~/band_r24.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r23.npz"
+ },
+ "commit_message": "r24 のセット（訓練・評価帯）"
+}

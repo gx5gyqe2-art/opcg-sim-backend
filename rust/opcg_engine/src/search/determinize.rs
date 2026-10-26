@@ -86,3 +86,162 @@ pub fn determinize(state: &GameState, me: Seat, order: &[String]) -> Result<Game
     }
     Ok(s.into_state())
 }
+
+// --- 見える範囲を分けた世界サンプル（`search_efficiency_plan.md` §7.11・WP `rs-reveal`・測定専用）---
+
+/// `idx` の位置にあるカードを `pool` の並べ替え `order`（uuid 列）で置き換えた盤面を作る下請け。
+/// `slots` は (席, ゾーン, 位置) の列で、`pool[i]` は `slots[i]` にある。並びは
+/// [`SearchRng::shuffle_order`](crate::search::rng::SearchRng::shuffle_order) が返す（空なら呼ばない）。
+fn reshuffle_slots(
+    state: &mut GameState,
+    slots: &[(Seat, CardZone, usize)],
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<(), EngineError> {
+    if slots.is_empty() {
+        return Ok(());
+    }
+    let zone_of = |st: &GameState, seat: Seat, zone: CardZone| -> Vec<CardIdx> {
+        let p = st.player(seat);
+        match zone {
+            CardZone::Hand => p.hand.clone(),
+            CardZone::Deck => p.deck.clone(),
+            CardZone::Life => p.life.clone(),
+            _ => unreachable!("reshuffle_slots: 手札・山札・ライフ以外は混ぜない"),
+        }
+    };
+    let pool: Vec<CardIdx> = slots
+        .iter()
+        .map(|&(seat, zone, at)| zone_of(state, seat, zone)[at])
+        .collect();
+    let uuids: Vec<String> = pool.iter().map(|c| state.card(*c).uuid.clone()).collect();
+    let order = rng.shuffle_order(&uuids)?;
+    if order.len() != pool.len() {
+        return Err(EngineError::BadPayload(format!(
+            "determinize: 並びの長さ {} が pool の {} と違う",
+            order.len(),
+            pool.len()
+        )));
+    }
+    let mut shuffled: Vec<CardIdx> = Vec::with_capacity(order.len());
+    for uuid in &order {
+        shuffled.push(
+            crate::ops::find_card_by_uuid(state, uuid)
+                .ok_or_else(|| EngineError::BadPayload(format!("determinize: 未知の uuid '{uuid}'")))?,
+        );
+    }
+    let (mut a, mut b) = (pool.clone(), shuffled.clone());
+    a.sort_unstable();
+    b.sort_unstable();
+    if a != b {
+        return Err(EngineError::BadPayload("determinize: 並びが pool の並べ替えになっていない".into()));
+    }
+    for (&(seat, zone, at), card) in slots.iter().zip(shuffled) {
+        let p = state.player_mut(seat);
+        match zone {
+            CardZone::Hand => p.hand[at] = card,
+            CardZone::Deck => p.deck[at] = card,
+            CardZone::Life => p.life[at] = card,
+            _ => unreachable!(),
+        }
+    }
+    Ok(())
+}
+
+/// `seat` の (手札?)＋山札＋(裏向きのライフ?) の位置の列（この順・pool の並び）。
+///
+/// `viewer` が `Some(v)` なら、`v` が**知っている札**（[`CardInstance::known_by`](crate::model::CardInstance::known_by)
+/// に `v` の bit）の位置を除く＝その札は動かさない（§7.15 の `fair`）。`None` は印を読まない（`opp_hand`）。
+fn hidden_slots(
+    state: &GameState,
+    seat: Seat,
+    hand: bool,
+    deck: bool,
+    life: bool,
+    viewer: Option<Seat>,
+) -> Vec<(Seat, CardZone, usize)> {
+    let p = state.player(seat);
+    let unknown = |c: CardIdx| viewer.map_or(true, |v| state.card(c).known_by & v.know_bit() == 0);
+    let mut out = Vec::new();
+    if hand {
+        out.extend(p.hand.iter().enumerate().filter(|(_, c)| unknown(**c)).map(|(i, _)| (seat, CardZone::Hand, i)));
+    }
+    if deck {
+        out.extend(p.deck.iter().enumerate().filter(|(_, c)| unknown(**c)).map(|(i, _)| (seat, CardZone::Deck, i)));
+    }
+    if life {
+        out.extend(
+            p.life
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| !state.card(**c).is_face_up && unknown(**c))
+                .map(|(i, _)| (seat, CardZone::Life, i)),
+        );
+    }
+    out
+}
+
+/// `reveal="opp_hand"`（§7.11）: 相手の手札は本当のまま、**相手の山札の並びだけ**を混ぜ直す
+/// （今の [`determinize_with`] は手札＋山札を 1 つの山として混ぜる）。山札が空なら乱数を消費しない。
+pub fn determinize_opp_deck_with(
+    state: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<GameState, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
+    let mut out = state.clone();
+    let slots = hidden_slots(state, me.other(), false, true, false, None);
+    reshuffle_slots(&mut out, &slots, rng)?;
+    Ok(out)
+}
+
+/// `reveal="fair"`（**既定**・§7.11／§7.15）: **自分に見えないものを全部**混ぜ直す。ただし自分が
+/// **知っている札**（[`CardInstance::known_by`](crate::model::CardInstance::known_by) に `me` の bit＝
+/// 手札に戻した札・公開した札・見て並べた山札の上など）はその位置に固定し、残りの枠だけを混ぜる。
+///
+/// - 相手の山: 相手の手札＋山札＋裏向きのライフのうち知らない枠（この順で 1 回 `shuffle_order`）
+/// - 自分の山: 自分の山札＋自分の裏向きのライフのうち知らない枠（続けてもう 1 回）
+///
+/// 各ゾーンの枚数・表向きのライフの位置と中身は保つ。手札（自分）・場・ステージ・リーダー・
+/// トラッシュ・一時領域（効果の解決中に見ているカード）・ドン!!は動かさない。空の山は乱数を消費しない。
+pub fn determinize_fair_with(
+    state: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<GameState, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
+    let mut out = state.clone();
+    let opp = hidden_slots(state, me.other(), true, true, true, Some(me));
+    reshuffle_slots(&mut out, &opp, rng)?;
+    let mine = hidden_slots(state, me, false, true, true, Some(me));
+    reshuffle_slots(&mut out, &mine, rng)?;
+    Ok(out)
+}
+
+/// `fair` の自分側だけ（自分の山札＋裏向きのライフのうち自分の知らない枠）を `source` の並びから混ぜ直して
+/// `out` に書く（§7.21 の守りの強い配り方が使う・相手側は呼び出し側が作る）。
+pub(crate) fn reshuffle_own_fair(
+    out: &mut GameState,
+    source: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<(), EngineError> {
+    let mine = hidden_slots(source, me, false, true, true, Some(me));
+    reshuffle_slots(out, &mine, rng)
+}
+
+/// `opp_blind`（`search_efficiency_plan.md` §7.14・WP `rs-oppblind`・測定専用）: **相手から見えない
+/// こちらの札**＝`me` の手札＋山札＋裏向きのライフを 1 つの山として混ぜ直す（`fair` の自分側と同じ作り
+/// に、相手から見えない手札を足したもの）。相手の側・表向きのライフ（位置と中身）・公開領域・各ゾーンの
+/// 枚数は動かさない。山が空なら乱数を消費しない。**相手が知っているこちらの札**（`known_by` に相手の
+/// bit）はその位置に固定する（§7.15）。
+pub fn determinize_self_with(
+    state: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<GameState, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
+    let mut out = state.clone();
+    let mine = hidden_slots(state, me, true, true, true, Some(me.other()));
+    reshuffle_slots(&mut out, &mine, rng)?;
+    Ok(out)
+}

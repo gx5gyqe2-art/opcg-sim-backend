@@ -485,7 +485,7 @@ impl Duration {
 }
 
 /// Python `TargetQuery`（全フィールド・既定値は Python と同じ）。
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TargetQuery {
     /// Python は `Zone | List[Zone]`。単一なら要素 1 の Vec。既定 `[FIELD]`。
     pub zone: Vec<ZoneRef>,
@@ -730,6 +730,9 @@ pub struct Ability {
 #[derive(Debug, Default, Clone)]
 pub struct AbilityTable {
     pub abilities: Vec<Ability>,
+    /// 能力ごとの「継続効果の再計算で実行しない」印（反応型・レストの置換・
+    /// `effects::passives::recalc_skips`）。能力から決まる値を表ごとに 1 度だけ作って持つ。
+    pub recalc_skip: std::sync::OnceLock<Vec<bool>>,
 }
 
 impl AbilityTable {

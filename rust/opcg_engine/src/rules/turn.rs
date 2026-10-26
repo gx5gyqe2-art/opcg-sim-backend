@@ -211,7 +211,7 @@ fn begin_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError>
     if s.state().active_interaction().is_none() && s.state().pending_triggers.is_empty() {
         return refresh_phase(s, masters);
     }
-    triggers::advance_pending_triggers(s, masters)?;
+    triggers::settle_pending(s, masters)?;
     if s.state().active_interaction().is_some() || !s.state().pending_triggers.is_empty() {
         s.edit().set_mgr_bool(MgrBoolField::TurnStartPending, true);
         Ok(())
@@ -232,14 +232,16 @@ pub fn refresh_phase(s: &mut Session, masters: &MasterTable) -> Result<(), Engin
 /// （付与ドン!!は剥がさない＝`keep_don=True`。【ターン1回】の使用回数は戻す）。
 fn reset_player_status(s: &mut Session, masters: &MasterTable, seat: Seat) {
     for card in units(s, seat) {
-        ops::reset_turn_status(s, masters, card, true, true);
+        ops::reset_turn_status_keep_freeze(s, masters, card, true, true);
     }
 }
 
 /// リーダー＋場＋ステージ（Python の `[p.leader] + p.field (+ p.stage)`）。
 fn units(s: &Session, seat: Seat) -> Vec<CardIdx> {
     let p = s.state().player(seat);
-    let mut out: Vec<_> = p.leader.into_iter().collect();
+    // 並びと中身は同じ（先に長さぶんを取っておくだけ）。
+    let mut out: Vec<CardIdx> = Vec::with_capacity(2 + p.field.len());
+    out.extend(p.leader);
     out.extend(p.field.iter().copied());
     out.extend(p.stage);
     out

@@ -5,9 +5,11 @@
 
 use crate::journal::Session;
 use crate::model::{MasterTable, Seat};
-use crate::rules::pending::{get_pending_request, pending_actor_action};
+use crate::rules::pending::pending_actor_action;
 use crate::state::EngineError;
-use serde_json::{json, Value};
+use crate::rules::moves::GameArgs;
+use serde_json::Value;
+use std::borrow::Cow;
 
 use super::{adapter, Move};
 
@@ -42,16 +44,19 @@ pub fn drain_own_interactions(
         ) {
             return Ok(());
         }
-        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
-        if stop_at_select && adapter::selection_moves(s, masters, actor).is_some() {
+        // ここに来るのは効果対話だけ（`pending_actor_action` はマリガンの次に中断を見る＝上の 4 種
+        // 以外の種別は進行中の中断の `front_action`）。要求の dict は組まず、要求の対話分岐
+        // （`get_pending_request`）が出す値を中断から直接読む（WP `rs-speed-d`）。
+        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。判定は候補を
+        // 組まずに数える（`adapter::selection_branch_exists_of`＝`selection_moves(..).is_some()`）。
+        let Some(it) = s.state().active_interaction() else {
+            return Ok(());
+        };
+        if stop_at_select && adapter::selection_branch_exists_of(it, actor) {
             return Ok(());
         }
-        let pending = get_pending_request(s, masters, false);
-        let payload = crate::effects::interact::default_interaction_payload(
-            s.state(),
-            masters,
-            pending.as_ref(),
-        );
+        let payload =
+            crate::effects::interact::default_interaction_payload_of(s.state(), masters, it);
         match crate::rules::actions::apply_game_action(
             s,
             masters,
@@ -80,8 +85,7 @@ pub fn apply_move_inplace(
     let _prof = crate::prof::enter(crate::prof::Cat::Apply);
     let bad = |m: String| EngineError::BadPayload(m);
     let action_type = mv
-        .get("action_type")
-        .and_then(Value::as_str)
+        .action_type()
         .ok_or_else(|| bad("move: 'action_type' がありません。".into()))?;
 
     if action_type == "SETUP_BOX" {
@@ -91,32 +95,43 @@ pub fn apply_move_inplace(
     }
 
     if action_type == "DON_BOX" {
-        let null = Value::Null;
-        let payload = mv.get("payload").unwrap_or(&null);
-        let uuid = payload.get("uuid").cloned().unwrap_or(Value::Null);
-        let don_k = payload.get("don_k").and_then(Value::as_i64).unwrap_or(0);
-        for _ in 0..don_k.max(0) {
-            crate::rules::actions::apply_game_action(
-                s,
-                masters,
-                actor,
-                "ATTACH_DON",
-                &json!({"uuid": uuid}),
-            )?;
-            drain_own_interactions(s, masters, actor, stop_at_select)?;
+        // 付与も攻撃も、適用が読むのは `uuid`（文字列）と `target_ids[0]`（文字列）だけ
+        // （今までの `{"uuid": uuid}`／`{"uuid": uuid, "target_ids": target_ids}` の dict から
+        // `apply_game_action` が読んでいた値と同じ）。
+        let p = mv.payload();
+        let uuid = p.and_then(|p| p.uuid());
+        let don_k = p.and_then(|p| p.don_k_i64()).unwrap_or(0);
+        if don_k > 0 {
+            let attach = GameArgs {
+                card_uuid: uuid,
+                target_uuid: None,
+                ability_index: None,
+            };
+            for _ in 0..don_k {
+                crate::rules::actions::apply_game_action_with(
+                    s,
+                    masters,
+                    actor,
+                    "ATTACH_DON",
+                    attach,
+                    no_payload,
+                )?;
+                drain_own_interactions(s, masters, actor, stop_at_select)?;
+            }
         }
-        let target_ids = payload
-            .get("target_ids")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        if !target_ids.is_empty() {
-            crate::rules::actions::apply_game_action(
+        if p.is_some_and(|p| p.has_target_ids()) {
+            let attack = GameArgs {
+                card_uuid: uuid,
+                target_uuid: p.and_then(|p| p.first_target_id()),
+                ability_index: None,
+            };
+            crate::rules::actions::apply_game_action_with(
                 s,
                 masters,
                 actor,
                 "ATTACK",
-                &json!({"uuid": uuid, "target_ids": target_ids}),
+                attack,
+                no_payload,
             )?;
             drain_own_interactions(s, masters, actor, stop_at_select)?;
         }
@@ -125,16 +140,39 @@ pub fn apply_move_inplace(
 
     // Python は `move["kind"]` を添字で読む＝欄が無ければ KeyError（＝例外手）。
     let kind = mv
-        .get("kind")
-        .and_then(Value::as_str)
+        .kind()
         .ok_or_else(|| bad("move: 'kind' がありません。".into()))?;
     if kind == "battle" {
-        let card_uuid = mv.get("card_uuid").and_then(Value::as_str);
-        crate::rules::actions::apply_battle_action(s, masters, actor, action_type, card_uuid)?;
+        crate::rules::actions::apply_battle_action(s, masters, actor, action_type, mv.card_uuid())?;
     } else {
-        let empty = Value::Object(serde_json::Map::new());
-        let payload = mv.get("payload").unwrap_or(&empty);
-        crate::rules::actions::apply_game_action(s, masters, actor, action_type, payload)?;
+        match mv.payload() {
+            Some(p) => {
+                // 対話の解決が読むのは payload だけ（`uuid`／`target_ids` 等の欄から引く操作カードは
+                // 盤面を読むだけで使われない）＝欄を引かない。
+                let args = if action_type == adapter::ACT_RESOLVE_SELECTION {
+                    GameArgs::default()
+                } else {
+                    p.game_args()
+                };
+                crate::rules::actions::apply_game_action_with(
+                    s,
+                    masters,
+                    actor,
+                    action_type,
+                    args,
+                    || p.to_json(),
+                )?
+            }
+            None => {
+                let empty = Value::Object(serde_json::Map::new());
+                crate::rules::actions::apply_game_action(s, masters, actor, action_type, &empty)?
+            }
+        }
     }
     drain_own_interactions(s, masters, actor, stop_at_select)
+}
+
+/// 付与・攻撃の適用は payload を読まない（読むのは対話の解決だけ）。
+fn no_payload() -> Cow<'static, Value> {
+    Cow::Owned(Value::Object(serde_json::Map::new()))
 }

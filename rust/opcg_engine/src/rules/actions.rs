@@ -12,6 +12,9 @@ use crate::effects::ast::TriggerType;
 use crate::ops;
 use crate::state::EngineError;
 use serde_json::Value;
+use std::borrow::Cow;
+
+use super::moves::GameArgs;
 
 use super::passive::{apply_passive_effects, refresh_passive_state};
 use super::pending::{pending_actor_action, ACT_PASS, ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER};
@@ -287,16 +290,25 @@ pub fn apply_game_action(
     action_type: &str,
     payload: &Value,
 ) -> Result<(), EngineError> {
-    let card_uuid = payload
-        .get("uuid")
-        .and_then(Value::as_str)
-        .or_else(|| payload.get("card_id").and_then(Value::as_str));
-    let target_uuid = payload
-        .get("target_ids")
-        .and_then(Value::as_array)
-        .and_then(|a| a.first())
-        .and_then(Value::as_str)
-        .or_else(|| payload.get("target_uuid").and_then(Value::as_str));
+    let args = GameArgs::of_json(payload);
+    apply_game_action_with(s, masters, seat, action_type, args, || Cow::Borrowed(payload))
+}
+
+/// [`apply_game_action`] の、payload から読む欄（[`GameArgs`]）を外から渡す版（探索の型の手・
+/// WP `rs-speed-d`）。`payload` は対話の解決（`RESOLVE_EFFECT_SELECTION`）だけが読む。
+pub fn apply_game_action_with<'p>(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    action_type: &str,
+    args: GameArgs<'_>,
+    payload: impl FnOnce() -> Cow<'p, Value>,
+) -> Result<(), EngineError> {
+    let GameArgs {
+        card_uuid,
+        target_uuid,
+        ability_index,
+    } = args;
     let operating = card_uuid.and_then(|u| operating_card(s.state(), seat, u));
 
     match action_type {
@@ -312,11 +324,13 @@ pub fn apply_game_action(
                         .find(|c| s.state().card(*c).uuid == uuid)
                 })
                 .ok_or_else(|| bad("対象のカードが手札にありません。"))?;
-            let name = masters.get(s.state().card(card).master).name.clone();
-            s.push_event(serde_json::json!({
-                "type": "PLAY", "player": seat.name(), "card_name": name,
-                "message": format!("「{name}」を登場"),
-            }));
+            if s.events_on() {
+                let name = masters.get(s.state().card(card).master).name.clone();
+                s.push_event(serde_json::json!({
+                    "type": "PLAY", "player": seat.name(), "card_name": name,
+                    "message": format!("「{name}」を登場"),
+                }));
+            }
             let cost = {
                 let c = s.state().card(card);
                 c.current_cost(masters.get(c.master))
@@ -328,10 +342,12 @@ pub fn apply_game_action(
         }
         // `end_turn` の中で `_validate_action(gm.turn_player, "MAIN_ACTION")` を行う（Python 同）。
         "TURN_END" => {
-            s.push_event(serde_json::json!({
-                "type": "TURN_END", "player": seat.name(),
-                "message": format!("ターン{}終了", s.state().turn_count),
-            }));
+            if s.events_on() {
+                s.push_event(serde_json::json!({
+                    "type": "TURN_END", "player": seat.name(),
+                    "message": format!("ターン{}終了", s.state().turn_count),
+                }));
+            }
             super::turn::end_turn(s, masters)?
         }
         "ATTACK" | "ATTACK_CONFIRM" => {
@@ -357,12 +373,14 @@ pub fn apply_game_action(
                 .into_iter()
                 .find(|c| s.state().card(*c).uuid == target_uuid)
                 .ok_or_else(|| bad("攻撃対象が見つかりません。"))?;
-            let atk_name = masters.get(s.state().card(attacker).master).name.clone();
-            let tgt_name = masters.get(s.state().card(target).master).name.clone();
-            s.push_event(serde_json::json!({
-                "type": "ATTACK", "player": seat.name(), "card_name": atk_name,
-                "message": format!("「{atk_name}」→「{tgt_name}」攻撃"),
-            }));
+            if s.events_on() {
+                let atk_name = masters.get(s.state().card(attacker).master).name.clone();
+                let tgt_name = masters.get(s.state().card(target).master).name.clone();
+                s.push_event(serde_json::json!({
+                    "type": "ATTACK", "player": seat.name(), "card_name": atk_name,
+                    "message": format!("「{atk_name}」→「{tgt_name}」攻撃"),
+                }));
+            }
             super::battle::declare_attack(s, masters, attacker, target)?;
         }
         "ATTACH_DON" => {
@@ -378,48 +396,53 @@ pub fn apply_game_action(
             e.set_don_attached_to(don, Some(card));
             e.don_zone_push(seat, DonZone::Attached, don);
             e.set_card_i32(card, CardI32Field::AttachedDon, attached + 1);
-            let name = masters.get(s.state().card(card).master).name.clone();
-            s.push_event(serde_json::json!({
-                "type": "ATTACH_DON", "player": seat.name(), "card_name": name,
-                "message": format!("「{name}」にドン!!付与"),
-            }));
+            if s.events_on() {
+                let name = masters.get(s.state().card(card).master).name.clone();
+                s.push_event(serde_json::json!({
+                    "type": "ATTACH_DON", "player": seat.name(), "card_name": name,
+                    "message": format!("「{name}」にドン!!付与"),
+                }));
+            }
             // 「ドン!!が付与された時」の誘発（OP02-002）。
             let host_owner = s.state().card(card).owner;
             crate::effects::triggers::enqueue_don_attached_listeners(s, masters, card, host_owner)?;
         }
         "ACTIVATE_MAIN" => {
             let card = operating.ok_or_else(|| bad("効果を発動するカードが見つかりません。"))?;
-            let index = payload
-                .get("ability_index")
-                .and_then(Value::as_u64)
-                .map(|n| n as usize);
-            let name = masters.get(s.state().card(card).master).name.clone();
-            s.push_event(serde_json::json!({
-                "type": "ACTIVATE_MAIN", "player": seat.name(), "card_name": name,
-                "message": format!("「{name}」の効果起動"),
-            }));
+            let index = ability_index;
+            if s.events_on() {
+                let name = masters.get(s.state().card(card).master).name.clone();
+                s.push_event(serde_json::json!({
+                    "type": "ACTIVATE_MAIN", "player": seat.name(), "card_name": name,
+                    "message": format!("「{name}」の効果起動"),
+                }));
+            }
             activate_main(s, masters, seat, card, index)?;
         }
         "RESOLVE_EFFECT_SELECTION" => {
-            resolve_interaction(s, masters, seat, payload)?;
+            resolve_interaction(s, masters, seat, &payload())?;
         }
         "MULLIGAN" => {
             super::turn::do_mulligan(s, masters, seat)?;
-            s.push_event(serde_json::json!({
-                "type": "MULLIGAN", "player": seat.name(), "message": "マリガン（手札全交換）",
-            }));
+            if s.events_on() {
+                s.push_event(serde_json::json!({
+                    "type": "MULLIGAN", "player": seat.name(), "message": "マリガン（手札全交換）",
+                }));
+            }
         }
         "KEEP_HAND" => {
             super::turn::keep_hand(s, masters, seat)?;
-            s.push_event(serde_json::json!({
-                "type": "KEEP_HAND", "player": seat.name(), "message": "手札キープ",
-            }));
+            if s.events_on() {
+                s.push_event(serde_json::json!({
+                    "type": "KEEP_HAND", "player": seat.name(), "message": "手札キープ",
+                }));
+            }
         }
         other => return Err(bad(format!("不明なアクションです: {other}"))),
     }
 
     // Python: アクション境界の `_advance_pending_triggers()` → `refresh_passive_state()`。
-    crate::effects::triggers::advance_pending_triggers(s, masters)?;
+    crate::effects::triggers::settle_pending(s, masters)?;
     refresh_passive_state(s, masters)?;
     Ok(())
 }
@@ -467,20 +490,21 @@ pub fn apply_battle_action(
     }
     match action_type {
         ACT_SELECT_BLOCKER => {
+            // ブロッカーの候補（場のキャラ＋【ブロッカー】のリーダー）から引く（2026-10-25 までは場だけを
+            // 探していて、リーダーの uuid は「ブロックしない」と同じに落ちていた・WP `defect-hunt-2`）。
             let blocker = card_uuid.and_then(|u| {
-                s.state()
-                    .player(seat)
-                    .field
-                    .iter()
-                    .copied()
+                super::pending::blocker_candidates(s.state(), seat)
+                    .into_iter()
                     .find(|c| s.state().card(*c).uuid == u)
             });
             if let Some(b) = blocker {
-                let name = masters.get(s.state().card(b).master).name.clone();
-                s.push_event(serde_json::json!({
-                    "type": "BLOCK", "player": seat.name(), "card_name": name,
-                    "message": format!("「{name}」でブロック"),
-                }));
+                if s.events_on() {
+                    let name = masters.get(s.state().card(b).master).name.clone();
+                    s.push_event(serde_json::json!({
+                        "type": "BLOCK", "player": seat.name(), "card_name": name,
+                        "message": format!("「{name}」でブロック"),
+                    }));
+                }
             }
             super::battle::handle_block(s, masters, blocker)?;
         }
@@ -495,18 +519,22 @@ pub fn apply_battle_action(
             });
             if let Some(c) = counter {
                 let m = masters.get(s.state().card(c).master);
-                let (name, counter_value) = (m.name.clone(), m.counter);
-                s.push_event(serde_json::json!({
-                    "type": "COUNTER", "player": seat.name(), "card_name": name,
-                    "message": format!("「{name}」でカウンター(+{counter_value})"),
-                }));
+                if s.events_on() {
+                    let (name, counter_value) = (m.name.clone(), m.counter);
+                    s.push_event(serde_json::json!({
+                        "type": "COUNTER", "player": seat.name(), "card_name": name,
+                        "message": format!("「{name}」でカウンター(+{counter_value})"),
+                    }));
+                }
             }
             super::battle::apply_counter(s, masters, seat, counter)?;
         }
         ACT_PASS => {
-            s.push_event(serde_json::json!({
-                "type": "PASS", "player": seat.name(), "message": "パス",
-            }));
+            if s.events_on() {
+                s.push_event(serde_json::json!({
+                    "type": "PASS", "player": seat.name(), "message": "パス",
+                }));
+            }
             // ブロックステップのパスは「ブロックしない」＝カウンターステップへ進む。
             if s.state().phase == crate::model::Phase::BlockStep {
                 super::battle::handle_block(s, masters, None)?;

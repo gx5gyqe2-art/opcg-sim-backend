@@ -1,0 +1,10 @@
+  final {'p1': {'leader': 'OP15-058', 'deck': 23, 'hand': 9, 'life': 0, 'field': 2, 'trash': 16}, 'p2': {'leader': 'OP16-079', 'deck': 20, 'hand': 6, 'life': 3, 'field': 4, 'trash': 17}}
+3461302 winner p2 turns 12 steps 155 acts {'p1': 78, 'p2': 41} MAX_STEPS 400 sec 58.4
+   (147, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', ('OP16-082', 'field'), 'MAIN', False)
+   (148, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', ('OP16-082', 'field'), 'MAIN', False)
+   (149, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', ('OP16-082', 'field'), 'MAIN', False)
+   (150, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', ('OP16-079', 'leader'), 'MAIN', False)
+   (151, 'p1', 12, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'SELECT_COUNTER', ('OP15-061', 'hand'), 'BATTLE_COUNTER', True)
+   (152, 'p1', 12, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', None, 'BATTLE_COUNTER', True)
+   (153, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', ('OP16-082', 'field'), 'MAIN', False)
+   (154, 'p1', 12, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', None, 'BATTLE_COUNTER', True)

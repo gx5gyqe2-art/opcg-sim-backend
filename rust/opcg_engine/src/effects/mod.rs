@@ -52,6 +52,8 @@ mod tests_rest_replace;
 mod tests_g3;
 #[cfg(test)]
 mod tests_reactions;
+#[cfg(test)]
+mod tests_trigger_order;
 pub mod triggers;
 pub mod value;
 
@@ -231,7 +233,7 @@ pub fn only_cards_strict(refs: &[TargetRef]) -> Result<Vec<CardIdx>, EngineError
 /// core（`cond.rs`／`value.rs`）が読み、resolver が書く。Python の dict のキーと 1:1
 /// （キー名をフィールド名にしてある）。`Eq` を持つのは `GameState` が `PartialEq` を要求する
 /// ため（journal の巻き戻しを bit 一致で検査する）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EffectContext {
     /// `saved_targets`: save_id / ref_id → 選ばれた対象（カード or ドン!!）。
     pub saved_targets: Vec<(String, Vec<TargetRef>)>,
@@ -426,6 +428,7 @@ mod tests {
                 raw_text: String::new(),
                 cost_optional: false,
             }],
+            ..Default::default()
         }
     }
 

@@ -1,0 +1,51 @@
+{
+ "kind": "gen",
+ "section": "§7.42",
+ "ledger_grep": "7.42 WP `worker-jobs`",
+ "about": "試し: 途中で止めて再開する生成（2 局 × 3 区切り・32 回）",
+ "job": "trial-gen-resume",
+ "branch": "claude/worker-job-trial-gen-resume",
+ "base": {
+  "branch": "claude/worker-jobs"
+ },
+ "shards": 1,
+ "hours": 0.2,
+ "vars": {
+  "BASE": "9900000 + k*1000"
+ },
+ "seed_base": "BASE",
+ "games": 2,
+ "parts": 3,
+ "workers": 1,
+ "out_dir": "n_records",
+ "part_dir": "trial_resume_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r13d.npz",
+ "args": [
+  "--sims",
+  "32",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--decks",
+  "real",
+  "--shard-games",
+  "1"
+ ],
+ "log": "~/trial_gen_resume.log",
+ "copy_logs": [
+  "~/trial_gen_resume.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--budget\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r13d.npz",
+  "games": 2,
+  "sims": 32
+ },
+ "commit_message": "trial gen shard {K}"
+}

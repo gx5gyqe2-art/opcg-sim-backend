@@ -409,6 +409,11 @@ impl Game {
     /// - `worlds`（省略＝1）… 1 回の決定で引く世界サンプルの本数（§20.7.1）。2 以上なら
     ///   K 本の世界で同じ sims の木を**並列**（`std::thread::scope`）に回し、根の統計を束ねる。
     ///   世界 i の乱数は `search_seed + i`。
+    /// - `omniscient`（省略＝false）… 全部見える探索（`search_efficiency_plan.md` §7.10・測定専用）。
+    ///   true なら世界を引き直さず本当の盤面で読む（`worlds` は 1 扱い）。
+    /// - `reveal`（省略＝今までどおり）… 見える範囲を分けた世界サンプル（§7.11・`"opp_hand"`／`"fair"`）。
+    /// - `opp_blind`（省略＝false）… 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。
+    ///   相手の番のノードの評価だけ、こちらの手札＋山札＋裏向きのライフを混ぜ直した複製で行う。
     ///
     /// 木を回す間は **GIL を放す**（`Python::detach`＝旧 `allow_threads`）＝世界スレッドが
     /// 走っている間も他の Python スレッド（API のリクエスト処理）が動ける。探索は Python を
@@ -470,6 +475,29 @@ impl Game {
         ))
     }
 
+    /// 席 `player_id` が**知っている札**（`CardInstance::known_by`・`search_efficiency_plan.md` §7.15）の枚数を
+    /// 隠れた領域ごとに数える（計測用・盤面 dict とは別出力＝golden に影響しない）。`deck_top` は自分の山札の上から
+    /// 続けて知っている枚数。
+    fn knowledge_json(&self, player_id: &str) -> PyResult<String> {
+        let me = self.seat_of(player_id)?;
+        let st = self.session.state();
+        let bit = me.know_bit();
+        let knows = |c: &crate::model::CardIdx| st.card(*c).known_by & bit != 0;
+        let count = |v: &[crate::model::CardIdx]| v.iter().filter(|c| knows(c)).count();
+        let down = |seat: Seat| -> Vec<crate::model::CardIdx> {
+            st.player(seat).life.iter().copied().filter(|c| !st.card(*c).is_face_up).collect()
+        };
+        let (mine, opp) = (st.player(me), st.player(me.other()));
+        to_py_json(&serde_json::json!({
+            "opp_hand": count(&opp.hand), "opp_hand_n": opp.hand.len(),
+            "opp_deck": count(&opp.deck), "opp_deck_n": opp.deck.len(),
+            "opp_life": count(&down(me.other())), "opp_life_n": down(me.other()).len(),
+            "my_deck": count(&mine.deck), "my_deck_n": mine.deck.len(),
+            "my_life": count(&down(me)), "my_life_n": down(me).len(),
+            "deck_top": mine.deck.iter().take_while(|c| knows(c)).count(),
+        }))
+    }
+
     /// 山札の残り枚数（`{"p1": n, "p2": n}`）。盤面 dict は伏せ情報なので出さない欄で、
     /// 思考トレースのリプレイフレーム（`services/replay._frame_side`）だけが使う。
     fn deck_counts_json(&self) -> PyResult<String> {
@@ -487,7 +515,7 @@ impl Game {
     /// 現在の要求（`selectable_uuids`）を見るので、**手を適用する前**に呼ぶこと。
     fn describe_move_json(&mut self, move_json: &str) -> PyResult<String> {
         let masters = self.masters()?;
-        let mv = parse_json(move_json, "move")?;
+        let mv = crate::search::Move::from_json(parse_json(move_json, "move")?);
         let pending =
             crate::rules::pending::get_pending_request(&mut self.session, masters, false);
         let d = crate::search::decide::describe_move(
@@ -559,20 +587,60 @@ impl Game {
                         .and_then(Value::as_bool)
                         .unwrap_or(false),
                     skip_onplay: v.get("skip_onplay").and_then(Value::as_bool).unwrap_or(false),
+                    deck_v14: v.get("deck_v14").and_then(Value::as_bool).unwrap_or(false),
                 }
             }
         };
-        let enc = crate::encode::encode(self.session.state(), masters, &vocab, seat, &opts)
-            .map_err(err)?;
-        to_py_json(&serde_json::json!({
-            "scalars": enc.scalars,
-            "field": enc.field,
-            "card_idx": enc.card_idx,
-            "tokens": enc.tok,
-            "rel_om": enc.rel_om,
-            "rel_oo": enc.rel_oo,
-            "extra": enc.extra,
-        }))
+        encode_json(self.session.state(), masters, &vocab, seat, &opts)
+    }
+
+    /// **探索の世界を 1 本作って符号化する**（測定専用・`tests/scripts/enc_fair_diff.py`・
+    /// `docs/search_efficiency_plan.md` §7.17 WP `enc-audit`）。
+    ///
+    /// decide が世界 `i` に使うのと同じ作り（`reveal` の混ぜ直し・乱数は
+    /// `Pcg32SearchRng::new(seed)`＝decide の `search_seed + i`）で盤面を引き、その盤面の根の
+    /// 入力（`encode` と同じ形）を返す。`reveal` は `"fair"`／`"peek"`／`"opp_hand"`／`"truth"`
+    /// （`truth`＝混ぜない本物の盤面）。元の対局は 1 ビットも変わらない。
+    #[pyo3(signature = (player_id, reveal, seed))]
+    fn encode_world(&self, player_id: &str, reveal: &str, seed: u64) -> PyResult<String> {
+        use crate::search::determinize as det;
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let vocab = crate::encode::current_vocab()
+            .map_err(err)?
+            .ok_or_else(|| PyValueError::new_err("encode_world: 語彙が未設定"))?;
+        let state = self.session.state();
+        let mut rng = crate::search::Pcg32SearchRng::new(seed);
+        let world = match reveal {
+            "truth" => state.clone(),
+            "fair" => det::determinize_fair_with(state, seat, &mut rng).map_err(err)?,
+            "peek" => det::determinize_with(state, seat, &mut rng).map_err(err)?,
+            "opp_hand" => det::determinize_opp_deck_with(state, seat, &mut rng).map_err(err)?,
+            _ => return Err(PyValueError::new_err(format!("encode_world: 未知の reveal '{reveal}'"))),
+        };
+        encode_json(&world, masters, &vocab, seat, &crate::encode::EncodeOptions::default())
+    }
+
+    /// **世界を引いた複製**（`move_judge.py`・`docs/search_efficiency_plan.md` §7.32・計測専用）: `encode_world` と
+    /// 同じ作り（`reveal` の混ぜ直し・乱数は `Pcg32SearchRng::new(seed)`）で盤面を引き、その盤面を**別の対局**として
+    /// 返す。`fork` と違い、返す対局の対局の乱数（シャッフル・コイントス）は `seed` の PCG32＝この先を最後まで
+    /// 打てる（`Replay` だと効果の SHUFFLE が混ぜない）。元の対局は 1 ビットも変わらない。
+    #[pyo3(signature = (player_id, reveal, seed))]
+    fn fork_world(&self, player_id: &str, reveal: &str, seed: u64) -> PyResult<Game> {
+        use crate::search::determinize as det;
+        let seat = self.seat_of(player_id)?;
+        let state = self.session.state();
+        let mut rng = crate::search::Pcg32SearchRng::new(seed);
+        let world = match reveal {
+            "truth" => state.clone(),
+            "fair" => det::determinize_fair_with(state, seat, &mut rng).map_err(err)?,
+            "peek" => det::determinize_with(state, seat, &mut rng).map_err(err)?,
+            "opp_hand" => det::determinize_opp_deck_with(state, seat, &mut rng).map_err(err)?,
+            _ => return Err(PyValueError::new_err(format!("fork_world: 未知の reveal '{reveal}'"))),
+        };
+        let mut session = Session::new(world);
+        session.rng = Rng::Pcg32(Pcg32::new(seed ^ 0x5851_F42D_4C95_7F2D));
+        Ok(Game { session, names: self.names.clone() })
     }
 
     /// **読み取り専用の複製**（手の値段の後続局面・`clock_succ.py`・`docs/reports/2026-10-10_clock_value.md` §1.2）。
@@ -618,12 +686,90 @@ impl Game {
         Game { session: Session::new(s.into_state()), names: self.names.clone() }
     }
 
+    /// 根の詰みの判定だけを回す（`search_efficiency_plan.md` §7.21・計測用・盤面は動かさない）。
+    ///
+    /// `opts_json`: `search_seed`（配り方の乱数・決定と同じ導出）・`rand`（公平な引き直しの数・既定 6）・
+    /// `max_nodes`（既定 20000）・`force`（true なら発動条件〔自分のメイン・届きうる攻撃の数〕を見ずに回す）・
+    /// `lethal_deal_legacy`（守りの強い配り方の旧い形・§7.33・既定 false）。
+    /// 本当の配り方は読まない（計測用の `true_deal`＝true のときだけ、本当の配り方 1 通りで判定する＝§7.28 の
+    /// 「証明したのに勝てなかった点に本当の守りが在ったか」の仕分け。決定は使わない）。戻り値 `{"applies", "status", "move", "line_len", "deals", "nodes", "sec"}`
+    /// （発動条件を満たさず `force` も無ければ `status="skip"`）。`sec` は計測のための実時間（判定は節点で打ち切る）。
+    fn lethal_json(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
+        use crate::search::lethal;
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let ov = parse_json(opts_json, "lethal opts")?;
+        let seed = ov.get("search_seed").and_then(Value::as_u64).unwrap_or(0);
+        let rand = ov.get("rand").and_then(Value::as_u64).map_or(lethal::LETHAL_RAND_DEALS, |n| n as usize);
+        let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
+        let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
+        let true_deal = ov.get("true_deal").and_then(Value::as_bool).unwrap_or(false);
+        // 守りの強い配り方の旧い形（§7.33・decide の `lethal_deal_legacy` と同じ・既定 false）
+        let deal_legacy = ov.get("lethal_deal_legacy").and_then(Value::as_bool).unwrap_or(false);
+        // 計測用（§7.30）: `trace`＝配り方ごとの手順を返す・`first`＝根の候補をこの手に限る・`guide`＝自分の手の案内
+        let trace = ov.get("trace").and_then(Value::as_bool).unwrap_or(false);
+        let first = ov.get("first").filter(|v| !v.is_null()).cloned().map(crate::search::Move::from_json);
+        let guide: Vec<crate::search::Move> = ov
+            .get("guide")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().cloned().map(crate::search::Move::from_json).collect())
+            .unwrap_or_default();
+        // 計測用（§7.51・WP `rs-defense-proof`）: `prove`＝誰の番でも、このターンに `player_id` の勝ちが配り方ごとに
+        // 証明できるか（[`lethal::prove_each`]・根の候補を作らない＝守りの窓の候補を当てた後の盤面を相手の側から読む）。
+        // `true_deal` なら本当の配り方 1 通り。
+        if ov.get("prove").and_then(Value::as_bool).unwrap_or(false) {
+            let state = self.session.state();
+            let t0 = std::time::Instant::now();
+            let (per, used) = py
+                .detach(|| -> Result<(Vec<&'static str>, u64), EngineError> {
+                    // `view`="other"＝配り方を相手（`player_id` の相手）の視点で作る（相手が知っている札は本物のまま）
+                    let from = if ov.get("view").and_then(Value::as_str) == Some("other") { seat.other() } else { seat };
+                    let deals = if true_deal {
+                        vec![state.clone()]
+                    } else {
+                        lethal::make_deals(state, masters, from, seed, rand, deal_legacy)?
+                    };
+                    Ok(lethal::prove_each(masters, &deals, seat, nodes, false))
+                })
+                .map_err(|e| self.map_err(e))?;
+            return to_py_json(&serde_json::json!({"per": per, "nodes": used, "sec": t0.elapsed().as_secs_f64()}));
+        }
+        let applies = lethal::applies(&mut self.session, masters, seat);
+        let bound = lethal::bound_report(&mut self.session, masters, seat);
+        if !applies && !force {
+            return to_py_json(&serde_json::json!({"applies": false, "status": "skip", "bound": bound}));
+        }
+        let state = self.session.state();
+        let t0 = std::time::Instant::now();
+        let out = py
+            .detach(|| -> Result<lethal::LethalOut, EngineError> {
+                let deals = if true_deal {
+                    vec![state.clone()]
+                } else {
+                    lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand, deal_legacy)?
+                };
+                if trace || first.is_some() {
+                    let t = lethal::Trace { first: first.as_ref(), guide: &guide };
+                    Ok(lethal::solve_root_traced(masters, state, seat, &deals, nodes, Some(t)))
+                } else {
+                    Ok(lethal::solve_root(masters, state, seat, &deals, nodes))
+                }
+            })
+            .map_err(|e| self.map_err(e))?;
+        to_py_json(&serde_json::json!({
+            "applies": applies, "status": out.status,
+            "move": out.mv.as_ref().map(crate::search::Move::to_json),
+            "line_len": out.line_len, "deals": out.deals, "nodes": out.nodes,
+            "sec": t0.elapsed().as_secs_f64(), "bound": bound, "lines": out.lines,
+        }))
+    }
+
     /// 探索が木の中で使う適用（`search::apply::apply_move_inplace`・`DON_BOX` は付与 k 回＋攻撃に展開・
     /// 分岐する自分の選択は残す）で 1 手進める。`fork` した対局にだけ使う（§1.2 の 3）。
     fn apply_search_move(&mut self, player_id: &str, move_json: &str) -> PyResult<()> {
         let masters = self.masters()?;
         let seat = self.seat_of(player_id)?;
-        let mv = parse_json(move_json, "move")?;
+        let mv = crate::search::Move::from_json(parse_json(move_json, "move")?);
         self.session.reset_events();
         crate::search::apply::apply_move_inplace(&mut self.session, masters, seat, &mv, true)
             .map_err(|e| self.map_err(e))
@@ -681,6 +827,26 @@ impl Game {
 }
 
 /// OS 乱数から seed を作る（`seed=None` のとき）。
+/// `Game.encode`／`Game.encode_world` の出力（同じ鍵・同じ並び）。
+fn encode_json(
+    state: &GameState,
+    masters: &MasterTable,
+    vocab: &crate::encode::Vocab,
+    seat: Seat,
+    opts: &crate::encode::EncodeOptions,
+) -> PyResult<String> {
+    let enc = crate::encode::encode(state, masters, vocab, seat, opts).map_err(err)?;
+    to_py_json(&serde_json::json!({
+        "scalars": enc.scalars,
+        "field": enc.field,
+        "card_idx": enc.card_idx,
+        "tokens": enc.tok,
+        "rel_om": enc.rel_om,
+        "rel_oo": enc.rel_oo,
+        "extra": enc.extra,
+    }))
+}
+
 fn os_seed() -> u64 {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hasher};

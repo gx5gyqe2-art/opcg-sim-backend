@@ -1,0 +1,43 @@
+[unpayable-activate] cards 377 legal activations 2791 inert 42
+合法手に出たのに打っても盤面が変わらない起動: ["OP13-079@rich: コストを払わず回数だけ消費
+OP13-079@no_don: コストを払わず回数だけ消費
+OP13-079@no_trash: コストを払わず回数だけ消費
+OP13-079@no_life: コストを払わず回数だけ消費
+OP13-079@no_deck: コストを払わず回数だけ消費
+OP13-079@alone: コストを払わず回数だけ消費
+OP13-079@opp_empty: コストを払わず回数だけ消費
+OP13-079@attached2: コストを払わず回数だけ消費
+OP15-003@rich: コストを払わず回数だけ消費
+OP15-003@no_don: コストを払わず回数だけ消費
+OP15-003@no_hand: コストを払わず回数だけ消費
+OP15-003@no_trash: コストを払わず回数だけ消費
+OP15-003@no_life: コストを払わず回数だけ消費
+OP15-003@no_deck: コストを払わず回数だけ消費
+OP15-003@alone: コストを払わず回数だけ消費
+OP15-003@attached2: コストを払わず回数だけ消費
+OP15-017@rich: コストを払わず回数だけ消費
+OP15-017@no_don: コストを払わず回数だけ消費
+OP15-017@no_hand: コストを払わず回数だけ消費
+OP15-017@no_trash: コストを払わず回数だけ消費
+OP15-017@no_life: コストを払わず回数だけ消費
+OP15-017@no_deck: コストを払わず回数だけ消費
+OP15-017@alone: コストを払わず回数だけ消費
+OP15-017@attached2: コストを払わず回数だけ消費
+OP16-084@rich
+OP16-084@no_don
+OP16-084@no_hand
+OP16-084@no_trash
+OP16-084@no_life
+OP16-084@no_deck
+OP16-084@alone
+OP16-084@opp_empty
+OP16-084@poor
+OP16-084@attached2
+OP17-020@no_hand: コストを払わず回数だけ消費
+ST28-004@rich: コストを払わず回数だけ消費
+ST28-004@no_don: コストを払わず回数だけ消費
+ST28-004@no_hand: コストを払わず回数だけ消費
+ST28-004@no_trash: コストを払わず回数だけ消費
+ST28-004@no_deck: コストを払わず回数だけ消費
+ST28-004@alone: コストを払わず回数だけ消費
+ST28-004@opp_empty: コストを払わず回数だけ消費"]

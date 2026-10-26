@@ -51,12 +51,56 @@ def build_parser():
     ap.add_argument("--sims", type=int, default=E.SERVE_SIMS)
     ap.add_argument("--budget", type=int, default=None,
                     help="基準席の戦闘箱の枝予算（既定 8000・0＝無制限）。候補席は --cand-budget")
+    ap.add_argument("--rethink-ratio", type=float, default=None,
+                    help="基準席の「迷う局面だけ世界 K 本で読み直す」の線 τ（§7.4・省略＝off）。"
+                         "候補席は --cand-rethink-ratio")
+    ap.add_argument("--rethink-worlds", type=int, default=None,
+                    help="基準席の読み直しの世界の本数 K（省略＝4）")
+    ap.add_argument("--omniscient", action="store_true",
+                    help="基準席を全部見える探索で打たせる（`docs/search_efficiency_plan.md` §7.10・"
+                         "測定専用）。候補席は --cand-omniscient")
+    ap.add_argument("--reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="基準席の探索の世界の見える範囲（`docs/search_efficiency_plan.md` §7.11・§7.15）。"
+                         "省略＝既定の fair。peek＝2026-10-21 までの既定（自分の山札と裏向きライフを本物のまま"
+                         "読む・測定用）／opp_hand（測定用）。候補席は --cand-reveal。--omniscient とは排他")
+    ap.add_argument("--opp-blind", action="store_true",
+                    help="基準席の木の中の相手にこちらの手札を見せない（`docs/search_efficiency_plan.md` §7.14・"
+                         "測定専用）。候補席は --cand-opp-blind")
+    ap.add_argument("--worlds", type=int, default=None,
+                    help="基準席の世界サンプルの本数（§20.7.1・省略＝1）。両席を出荷の設定（世界 2 本）で打たせるとき"
+                         "に --cand-worlds と組で使う（§7.21）。K 本ぶんスレッドを使うので --workers を下げること")
+    ap.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                    help="基準席の詰みの証明（`docs/search_efficiency_plan.md` §7.21・省略＝off）。"
+                         "候補席は --cand-lethal-proof")
+    ap.add_argument("--lethal-root-nodes", type=int, default=None,
+                    help="基準席の根の詰みの証明の節点の上限（`docs/search_efficiency_plan.md` §7.49・測定用・省略＝Rust の"
+                         "既定 20,000）。候補席は --cand-lethal-root-nodes")
+    ap.add_argument("--commit-sig-legacy", action="store_true",
+                    help="基準席を旧い手の署名で打たせる（WP `rs-commit-sig`・測定専用＝箱の commit の照合で"
+                         "カウンター・ブロッカーの札が落ちる 2026-10-22 までの形）。候補席は --cand-commit-sig-legacy")
+    ap.add_argument("--lethal-deal-legacy", action="store_true",
+                    help="基準席の詰みの証明の守りの強い配り方を旧い形にする（`docs/search_efficiency_plan.md` §7.33・"
+                         "測定用・カウンターイベントを払えるかを見ずに積む）。候補席は --cand-lethal-deal-legacy")
+    ap.add_argument("--commit-hidden-legacy", action="store_true",
+                    help="基準席を、箱の commit の続きに見えていなかった札から選ぶ段も積む旧い形で打たせる"
+                         "（`docs/search_efficiency_plan.md` §7.39・測定専用）。候補席は --cand-commit-hidden-legacy")
+    ap.add_argument("--window-carry-legacy", action="store_true",
+                    help="基準席を、窓・対話の続き（効果の対話の段・戦闘の応手の段）を積む旧い形で打たせる"
+                         "（`docs/search_efficiency_plan.md` §7.42 の 1・測定専用）。候補席は --cand-window-carry-legacy")
+    ap.add_argument("--window-worlds-legacy", action="store_true",
+                    help="基準席の窓の根畳みを世界 1 本で読ませる（§7.42 の 2・測定専用）。候補席は --cand-window-worlds-legacy")
+    ap.add_argument("--window-tree-legacy", action="store_true",
+                    help="基準席のライフが少ない戦闘の応手を静的な値で比べさせる（§7.42 の 3・測定専用）。"
+                         "候補席は --cand-window-tree-legacy")
+    ap.add_argument("--confirm-trigger-legacy", action="store_true",
+                    help="基準席を、トリガーの発動確認を「発動する」の 1 手だけで打つ旧い形で打たせる"
+                         "（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。候補席は --cand-confirm-trigger-legacy")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
                          "real=実デッキ 4 リーダー／purple=紫を含むリーダー（掘り実験の母集団）")
     ap.add_argument("--decks", default="singleton",
-                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"),
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "synth_roles2", "user", "official", "real"),
                     help="デッキの中身。singleton=従来（色が合う 50 枚・全部 1 枚ずつ）／"
                          "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む／"
                          "synth_roles=合成に除去の型を色ごとに差し込む（§20.8.1）")
@@ -65,6 +109,26 @@ def build_parser():
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
     A.add_cand_args(ap)
     return ap
+
+
+def _best_kw(args):
+    """基準席のつまみ（§7.4 の読み直し・§7.10 の全部見える探索・§7.11 の見える範囲・§7.14 の相手に手札を見せない・§7.21 の詰みの証明・§7.49 の証明の節点の上限・WP `rs-commit-sig` の旧い手の署名・§7.33 の守りの強い配り方の旧い形・§7.39 の見えていなかった札を選ぶ続きの旧い形・§7.42 の窓・対話の決め方の旧い形 3 つ・§7.44 のトリガーを断らない旧い形）。何も立っていなければ None＝基準席は今までどおり。"""
+    kw = {k: v for k, v in (("rethink_ratio", args.rethink_ratio),
+                            ("rethink_worlds", args.rethink_worlds),
+                            ("omniscient", True if args.omniscient else None),
+                            ("reveal", args.reveal),
+                            ("opp_blind", True if args.opp_blind else None),
+                            ("lethal_proof", args.lethal_proof),
+                            ("lethal_nodes", args.lethal_root_nodes),
+                            ("commit_sig_legacy", True if args.commit_sig_legacy else None),
+                            ("lethal_deal_legacy", True if args.lethal_deal_legacy else None),
+                            ("commit_hidden_legacy", True if args.commit_hidden_legacy else None),
+                            ("window_carry_legacy", True if args.window_carry_legacy else None),
+                            ("window_worlds_legacy", True if args.window_worlds_legacy else None),
+                            ("window_tree_legacy", True if args.window_tree_legacy else None),
+                            ("confirm_trigger_legacy", True if args.confirm_trigger_legacy else None),
+                            ("worlds", args.worlds if args.worlds and args.worlds > 1 else None)) if v is not None}
+    return kw or None
 
 
 def main(argv=None):
@@ -80,7 +144,8 @@ def main(argv=None):
         batch = todo[: args.max_pairs]
         t0 = time.time()
         initargs = (args.candidate, args.baseline, cand_kw, args.leaders,
-                    args.decks, args.pair_timeout, args.sims, args.budget)
+                    args.decks, args.pair_timeout, args.sims, args.budget,
+                    _best_kw(args))
         with mp.get_context("spawn").Pool(args.workers, initializer=A.init_pool,
                                           initargs=initargs) as pool:
             with open(args.out, "a") as f:
@@ -98,6 +163,8 @@ def main(argv=None):
         res["candidate"] = args.candidate
         if cand_kw:
             res["cand_opts"] = cand_kw          # 判定は設定に紐づく（§20.5.3）
+        if _best_kw(args):
+            res["best_opts"] = _best_kw(args)   # 基準席の読み直しも判定に紐づく（§7.4）
         print(f"ARENA_RESUME_FINAL {json.dumps(res, ensure_ascii=False)}", flush=True)
     return 0
 

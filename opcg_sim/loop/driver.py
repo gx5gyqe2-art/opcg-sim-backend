@@ -22,7 +22,9 @@ from opcg_sim.loop import engine as E
 
 #: 1 局の安全上限（無限ループ検出）。旧 `game_driver.DEFAULT_MAX_STEPS` は 4000 だが、
 #: 学習ループの生成／アリーナは 400 で打ち切っていた（`n_record_gen.MAX_STEPS`）。
-DEFAULT_MAX_STEPS = 400
+#: 2026-10-25 から 1,000（ユーザ決定・`docs/reports/2026-10-24_long_game_cap.md`: 400 手に届く局は正しいが長いだけ・
+#: 990 局で 1,000 手に届く局 0・手の総数 +0.06%）。`record_gen.MAX_STEPS` と揃える。
+DEFAULT_MAX_STEPS = 1000
 
 
 class GameAborted(Exception):
@@ -96,7 +98,10 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
         spec = seats[name]
         turn = int(game.turn_count or 0)
         carry = carries[name].get(turn, name)
-        out = json.loads(game.decide(name, spec.decide_opts(seed, turn, name, carry)))
+        out = E.decide_with_rethink(lambda o: game.decide(name, o),
+                                    spec.decide_opts(seed, turn, name, carry),
+                                    getattr(spec, "rethink_ratio", None),
+                                    getattr(spec, "rethink_worlds", E.PLAY_RETHINK_WORLDS))
         move = out.get("move")
         if move is None:
             carries[name].put(out)

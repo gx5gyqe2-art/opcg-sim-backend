@@ -14,6 +14,7 @@ use pyo3::prelude::*;
 mod audit;
 mod effects;
 mod encode;
+mod fxhash;
 mod journal;
 mod model;
 mod net;
@@ -278,6 +279,10 @@ fn encode_state_impl(
                     .unwrap_or(false),
                 skip_onplay: v
                     .get("skip_onplay")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                deck_v14: v
+                    .get("deck_v14")
                     .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false),
             }

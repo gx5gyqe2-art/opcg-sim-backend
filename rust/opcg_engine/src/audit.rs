@@ -390,7 +390,7 @@ fn audit_board(session: &mut Session, masters: &MasterTable) -> Result<Value, En
 /// 呼び直すと golden テストの時間の大半がこれになる。追加する定義は定数なので使い回す。
 static AUDIT_MASTERS: OnceLock<MasterTable> = OnceLock::new();
 
-fn audit_masters(base: &'static MasterTable) -> Result<&'static MasterTable, EngineError> {
+pub(crate) fn audit_masters(base: &'static MasterTable) -> Result<&'static MasterTable, EngineError> {
     if let Some(table) = AUDIT_MASTERS.get() {
         return Ok(table);
     }

@@ -1,0 +1,51 @@
+{
+ "kind": "gen",
+ "section": "§7.46",
+ "ledger_grep": "7.46 WP `worker-job-push-check`",
+ "about": "試し: push の確かめ（1 局 × 1 区切り・32 回）",
+ "job": "trial-push-w{K}",
+ "branch": "claude/worker-job-trial-push-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 5,
+ "hours": 0.2,
+ "vars": {
+  "BASE": "9960000 + k*1000"
+ },
+ "seed_base": "BASE",
+ "games": 1,
+ "parts": 1,
+ "workers": 1,
+ "out_dir": "n_records",
+ "part_dir": "trial_push_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r13d.npz",
+ "args": [
+  "--sims",
+  "32",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--decks",
+  "real",
+  "--shard-games",
+  "1"
+ ],
+ "log": "~/trial_push_w{K}.log",
+ "copy_logs": [
+  "~/trial_push_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--budget\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r13d.npz",
+  "games": 1,
+  "sims": 32
+ },
+ "commit_message": "trial push shard {K}"
+}

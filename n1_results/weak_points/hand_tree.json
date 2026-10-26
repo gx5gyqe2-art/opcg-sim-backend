@@ -1,0 +1,82 @@
+[
+ {
+  "discard": [
+   "OP12-037"
+  ],
+  "window_q": -0.3122,
+  "static": {
+   "r13d": -0.312,
+   "r22": -0.133
+  },
+  "tree_x1": {
+   "v": -0.616,
+   "best": "{\"action_type\": \"ATTACK\", \"card\": \"OP12-030\", \"targets\": [\"OP15-098\"]}",
+   "kind": "main"
+  },
+  "tree_x4": {
+   "v": -0.6726,
+   "best": "{\"action_type\": \"TURN_END\"}",
+   "kind": "main"
+  }
+ },
+ {
+  "discard": [
+   "OP12-039"
+  ],
+  "window_q": -0.2614,
+  "static": {
+   "r13d": -0.261,
+   "r22": -0.114
+  },
+  "tree_x1": {
+   "v": -0.5374,
+   "best": "{\"action_type\": \"ATTACK\", \"card\": \"OP12-030\", \"targets\": [\"OP15-098\"]}",
+   "kind": "main"
+  },
+  "tree_x4": {
+   "v": -0.656,
+   "best": "{\"action_type\": \"TURN_END\"}",
+   "kind": "main"
+  }
+ },
+ {
+  "discard": [
+   "OP12-031"
+  ],
+  "window_q": -0.3465,
+  "static": {
+   "r13d": -0.347,
+   "r22": -0.101
+  },
+  "tree_x1": {
+   "v": -0.5052,
+   "best": "{\"action_type\": \"ATTACK\", \"card\": \"OP12-030\", \"targets\": [\"OP15-098\"]}",
+   "kind": "main"
+  },
+  "tree_x4": {
+   "v": -0.7073,
+   "best": "{\"action_type\": \"TURN_END\"}",
+   "kind": "main"
+  }
+ },
+ {
+  "discard": [
+   "OP12-023"
+  ],
+  "window_q": -0.404,
+  "static": {
+   "r13d": -0.404,
+   "r22": -0.169
+  },
+  "tree_x1": {
+   "v": -0.6545,
+   "best": "{\"action_type\": \"TURN_END\"}",
+   "kind": "main"
+  },
+  "tree_x4": {
+   "v": -0.7769,
+   "best": "{\"action_type\": \"TURN_END\"}",
+   "kind": "main"
+  }
+ }
+]

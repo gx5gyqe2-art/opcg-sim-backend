@@ -8,9 +8,11 @@
 //! - WP `rs-p4-mcts`（上の統合後）: `TreeMCTS`／静止探索／戦闘箱・対話箱／`decide`（窓の根畳み・箱コミット・
 //!   等価手マージ・温度・残り腕）。
 //!
-//! 手（`Move`）は Python の dict と同じ JSON（`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の
-//! `uuid`／`don_k`／`target_ids`）。乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が
-//! Python の `np.random.Generator` をラップして記録する）。自前の生成器は P5。
+//! 手（`Move`）は型（[`crate::rules::moves`]・WP `rs-speed-d`）。意味は Python の dict と同じ
+//! （`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の `uuid`／`don_k`／`target_ids`）で、
+//! JSON の形（[`Move::to_json`]）は境目（`decide` の出力・`search_legal` など）でだけ作る。
+//! 乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が Python の
+//! `np.random.Generator` をラップして記録する）。自前の生成器は P5。
 
 #![allow(dead_code)]
 
@@ -19,6 +21,7 @@ pub mod adapter;
 pub mod apply;
 pub mod decide;
 pub mod determinize;
+pub mod lethal;
 #[path = "macro.rs"]
 pub mod r#macro;
 pub mod mcts;
@@ -39,8 +42,8 @@ use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use serde_json::Value;
 
-/// 探索用の手（Python の dict と同じ JSON）。
-pub type Move = Value;
+/// 探索用の手（型・JSON の形は境目だけ＝[`crate::rules::moves`]・WP `rs-speed-d`）。
+pub use crate::rules::moves::{Move, Payload, PayloadRef};
 
 /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定は [`LeafRollout::None`]＝今までどおり**。
 ///
@@ -108,6 +111,9 @@ pub struct SearchOptions {
     /// `sel_branch_left`・`macro::may_branch_selection`）を on/off できる。準備箱そのもの
     /// （(1)）は [`SearchOptions::setup_box`] のまま。
     pub select_branch: Option<bool>,
+    /// トリガーの発動確認（`CONFIRM_TRIGGER`）を「発動する」の 1 手だけにする旧い形
+    /// （§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**・既定 false＝「発動する／しない」の 2 手）。
+    pub confirm_trigger_legacy: bool,
 }
 
 impl SearchOptions {
@@ -128,6 +134,7 @@ impl Default for SearchOptions {
             setup_box_keep_bare: false,
             leaf_rollout: LeafRollout::None,
             select_branch: None,
+            confirm_trigger_legacy: false,
         }
     }
 }
@@ -190,6 +197,8 @@ fn options_from_json(v: &Value) -> SearchOptions {
             .unwrap_or(d.leaf_rollout),
         // §20.7.8 の 5: 欄が無い／null＝None（`setup_box` に従う）。
         select_branch: v.get("select_branch").and_then(Value::as_bool),
+        // §7.44 の (B): トリガーの発動確認を「発動する」だけにする旧い形（測定専用）。
+        confirm_trigger_legacy: flag("confirm_trigger_legacy", d.confirm_trigger_legacy),
     }
 }
 
@@ -248,7 +257,8 @@ pub fn search_legal(hidden_json: &str, opts_json: &str) -> Result<String, Engine
                     "search_legal: prefix[{i}] を打つ主体が居ない（要求が無い）"
                 )));
             };
-            apply::apply_move_inplace(&mut s, masters, actor, mv, true).map_err(|e| match e {
+            let mv = Move::from_json(mv.clone());
+            apply::apply_move_inplace(&mut s, masters, actor, &mv, true).map_err(|e| match e {
                 EngineError::BadPayload(m) => {
                     EngineError::BadPayload(format!("search_legal: prefix[{i}]: {m}"))
                 }
@@ -259,7 +269,10 @@ pub fn search_legal(hidden_json: &str, opts_json: &str) -> Result<String, Engine
         }
     }
     let moves = legal_actions(&mut s, masters, &opts)?;
-    dump(&Value::Array(moves), "search_legal")
+    dump(
+        &Value::Array(moves.iter().map(Move::to_json).collect()),
+        "search_legal",
+    )
 }
 
 /// `opcg_engine.search_determinize(hidden_json, seat, order_json)` → 盤面 dict。
@@ -376,13 +389,13 @@ pub fn decide_on_state(
     }
     let boxes = r#macro::take_setup_stats();
     let mut body = serde_json::json!({
-        "move": out.mv,
+        "move": out.mv.as_ref().map(Move::to_json),
         // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
         "sig": out.sig,
         "k": out.k,
         "kind": out.kind,
         "stats": {
-            "legal": out.legal,
+            "legal": out.legal.iter().map(Move::to_json).collect::<Vec<_>>(),
             "N": out.n,
             "Q": out.q,
             "P": out.p,
@@ -397,7 +410,7 @@ pub fn decide_on_state(
         })).collect::<Vec<_>>(),
         // PV（主変化・§20.4・kind=main のときだけ埋まる）。
         "pv": out.pv.iter().map(|p| serde_json::json!({
-            "move": p.mv, "seat": p.seat.name(), "n": p.n, "q": p.q,
+            "move": p.mv.to_json(), "seat": p.seat.name(), "n": p.n, "q": p.q,
         })).collect::<Vec<_>>(),
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
@@ -408,7 +421,43 @@ pub fn decide_on_state(
     // 葉の打ち切りの実績（§20.7.9）は `leaf_rollout != none` のときだけ足す。
     // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
     // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
+    // 窓の読み方（§7.42・世界 K 本か短い木で読んだ窓だけ欄を足す）。
+    if let Some((w, tree)) = out.window_read {
+        body["window"] = serde_json::json!({"worlds": w, "tree": tree});
+    }
+    // 守りの証明（§7.51）は対象の窓だった決定だけに欄を足す（既定 off では鍵ごと出ない）。
+    if let Some(d) = &out.defense_proof {
+        body["defense_proof"] = d.clone();
+    }
     let rollout = quiesce::take_rollout_stats();
+    // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
+    if out.lethal.is_some() || out.lethal_reply.is_some() {
+        let mut info = serde_json::Map::new();
+        info.insert("mode".into(), Value::from(opts.lethal_proof.name()));
+        if let Some(l) = &out.lethal {
+            info.insert(
+                "root".into(),
+                serde_json::json!({"status": l.status, "deals": l.deals, "nodes": l.nodes, "line_len": l.line_len}),
+            );
+        }
+        if let Some(r) = &out.lethal_reply {
+            info.insert(
+                "reply".into(),
+                serde_json::json!({"checked": r.checked, "children": r.children, "proven": r.proven, "nodes": r.nodes}),
+            );
+        }
+        if let Some(o) = body.as_object_mut() {
+            if out.kind == "lethal" {
+                if let (Some(stats), Some(l)) = (o.get_mut("stats").and_then(Value::as_object_mut), &out.lethal) {
+                    stats.insert("lethal_proof".into(), Value::from("root"));
+                    stats.insert("lethal_line_len".into(), Value::from(l.line_len));
+                    stats.insert("lethal_deals".into(), Value::from(l.deals));
+                    stats.insert("lethal_nodes".into(), Value::from(l.nodes));
+                }
+            }
+            o.insert("lethal".into(), Value::Object(info));
+        }
+    }
     if let Some(o) = body.as_object_mut() {
         o.extend(worlds_fields);
         if !rollout.is_null() {
@@ -436,7 +485,48 @@ pub fn decide_opts_and_carry(
             .and_then(Value::as_bool)
             .unwrap_or(false),
     };
-    Ok((decide_options_from_json(ov), carry))
+    // `reveal`（§7.11・§7.15）: 省略・null は既定（`fair`）。知らない値・文字列でない値は黙って既定へ
+    // 落とさない。`omniscient` と同時に明示したらエラー（既定と同じ `"fair"` を明示した場合も）。
+    match ov.get("reveal") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(decide::Reveal::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: reveal は \"fair\"／\"peek\"／\"opp_hand\" のどれか（{r}）"
+                )));
+            }
+            if ov.get("omniscient").and_then(Value::as_bool) == Some(true) {
+                return Err(EngineError::BadPayload(
+                    "decide: omniscient と reveal は同時に指定できない".into(),
+                ));
+            }
+        }
+    }
+    // `defense_proof_view`（§7.51）: "mine"／"opp" のほかは黙って既定へ落とさない。
+    match ov.get("defense_proof_view") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(decide::DefenseView::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: defense_proof_view は \"mine\"／\"opp\" のどれか（{r}）"
+                )));
+            }
+        }
+    }
+    // `lethal_proof`（§7.21）: "off"／"root"／"root_reply" のほかは黙って既定へ落とさない。
+    match ov.get("lethal_proof") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(lethal::LethalProof::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: lethal_proof は \"off\"／\"root\"／\"root_reply\" のどれか（{r}）"
+                )));
+            }
+        }
+    }
+    let opts = decide_options_from_json(ov);
+    opts.validate()?;
+    Ok((opts, carry))
 }
 
 /// `decide` の `prefix`（`[{"actor":"p1","move":{...}}, ...]`）を `run_game` と同じ手順で適用する。
@@ -540,12 +630,73 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .map(|n| n as usize)
             .filter(|n| *n > 0)
             .unwrap_or(d.worlds),
+        // 世界を同時に回すスレッドの上限（§7.55・既定 0＝世界ごとに 1 スレッド・打つ手は不変）。
+        world_threads: v
+            .get("world_threads")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .unwrap_or(d.world_threads),
         search_seed: v.get("search_seed").and_then(Value::as_u64),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,
             Some(other) => other.as_i64().filter(|b| *b > 0),
         },
+        // 全部見える探索（`search_efficiency_plan.md` §7.10・測定専用・既定 false）。
+        omniscient: flag("omniscient", d.omniscient),
+        // 世界サンプルの見える範囲（§7.11・§7.15・既定 `fair`・`peek`／`opp_hand` は測定用）。知らない値は
+        // [`decide_opts_and_carry`] がエラーにする（ここでは既定へ落とす）。
+        reveal: v
+            .get("reveal")
+            .and_then(Value::as_str)
+            .and_then(decide::Reveal::from_name)
+            .unwrap_or(d.reveal),
+        // 木の中の相手にこちらの手札を見せない（§7.14・測定専用・既定 false）。
+        opp_blind: flag("opp_blind", d.opp_blind),
+        // 詰みの証明（§7.21・既定 off）。知らない値は [`decide_opts_and_carry`] がエラーにする。
+        lethal_proof: v
+            .get("lethal_proof")
+            .and_then(Value::as_str)
+            .and_then(lethal::LethalProof::from_name)
+            .unwrap_or(d.lethal_proof),
+        lethal_nodes: v.get("lethal_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_nodes),
+        lethal_reply_nodes: v.get("lethal_reply_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_reply_nodes),
+        lethal_reply_total: v.get("lethal_reply_total").and_then(Value::as_u64).unwrap_or(d.lethal_reply_total),
+        // 旧い手の署名（WP `rs-commit-sig`・測定専用・既定 false）。
+        commit_sig_legacy: flag("commit_sig_legacy", d.commit_sig_legacy),
+        // 守りの強い配り方の旧い形（§7.33・測定用・既定 false）。
+        lethal_deal_legacy: flag("lethal_deal_legacy", d.lethal_deal_legacy),
+        // 見えていなかった札を選ぶ続きを捨てない旧い形（§7.39・WP `rs-commit-hidden`・測定専用・既定 false）。
+        commit_hidden_legacy: flag("commit_hidden_legacy", d.commit_hidden_legacy),
+        // 窓・対話の決め方（§7.42・WP `rs-window-read`）。3 つの旧い旗は測定専用・既定 false。
+        window_carry_legacy: flag("window_carry_legacy", d.window_carry_legacy),
+        window_worlds: v
+            .get("window_worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.window_worlds),
+        window_worlds_legacy: flag("window_worlds_legacy", d.window_worlds_legacy),
+        window_tree_legacy: flag("window_tree_legacy", d.window_tree_legacy),
+        window_tree_life: v.get("window_tree_life").and_then(Value::as_i64).unwrap_or(d.window_tree_life),
+        window_tree_worlds: v
+            .get("window_tree_worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.window_tree_worlds),
+        // 守りの窓の相手から見た詰みの証明（§7.51・WP `rs-defense-proof`・測定用・既定 false）。
+        defense_proof: flag("defense_proof", d.defense_proof),
+        defense_proof_life: v.get("defense_proof_life").and_then(Value::as_i64).unwrap_or(d.defense_proof_life),
+        defense_proof_flat: v.get("defense_proof_flat").and_then(Value::as_f64).unwrap_or(d.defense_proof_flat),
+        defense_proof_sat: v.get("defense_proof_sat").and_then(Value::as_f64).unwrap_or(d.defense_proof_sat),
+        defense_proof_nodes: v.get("defense_proof_nodes").and_then(Value::as_u64).unwrap_or(d.defense_proof_nodes),
+        defense_proof_total: v.get("defense_proof_total").and_then(Value::as_u64).unwrap_or(d.defense_proof_total),
+        defense_proof_view: v
+            .get("defense_proof_view")
+            .and_then(Value::as_str)
+            .and_then(decide::DefenseView::from_name)
+            .unwrap_or(d.defense_proof_view),
     }
 }
 
@@ -597,7 +748,7 @@ pub fn search_apply(
     let masters = masters_or_err("search_apply")?;
     let hidden = parse(hidden_json, "search_apply: hidden")?;
     let actor = seat_or_err(seat, "search_apply")?;
-    let mv = parse(move_json, "search_apply: move")?;
+    let mv = Move::from_json(parse(move_json, "search_apply: move")?);
     let mut s = Session::new(GameState::from_record(&hidden, masters)?);
     apply_move_inplace(&mut s, masters, actor, &mv, stop_at_select)?;
     let board = board_with_pending(&mut s, masters)?;

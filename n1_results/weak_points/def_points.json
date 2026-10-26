@@ -1,0 +1,1090 @@
+[
+ {
+  "seed": 3351006,
+  "seat": "p1",
+  "step": 159,
+  "turn": 14,
+  "pending": "SEARCH_AND_SELECT",
+  "msg": "「シャンクス」の効果: 対象を選択（1枚まで）",
+  "board": {
+   "me": {
+    "leader": "OP09-001(R)+D2",
+    "field": [
+     "OP09-013(R)+D3",
+     "OP16-012(R)+D3",
+     "OP16-012"
+    ],
+    "hand": [
+     "ST23-001",
+     "OP02-021",
+     "OP07-016",
+     "OP16-018",
+     "OP09-012",
+     "OP02-021"
+    ],
+    "life": 0,
+    "deck": 33,
+    "don_active": 1,
+    "don_rested": 1
+   },
+   "opp": {
+    "leader": "OP15-001(R)+D5",
+    "field": [
+     "OP03-028"
+    ],
+    "hand": [
+     "OP08-017",
+     "OP15-009",
+     "OP03-037",
+     "OP04-013",
+     "OP15-027",
+     "OP03-027"
+    ],
+    "life": 1,
+    "deck": 34,
+    "don_active": 5,
+    "don_rested": 0
+   }
+  },
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+    "Q": -0.861
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+    "Q": -0.864
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "Q": -0.88
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.861
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.864
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.88
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.861
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.864
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.88
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.861
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.864
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.88
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 64,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.861
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.864
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.88
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP03-028\"], \"selected_slots\": [0], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.593
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-001\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.53
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.575
+    ]
+   ]
+  }
+ },
+ {
+  "seed": 3351014,
+  "seat": "p2",
+  "step": 208,
+  "turn": 15,
+  "pending": "CONFIRM_OPTIONAL",
+  "msg": "「クロコダイル」の効果を使用しますか？（コストを払う）",
+  "board": {
+   "opp": {
+    "leader": "OP11-041(R)+D2",
+    "field": [
+     "OP11-056"
+    ],
+    "hand": [
+     "EB02-022",
+     "EB02-059"
+    ],
+    "life": 2,
+    "deck": 27,
+    "don_active": 8,
+    "don_rested": 0
+   },
+   "me": {
+    "leader": "OP04-058(R)+D1",
+    "field": [
+     "OP04-066",
+     "OP04-060(R)",
+     "OP04-060(R)",
+     "EB01-035(R)+D3",
+     "EB01-034"
+    ],
+    "hand": [
+     "OP05-075",
+     "EB01-035"
+    ],
+    "life": 0,
+    "deck": 28,
+    "don_active": 0,
+    "don_rested": 4
+   }
+  },
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "Q": -0.85
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "Q": -0.85
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.85
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.85
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.85
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.85
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.85
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.85
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "window": {
+    "worlds": 64,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.853
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.846
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.852
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.857
+    ]
+   ]
+  }
+ },
+ {
+  "seed": 3351102,
+  "seat": "p2",
+  "step": 99,
+  "turn": 11,
+  "pending": "SELECT_COUNTER",
+  "msg": "カウンターカードを選択してください",
+  "board": {
+   "opp": {
+    "leader": "OP11-021(R)+D2",
+    "field": [
+     "EB04-015(R)",
+     "OP15-033(R)+D2",
+     "OP04-026+D2"
+    ],
+    "hand": [
+     "OP15-033",
+     "EB04-020",
+     "OP02-037",
+     "EB02-011",
+     "OP11-034"
+    ],
+    "life": 2,
+    "deck": 35,
+    "don_active": 4,
+    "don_rested": 0
+   },
+   "me": {
+    "leader": "OP07-038(R)+D3",
+    "field": [
+     "ST17-003(R)",
+     "OP07-048",
+     "ST03-005"
+    ],
+    "hand": [
+     "OP07-050",
+     "EB03-029",
+     "OP01-089",
+     "OP16-042",
+     "ST17-002"
+    ],
+    "life": 1,
+    "deck": 33,
+    "don_active": 0,
+    "don_rested": 7
+   }
+  },
+  "live": "{\"action_type\": \"PASS\"}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+    "Q": -0.953
+   },
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+    "Q": -0.955
+   },
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+    "Q": -0.953
+   },
+   {
+    "move": "{\"action_type\": \"PASS\"}",
+    "Q": -0.952
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+     -0.955
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.952
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+     -0.955
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.952
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+     -0.962
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+     -0.963
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+     -0.962
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.966
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+     -0.955
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.952
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-050\"}",
+     -0.954
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-042\"}",
+     -0.954
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST17-002\"}",
+     -0.954
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.944
+    ]
+   ]
+  }
+ },
+ {
+  "seed": 3351122,
+  "seat": "p1",
+  "step": 182,
+  "turn": 14,
+  "pending": "CONFIRM_OPTIONAL",
+  "msg": "「ドンキホーテ・ドフラミンゴ」の効果を使用しますか？（コストを払う）",
+  "board": {
+   "me": {
+    "leader": "OP14-060(R)",
+    "field": [
+     "OP10-072(R)+D1",
+     "OP14-069(R)"
+    ],
+    "hand": [
+     "OP03-074",
+     "OP14-067",
+     "OP14-076"
+    ],
+    "life": 0,
+    "deck": 28,
+    "don_active": 7,
+    "don_rested": 1
+   },
+   "opp": {
+    "leader": "OP16-080(R)+D2",
+    "field": [
+     "OP09-086(R)",
+     "OP14-112(R)",
+     "OP09-083(R)+D1",
+     "OP09-093",
+     "OP10-086"
+    ],
+    "hand": [
+     "OP16-109",
+     "OP09-099"
+    ],
+    "life": 1,
+    "deck": 23,
+    "don_active": 3,
+    "don_rested": 4
+   }
+  },
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "Q": -0.986
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "Q": -0.987
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.986
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.987
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.986
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.987
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.986
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.987
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 64,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.986
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.987
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+     -0.955
+    ],
+    [
+     "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+     -0.944
+    ]
+   ]
+  }
+ },
+ {
+  "seed": 3351127,
+  "seat": "p2",
+  "step": 110,
+  "turn": 11,
+  "pending": "SELECT_COUNTER",
+  "msg": "カウンターカードを選択してください",
+  "board": {
+   "opp": {
+    "leader": "OP03-021(R)+D2",
+    "field": [
+     "OP03-028(R)+D1",
+     "OP10-038(R)",
+     "OP10-038(R)",
+     "OP03-026+D4"
+    ],
+    "hand": [
+     "EB02-012",
+     "OP03-026",
+     "OP15-027",
+     "OP10-038",
+     "OP15-028",
+     "OP05-029"
+    ],
+    "life": 0,
+    "deck": 35,
+    "don_active": 3,
+    "don_rested": 0
+   },
+   "me": {
+    "leader": "ST02-001(R)+D2",
+    "field": [
+     "ST16-001(R)",
+     "P-003(R)+D6"
+    ],
+    "hand": [
+     "ST12-016",
+     "OP07-021",
+     "OP07-023",
+     "OP07-023"
+    ],
+    "life": 1,
+    "deck": 35,
+    "don_active": 0,
+    "don_rested": 2
+   }
+  },
+  "live": "{\"action_type\": \"PASS\"}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+    "Q": 0.937
+   },
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+    "Q": 0.936
+   },
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+    "Q": 0.936
+   },
+   {
+    "move": "{\"action_type\": \"PASS\"}",
+    "Q": 0.953
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+     0.937
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     0.953
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+     0.937
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     0.953
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+     0.981
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.981
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.981
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     0.985
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+     0.937
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.936
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     0.953
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"PASS\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-021\"}",
+     0.881
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.884
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-023\"}",
+     0.884
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     0.91
+    ]
+   ]
+  }
+ },
+ {
+  "seed": 3351191,
+  "seat": "p1",
+  "step": 114,
+  "turn": 10,
+  "pending": "SELECT_COUNTER",
+  "msg": "カウンターカードを選択してください",
+  "board": {
+   "me": {
+    "leader": "OP15-039(R)",
+    "field": [
+     "OP15-051",
+     "OP15-051",
+     "OP15-046(R)",
+     "OP10-048"
+    ],
+    "hand": [
+     "OP15-044",
+     "OP15-057",
+     "ST03-004"
+    ],
+    "life": 2,
+    "deck": 30,
+    "don_active": 0,
+    "don_rested": 9
+   },
+   "opp": {
+    "leader": "OP08-098(R)",
+    "field": [
+     "OP15-101",
+     "OP15-114",
+     "OP08-109",
+     "OP15-109(R)",
+     "EB02-052(R)"
+    ],
+    "hand": [
+     "OP08-116",
+     "OP15-102",
+     "EB03-050",
+     "EB02-052",
+     "OP05-112",
+     "OP08-116"
+    ],
+    "life": 3,
+    "deck": 29,
+    "don_active": 0,
+    "don_rested": 10
+   }
+  },
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+  "same_as_audit": true,
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "cands": [
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+    "Q": -0.977
+   },
+   {
+    "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+    "Q": -0.977
+   },
+   {
+    "move": "{\"action_type\": \"PASS\"}",
+    "Q": -0.991
+   }
+  ],
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+     -0.935
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+     -0.935
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.992
+    ]
+   ]
+  },
+  "tree_life3": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+     -0.935
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+     -0.935
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.992
+    ]
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+     -0.977
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+     -0.977
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.991
+    ]
+   ]
+  },
+  "worlds64": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 64,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+     -0.977
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+     -0.977
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.991
+    ]
+   ]
+  },
+  "r22_ship": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "kind": "window",
+   "cands": [
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+     -0.953
+    ],
+    [
+     "{\"action_type\": \"PASS\"}",
+     -0.987
+    ]
+   ]
+  }
+ }
+]

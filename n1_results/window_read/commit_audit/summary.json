@@ -1,0 +1,1687 @@
+{
+ "games": 300,
+ "void": 0,
+ "decisions": {
+  "own:main": 19567,
+  "opp:main": 388,
+  "own:window": 5540,
+  "opp:window": 14883,
+  "own:commit": 2564,
+  "own:lethal": 1269
+ },
+ "commit_share": {
+  "own": {
+   "k": 2564,
+   "n": 28940,
+   "rate": 0.0886
+  },
+  "opp": {
+   "k": 0,
+   "n": 15271,
+   "rate": 0.0
+  },
+  "all": {
+   "k": 2564,
+   "n": 44211,
+   "rate": 0.058
+  }
+ },
+ "by_all": {
+  "all": {
+   "points": 2564,
+   "diff": {
+    "k": 344,
+    "n": 2564,
+    "rate": 0.1342
+   },
+   "diff_desc": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "diff_card": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "cal_diff": {
+    "k": 536,
+    "n": 2564,
+    "rate": 0.209
+   },
+   "cal_diff_desc": {
+    "k": 535,
+    "n": 2564,
+    "rate": 0.2087
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 2564,
+    "no_opp_diff": {
+     "k": 344,
+     "n": 2564,
+     "rate": 0.1342
+    }
+   }
+  }
+ },
+ "by_side": {
+  "own": {
+   "points": 2564,
+   "diff": {
+    "k": 344,
+    "n": 2564,
+    "rate": 0.1342
+   },
+   "diff_desc": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "diff_card": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "cal_diff": {
+    "k": 536,
+    "n": 2564,
+    "rate": 0.209
+   },
+   "cal_diff_desc": {
+    "k": 535,
+    "n": 2564,
+    "rate": 0.2087
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 2564,
+    "no_opp_diff": {
+     "k": 344,
+     "n": 2564,
+     "rate": 0.1342
+    }
+   }
+  }
+ },
+ "by_type": {
+  "own:attach": {
+   "points": 1454,
+   "diff": {
+    "k": 189,
+    "n": 1454,
+    "rate": 0.13
+   },
+   "diff_desc": {
+    "k": 185,
+    "n": 1454,
+    "rate": 0.1272
+   },
+   "diff_card": {
+    "k": 185,
+    "n": 1454,
+    "rate": 0.1272
+   },
+   "cal_diff": {
+    "k": 296,
+    "n": 1454,
+    "rate": 0.2036
+   },
+   "cal_diff_desc": {
+    "k": 295,
+    "n": 1454,
+    "rate": 0.2029
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 1454,
+    "no_opp_diff": {
+     "k": 189,
+     "n": 1454,
+     "rate": 0.13
+    }
+   }
+  },
+  "own:attack": {
+   "points": 1110,
+   "diff": {
+    "k": 155,
+    "n": 1110,
+    "rate": 0.1396
+   },
+   "diff_desc": {
+    "k": 152,
+    "n": 1110,
+    "rate": 0.1369
+   },
+   "diff_card": {
+    "k": 152,
+    "n": 1110,
+    "rate": 0.1369
+   },
+   "cal_diff": {
+    "k": 240,
+    "n": 1110,
+    "rate": 0.2162
+   },
+   "cal_diff_desc": {
+    "k": 240,
+    "n": 1110,
+    "rate": 0.2162
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 1110,
+    "no_opp_diff": {
+     "k": 155,
+     "n": 1110,
+     "rate": 0.1396
+    }
+   }
+  }
+ },
+ "by_src": {
+  "box@own": {
+   "points": 2564,
+   "diff": {
+    "k": 344,
+    "n": 2564,
+    "rate": 0.1342
+   },
+   "diff_desc": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "diff_card": {
+    "k": 337,
+    "n": 2564,
+    "rate": 0.1314
+   },
+   "cal_diff": {
+    "k": 536,
+    "n": 2564,
+    "rate": 0.209
+   },
+   "cal_diff_desc": {
+    "k": 535,
+    "n": 2564,
+    "rate": 0.2087
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 2564,
+    "no_opp_diff": {
+     "k": 344,
+     "n": 2564,
+     "rate": 0.1342
+    }
+   }
+  }
+ },
+ "by_src_type": {
+  "box@own|attach": {
+   "points": 1454,
+   "diff": {
+    "k": 189,
+    "n": 1454,
+    "rate": 0.13
+   },
+   "diff_desc": {
+    "k": 185,
+    "n": 1454,
+    "rate": 0.1272
+   },
+   "diff_card": {
+    "k": 185,
+    "n": 1454,
+    "rate": 0.1272
+   },
+   "cal_diff": {
+    "k": 296,
+    "n": 1454,
+    "rate": 0.2036
+   },
+   "cal_diff_desc": {
+    "k": 295,
+    "n": 1454,
+    "rate": 0.2029
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 1454,
+    "no_opp_diff": {
+     "k": 189,
+     "n": 1454,
+     "rate": 0.13
+    }
+   }
+  },
+  "box@own|attack": {
+   "points": 1110,
+   "diff": {
+    "k": 155,
+    "n": 1110,
+    "rate": 0.1396
+   },
+   "diff_desc": {
+    "k": 152,
+    "n": 1110,
+    "rate": 0.1369
+   },
+   "diff_card": {
+    "k": 152,
+    "n": 1110,
+    "rate": 0.1369
+   },
+   "cal_diff": {
+    "k": 240,
+    "n": 1110,
+    "rate": 0.2162
+   },
+   "cal_diff_desc": {
+    "k": 240,
+    "n": 1110,
+    "rate": 0.2162
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 1110,
+    "no_opp_diff": {
+     "k": 155,
+     "n": 1110,
+     "rate": 0.1396
+    }
+   }
+  }
+ },
+ "by_type_shape": {
+  "own:attach|same": {
+   "points": 1265,
+   "diff": {
+    "k": 0,
+    "n": 1265,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 1265,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 1265,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 214,
+    "n": 1265,
+    "rate": 0.1692
+   },
+   "cal_diff_desc": {
+    "k": 213,
+    "n": 1265,
+    "rate": 0.1684
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 1265,
+    "no_opp_diff": {
+     "k": 0,
+     "n": 1265,
+     "rate": 0.0
+    }
+   }
+  },
+  "own:attack|same": {
+   "points": 955,
+   "diff": {
+    "k": 0,
+    "n": 955,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 955,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 955,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 187,
+    "n": 955,
+    "rate": 0.1958
+   },
+   "cal_diff_desc": {
+    "k": 187,
+    "n": 955,
+    "rate": 0.1958
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 955,
+    "no_opp_diff": {
+     "k": 0,
+     "n": 955,
+     "rate": 0.0
+    }
+   }
+  },
+  "own:attach|ATTACH_DON->ATTACK": {
+   "points": 137,
+   "diff": {
+    "k": 137,
+    "n": 137,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 137,
+    "n": 137,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 137,
+    "n": 137,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 63,
+    "n": 137,
+    "rate": 0.4599
+   },
+   "cal_diff_desc": {
+    "k": 63,
+    "n": 137,
+    "rate": 0.4599
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 137,
+    "no_opp_diff": {
+     "k": 137,
+     "n": 137,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|ATTACK->ATTACH_DON": {
+   "points": 73,
+   "diff": {
+    "k": 73,
+    "n": 73,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 73,
+    "n": 73,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 73,
+    "n": 73,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 24,
+    "n": 73,
+    "rate": 0.3288
+   },
+   "cal_diff_desc": {
+    "k": 24,
+    "n": 73,
+    "rate": 0.3288
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 73,
+    "no_opp_diff": {
+     "k": 73,
+     "n": 73,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|other_card": {
+   "points": 29,
+   "diff": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 11,
+    "n": 29,
+    "rate": 0.3793
+   },
+   "cal_diff_desc": {
+    "k": 11,
+    "n": 29,
+    "rate": 0.3793
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 29,
+    "no_opp_diff": {
+     "k": 29,
+     "n": 29,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|ATTACK->PLAY": {
+   "points": 27,
+   "diff": {
+    "k": 27,
+    "n": 27,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 27,
+    "n": 27,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 27,
+    "n": 27,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 9,
+    "n": 27,
+    "rate": 0.3333
+   },
+   "cal_diff_desc": {
+    "k": 9,
+    "n": 27,
+    "rate": 0.3333
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 27,
+    "no_opp_diff": {
+     "k": 27,
+     "n": 27,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attach|other_card": {
+   "points": 22,
+   "diff": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 7,
+    "n": 22,
+    "rate": 0.3182
+   },
+   "cal_diff_desc": {
+    "k": 7,
+    "n": 22,
+    "rate": 0.3182
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 22,
+    "no_opp_diff": {
+     "k": 22,
+     "n": 22,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attach|ATTACH_DON->PLAY": {
+   "points": 17,
+   "diff": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 7,
+    "n": 17,
+    "rate": 0.4118
+   },
+   "cal_diff_desc": {
+    "k": 7,
+    "n": 17,
+    "rate": 0.4118
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 17,
+    "no_opp_diff": {
+     "k": 17,
+     "n": 17,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|other_target": {
+   "points": 15,
+   "diff": {
+    "k": 15,
+    "n": 15,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 15,
+    "n": 15,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 15,
+    "n": 15,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 5,
+    "n": 15,
+    "rate": 0.3333
+   },
+   "cal_diff_desc": {
+    "k": 5,
+    "n": 15,
+    "rate": 0.3333
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 15,
+    "no_opp_diff": {
+     "k": 15,
+     "n": 15,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attach|ATTACH_DON->ACTIVATE_MAIN": {
+   "points": 9,
+   "diff": {
+    "k": 9,
+    "n": 9,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 9,
+    "n": 9,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 9,
+    "n": 9,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 2,
+    "n": 9,
+    "rate": 0.2222
+   },
+   "cal_diff_desc": {
+    "k": 2,
+    "n": 9,
+    "rate": 0.2222
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 9,
+    "no_opp_diff": {
+     "k": 9,
+     "n": 9,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|ATTACK->ACTIVATE_MAIN": {
+   "points": 8,
+   "diff": {
+    "k": 8,
+    "n": 8,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 8,
+    "n": 8,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 8,
+    "n": 8,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 3,
+    "n": 8,
+    "rate": 0.375
+   },
+   "cal_diff_desc": {
+    "k": 3,
+    "n": 8,
+    "rate": 0.375
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 8,
+    "no_opp_diff": {
+     "k": 8,
+     "n": 8,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attach|same_card_other_copy": {
+   "points": 4,
+   "diff": {
+    "k": 4,
+    "n": 4,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 3,
+    "n": 4,
+    "rate": 0.75
+   },
+   "cal_diff_desc": {
+    "k": 3,
+    "n": 4,
+    "rate": 0.75
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 4,
+    "no_opp_diff": {
+     "k": 4,
+     "n": 4,
+     "rate": 1.0
+    }
+   }
+  },
+  "own:attack|same_card_other_copy": {
+   "points": 3,
+   "diff": {
+    "k": 3,
+    "n": 3,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 3,
+    "rate": 0.3333
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 3,
+    "rate": 0.3333
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "opp_moved_between": {
+    "points": 0,
+    "diff": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    },
+    "no_opp_points": 3,
+    "no_opp_diff": {
+     "k": 3,
+     "n": 3,
+     "rate": 1.0
+    }
+   }
+  }
+ },
+ "fresh_kind": {
+  "main": 2564
+ },
+ "fresh_kind_when_diff": {
+  "main": 344
+ }
+}

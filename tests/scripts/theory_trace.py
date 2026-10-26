@@ -339,7 +339,7 @@ def build_parser():
     ap.add_argument("--games", type=int, default=4)
     ap.add_argument("--seed-base", type=int, required=True)
     ap.add_argument("--decks", default="synth_roles",
-                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"))
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "synth_roles2", "user", "official", "real"))
     ap.add_argument("--sims", type=int, default=64)
     ap.add_argument("--seq", default="attack_any", choices=SF.SEQ_MODES,
                     help="純付与の読み替え（T144／T155b・既定 attack_any＝T18 と同じ読み）")

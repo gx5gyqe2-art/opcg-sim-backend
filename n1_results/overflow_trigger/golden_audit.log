@@ -1,0 +1,2 @@
+OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_golden_make.py audit
+[golden] /home/user/opcg-sim-backend/tests/fixtures/rs_goldens/audit.json (3387 abilities, 0.96 MB)

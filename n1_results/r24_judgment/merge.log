@@ -1,0 +1,3 @@
+[r24 real] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2858.0, "wr": 0.5104, "ci95": [0.5004, 0.5203], "elo": 7.2, "elo95": [0.3, 14.1], "promoted": false, "shards": 16, "dup_seeds": 0}
+[r24 mirror] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2793.0, "wr": 0.4988, "ci95": [0.4867, 0.5108], "elo": -0.9, "elo95": [-9.2, 7.5], "promoted": false, "shards": 16, "dup_seeds": 0}
+[r24 synth2] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2769.0, "wr": 0.4945, "ci95": [0.4843, 0.5046], "elo": -3.8, "elo95": [-10.9, 3.2], "promoted": false, "shards": 16, "dup_seeds": 0}

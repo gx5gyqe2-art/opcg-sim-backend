@@ -1,0 +1,10 @@
+  final {'p1': {'leader': 'OP15-039', 'deck': 10, 'hand': 6, 'life': 5, 'field': 5, 'trash': 24}, 'p2': {'leader': 'OP07-097', 'deck': 22, 'hand': 3, 'life': 4, 'field': 1, 'trash': 20}}
+3461060 winner None turns 33 steps 400 acts {'p1': 191, 'p2': 128} MAX_STEPS 400 sec 192.2
+   (392, 'p1', 33, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (393, 'p1', 33, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', 'MAIN', False)
+   (394, 'p1', 33, 'SEARCH_AND_SELECT', '「レベッカ」の効果: 対象を選択（1枚）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', False)
+   (395, 'p1', 33, 'SEARCH_AND_SELECT', '「レベッカ」の効果: 対象を選択（1枚まで）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', False)
+   (396, 'p1', 33, 'CONFIRM_OPTIONAL', '「キュロス」の効果を使用しますか？（コストを払う）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', False)
+   (397, 'p1', 33, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', 'MAIN', False)
+   (398, 'p2', 33, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', 'BATTLE_COUNTER', True)
+   (399, 'p1', 33, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', 'MAIN', False)

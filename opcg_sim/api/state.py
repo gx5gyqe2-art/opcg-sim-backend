@@ -26,3 +26,5 @@ def clear_all() -> None:
     """全レジストリをクリアする（テストのセットアップ/ティアダウン用）。"""
     for reg in (GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS):
         reg.clear()
+    from opcg_sim.api.services import cpu_think
+    cpu_think.clear_all()

@@ -1,0 +1,1189 @@
+[
+ {
+  "seed": 5000150,
+  "changed": true,
+  "first_div": 36,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "57b702f0-80c9-4657-a90f-02aeca5e7a63",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "52483b81-9b41-4f02-b02a-450634e551e4",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   114,
+   119
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000151,
+  "changed": false
+ },
+ {
+  "seed": 5000152,
+  "changed": true,
+  "first_div": 13,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "76dfe735-9c29-4e44-96ac-b2be0b183f50",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "08bc4e8d-7098-422b-8799-16e874f06a26",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   110,
+   115
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000153,
+  "changed": true,
+  "first_div": 11,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "4bf7de1a-0b63-407c-bd8a-2f60698f2477",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c360c57f-ab8f-43f2-9d53-ae090705e3a4",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   112,
+   116
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000154,
+  "changed": true,
+  "first_div": 45,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "b553dca4-8f03-4afc-b24e-38c5dd1136db",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "45f15a27-71fd-4e59-a100-9ea4f62a93dd",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   110,
+   123
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000155,
+  "changed": false
+ },
+ {
+  "seed": 5000156,
+  "changed": true,
+  "first_div": 22,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "b4b20dac-7518-443f-ac3a-326721dbd4a1",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c263af75-cdb0-4cef-972c-c96e4c32f6d6",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   63,
+   105
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "changed": true,
+  "first_div": 67,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "52756509-088b-4a1a-8236-c9aceaeb99c7",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d52366d0-13cd-40f4-a7ef-8beda846b463",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   102,
+   102
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000158,
+  "changed": true,
+  "first_div": 55,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6d75cef6-92f4-4a65-8c93-9bbf69871ac2",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "33dfb74e-fb30-424e-9943-58879bebef67",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   105,
+   105
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000159,
+  "changed": true,
+  "first_div": 26,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d837b7f5-59fb-429c-9f17-b1ef1f9957b7",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "e522ec81-1c5a-41af-a8e4-91ba850aaac1",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   100,
+   96
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000160,
+  "changed": true,
+  "first_div": 47,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "eb399cc4-4cb1-4d33-9cc2-c6ea56690306",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "f51d4ac3-7a68-4bb1-8cfa-7e07c41274f6",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   103,
+   183
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000161,
+  "changed": true,
+  "first_div": 48,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c8ff9742-e5c0-493d-8789-f0546fc1be42",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "34ae9ded-c814-4360-9ec8-f4f5f3450bd3",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   139,
+   144
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000162,
+  "changed": true,
+  "first_div": 41,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "02c2234d-5301-44d0-b318-a1b22e3ae779",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "7b8654c5-6548-4145-b2dd-1104e0940bc6",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   102,
+   101
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000163,
+  "changed": true,
+  "first_div": 51,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "b46abf85-65ef-40e2-b8fc-7052e367e1b7",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "698def11-e177-4f8f-9197-6a98d9234ee1",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   97,
+   138
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000164,
+  "changed": true,
+  "first_div": 26,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "938361c4-e974-40f2-b267-da4ae646c5cd",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "ee9e661c-c3a0-4440-8926-7f9ef3f82a68",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   122,
+   122
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000165,
+  "changed": true,
+  "first_div": 9,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "0ef40450-30a7-4250-b99b-4e9b1f7be4a9",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "4b8c4dff-e0a1-48a1-bde5-7605f5c38b4e",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   126,
+   111
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000166,
+  "changed": true,
+  "first_div": 18,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "57fa72e6-d7b7-4ed7-8c7a-2505b08451a2",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "054f522d-a373-4bff-9524-5ff38115bb2e",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   102,
+   99
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000167,
+  "changed": true,
+  "first_div": 10,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "0aefdc12-0843-4808-89b2-2d98fb53c259",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "8f671323-a337-4dd3-860c-385d51211c45",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   79,
+   116
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000168,
+  "changed": true,
+  "first_div": 56,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "b5e6505e-b58c-45b4-9fdd-b0f787671008",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "059df9fc-7608-452c-aa25-bc92915e1ec8",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   106,
+   103
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000169,
+  "changed": true,
+  "first_div": 9,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "36233dfc-d3e7-4b16-a4cf-bc122f20d1ec",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "cd16b413-c4b5-4c79-a20b-bfe5382c481b",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   185,
+   148
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000170,
+  "changed": true,
+  "first_div": 8,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6f3edc0f-584e-46f7-81d5-d7dc10421f85",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "49b40e30-076b-43f4-8661-c7235a39a598",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   118,
+   96
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000171,
+  "changed": true,
+  "first_div": 24,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c66a3603-3229-4174-ac55-15f60a6e9e5b",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d52ca52b-02fc-4043-920c-be73d3a522fb",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   75,
+   72
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000172,
+  "changed": true,
+  "first_div": 42,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "707d1c05-22c6-4f08-a1ee-ddd3f90978ae",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "dc151da2-0c4b-448d-9613-d06e7c5f0595",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   100,
+   100
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000173,
+  "changed": true,
+  "first_div": 31,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "ea1ae9ea-eecc-4f14-bbb7-e0376ddbc90b",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "54d7b326-f3b3-43f3-b858-cad5a1f78e79",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   90,
+   109
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000174,
+  "changed": true,
+  "first_div": 32,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "670f132c-7f82-45c9-819a-214a3c03be78",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "9787beb2-b1b9-4bb3-9323-f83beeb1bd9e",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   169,
+   117
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000175,
+  "changed": true,
+  "first_div": 16,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "eee266dc-e876-47c9-a242-6c6709d96660",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "561ccd59-d622-4b85-a4bc-ed8c1f7af88d",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   105,
+   105
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000176,
+  "changed": true,
+  "first_div": 41,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6e491ef6-4b27-43a1-a559-192f947cfb3b",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "fff212ef-d071-4b0b-a7b3-c422cec1c776",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   97,
+   106
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000177,
+  "changed": true,
+  "first_div": 10,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "acec2919-bc24-4278-9fb2-8b4d70d3dfb9",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d67e69a7-e0ab-41a4-a1e3-8af8e7214f54",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   142,
+   169
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000178,
+  "changed": true,
+  "first_div": 122,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "ba16be98-2fa4-4484-84f7-96ec17ca75ba",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c8142bca-11dc-4e6c-b9bf-b7d341058fff",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   129,
+   129
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000179,
+  "changed": true,
+  "first_div": 38,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "4a3ec2be-3e4f-43ee-a165-019edb7e7343",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d3ead39b-5e9d-445b-9931-66d31b00cf8b",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   135,
+   138
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000180,
+  "changed": true,
+  "first_div": 85,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "75226548-9cab-4044-af8f-6b9c0647ea9b",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "0def5c69-8d97-42ca-bcef-ad250dad91cc",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   127,
+   125
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000181,
+  "changed": true,
+  "first_div": 25,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "e9730fd1-13cb-4539-bc0d-668e9eac3904",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "1bbc6d33-50e8-4bd4-98d5-7103b9c7e51a",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   119,
+   124
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000182,
+  "changed": true,
+  "first_div": 46,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "58e2b329-fd0d-4141-b0e8-53d516c67036",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "2f9ab3d9-1179-4e82-bbb6-2b9ea078906c",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   93,
+   96
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000183,
+  "changed": true,
+  "first_div": 44,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "0edc0515-265a-47e4-be2b-deac1d962e30",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6d81743d-3f53-4052-b881-1876cd069b16",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   118,
+   122
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000184,
+  "changed": true,
+  "first_div": 33,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "a137fb30-262e-402b-b671-3301cf4b0faf",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "f24168e0-04ec-481c-9d2c-9375d18c99a2",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   88,
+   83
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000185,
+  "changed": true,
+  "first_div": 12,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "75a51bc3-a126-4868-8dc4-6b9129aadb6f",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "5bbe7e20-7e60-4b62-9f63-b2b6aad6e411",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   151,
+   112
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000186,
+  "changed": true,
+  "first_div": 66,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "8eb99f04-bfd2-4b09-959c-1591de90ad6d",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "31ff5468-1aff-4245-9147-4c7c1fc02378",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   91,
+   91
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000187,
+  "changed": true,
+  "first_div": 48,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "09d40c99-a672-46ff-a01c-cc33f522ee44",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "582da165-e4b0-4c81-835d-c02032e642ed",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   100,
+   125
+  ],
+  "winner": [
+   "p2",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000188,
+  "changed": true,
+  "first_div": 29,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "4ecd5b1e-59e0-4a58-a3ac-6ec05c38ddcc",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "90a00f22-3dd5-424c-b5de-899473483dda",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   100,
+   95
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "changed": true,
+  "first_div": 86,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "74ac170f-fa98-4e49-a7d7-a13622544310",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6dbdad3d-e181-41e7-86c1-5ebacf8fcb18",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   104,
+   144
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000190,
+  "changed": true,
+  "first_div": 47,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d661a486-f1ed-47f0-ad9c-af4374ff3174",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "d0151468-ffaf-4a5f-b4ee-513ffae9eda6",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   128,
+   136
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000191,
+  "changed": true,
+  "first_div": 39,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "b00c214f-bb4d-4021-aecb-a4d85a5fec07",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "6b0a0974-ed99-41b3-b31f-f36f42d093be",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   118,
+   91
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000192,
+  "changed": true,
+  "first_div": 18,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c36359f3-b389-4c30-9827-fdd156fc92a1",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "5e09451d-7b67-4c5a-86bc-e4d8c6230850",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   164,
+   146
+  ],
+  "winner": [
+   "p1",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000193,
+  "changed": true,
+  "first_div": 62,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "391458be-17f0-468a-860c-21ce5a07f3c3",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "0e394896-0ce3-4991-b0e4-2356b3eb8276",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   143,
+   105
+  ],
+  "winner": [
+   "p2",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000194,
+  "changed": true,
+  "first_div": 77,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c82a4e35-0748-4111-a589-32dbb16a036f",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "88b028bb-b322-4703-8aed-04ecc9573d35",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   133,
+   133
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000195,
+  "changed": true,
+  "first_div": 11,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "4c1deec5-43b9-4271-9818-efe6f55120e2",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "77d88eae-71a5-44a4-b7e1-99c69938b4c9",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   132,
+   102
+  ],
+  "winner": [
+   "p2",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000196,
+  "changed": false
+ },
+ {
+  "seed": 5000197,
+  "changed": true,
+  "first_div": 23,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "46a5933e-c394-4756-a799-5d966a1a7f48",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "503fbae2-f5df-4eaf-bd40-4f2b66beb11f",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   106,
+   137
+  ],
+  "winner": [
+   "p1",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000198,
+  "changed": true,
+  "first_div": 33,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "c1cea00f-aaaa-4285-b868-2433895c7c5d",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "91ba701b-5fe4-4d85-bc2a-bb639331d1ce",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   114,
+   114
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000199,
+  "changed": true,
+  "first_div": 47,
+  "old": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "f7dbec65-1020-47ca-a514-da7a0161f219",
+   "kind": "battle"
+  },
+  "new": {
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "f5cfcb27-e47d-437b-8531-b8aa2d6991e6",
+   "kind": "battle"
+  },
+  "kind_new": "commit",
+  "legacy_reproduces_head": true,
+  "len": [
+   154,
+   154
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ }
+]

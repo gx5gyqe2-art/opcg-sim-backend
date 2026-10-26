@@ -22,6 +22,7 @@
 pub mod actions;
 pub mod battle;
 pub mod legal;
+pub mod moves;
 pub mod passive;
 pub mod pending;
 pub mod turn;
@@ -29,6 +30,8 @@ pub mod turn;
 mod tests_rules;
 #[cfg(test)]
 mod tests_cost_gate;
+#[cfg(test)]
+mod tests_unpayable_activate;
 
 use crate::model::{CardIdx, CardType, GameState, MasterTable, Restriction, Seat};
 

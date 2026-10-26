@@ -63,6 +63,18 @@ WP `rs-eps-explore`）を足すだけ。`dump_io.py` は**無い列を `None` �
 無い＝理論の計器専用・学習・生成・serve の挙動は 1 bit も変わらない）。中身は `aux_def_from_ledger`
 が正本。`--no-aux` なら他の補助教師と同じく全 0。
 
+**相手の集団**（2026-10-25・WP `league-gen`・`search_efficiency_plan.md` §7.56・`docs/reports/2026-10-25_league_gen.md`）:
+`--opp-pool r24:0.5,r23:0.2,r22:0.15,r13d:0.15` を渡すと、局ごとに片方の席を「学ぶ側」（`--net`＝今の生成役）、
+もう片方を集団から重みどおりに引いたネットにする（`opp_draw`・**局の seed だけで決まる**＝再現できる）。
+学ぶ側の席は seed の偶奇で p1／p2 を交互にする（先手・後手の偏りを出さない）。相手の席の探索の設定
+（sims・世界・雑音・温度・ε）は学ぶ側と同じ。列が 2 本増える（`_POOL_KEYS`・**集団なしの既定では書かない**＝
+今の記録と 1 bit も変わらない）:
+  seat_net(D str)                          … その行の席を打ったネットの名前（集団の名前・例 "r23"）
+  learner(D int8)                          … 1＝その席を打ったのが学ぶ側のネット（集団に学ぶ側と同じ
+                                             ネットが入っていて引かれた局は**両席とも 1**＝今の自己対戦と同じ教材）
+`n_rel_train --pi-rows learner` が方策の教師を `learner==1` の行に絞る（価値の教師は両席の行のまま）。
+局メタ（`meta_games.json`）には `nets`（席 → 名前）と `learner_seat` が、`meta_n_record.json` には `opp_pool` が入る。
+
 **符号化 v14**（2026-09-11・計画 §20.9・`meta_n_record.json` の `enc_version`＝14）: 列の**名前**は
 1 つも変わらないが、`tokens` が `[22,20]→[22,22]`・`scalars` が `123→127` になる（append-only）。
 `dump_io` が v13 の波を 0 埋めで v14 の形に揃えるので、**波を混ぜて訓練できる**。併せて
@@ -90,13 +102,17 @@ from opcg_sim.loop import decks as D                                   # noqa: E
 from opcg_sim.loop import driver as DR                                 # noqa: E402
 from opcg_sim.loop import engine as E                                  # noqa: E402
 
-MAX_STEPS = 400
+MAX_STEPS = DR.DEFAULT_MAX_STEPS   # 1,000（2026-10-25・driver と同じ値・reanalyze も使う）
 MAX_CI = 24            # card_idx の PAD 長（G 系符号化の既定枠・列の形は据え置き）
 ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta にだけ残る）
 ENC_VERSION_V2 = 13    # dump v2／v3／波 29 まで（v12 ＋ グローバル追加 29・append-only）
 #: 符号化 v14（2026-09-11・§20.9）。**列の形が変わる唯一の欄**（tokens 22×22・scalars 127）。
 #: `dump_io` は v13 の波を 0 埋めで v14 の形に揃えて読む＝波を混ぜて訓練できる。
-ENC_VERSION_V14 = NL.NR_ENC_VERSION    # 14
+ENC_VERSION_V14 = NL.NR_ENC_VERSION_V14    # 14
+#: 符号化 v15（2026-10-22・WP `enc-v15`・`search_efficiency_plan.md` §7.19）: **形は v14 と同じ**で、自分の残り
+#: 山札の 16 列が「山札＋伏せたライフから作る期待値」になった（伏せたライフの中身に依らない）。meta に書くのはこれ。
+#: 波 47 までの v14 の波と形が同じ＝そのまま混ぜて読める（16 列の意味だけが違う）。
+ENC_VERSION_V15 = NL.NR_ENC_VERSION    # 15
 DUMP_VERSION = 5       # v4 ＋ 守る側の補助教師（aux_def／aux_def_row・P8・`2026-09-24_p8_defender_columns.md`）
 #: `--decks` の既定（歴代の波は全て synth＝規約を変えない）。
 DEFAULT_DECKS = "synth"
@@ -542,28 +558,117 @@ def eps_swap(out, move, cids, db, eps_play, eps_hold, rng):
 def move_sig(mv):
     """Python `learned/plan.move_sig` と同じ鍵（Rust `search::decide::move_sig` の写し）。
 
-    JSON にしたときの形（`[action_type, uuid, target_ids, selected_uuids, accepted]`）が
-    旧版の `json.dumps(tuple)` と一致する＝`pol_sig`／`sig` 列の中身が変わらない。
+    JSON にしたときの形は `[action_type, 札, target_ids, selected_uuids, accepted]`（＋区別の欄）。
+    札は `payload.uuid`、無ければ最上位の `card_uuid`（戦闘の手）。6 つ目の欄（dict）は `position`
+    （既定の "BOTTOM" 以外）・`selects`（2 段以上）・`index`（0 以外）があるときだけ付く（WP `rs-commit-sig`・2026-10-23 から。
+    それより前の波の `sig`／`pol_sig` は戦闘の手の札が null）。
     """
     p = mv.get("payload") or {}
-    return [mv.get("action_type") or p.get("action_type"), p.get("uuid"),
-            list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
-            p.get("accepted")]
+    card = p.get("uuid")
+    if card is None:
+        card = mv.get("card_uuid")
+    sig = [mv.get("action_type") or p.get("action_type"), card,
+           list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
+           p.get("accepted")]
+    ext = {}
+    if p.get("position") is not None and p.get("position") != "BOTTOM":
+        ext["position"] = p["position"]
+    if isinstance(p.get("selects"), list) and len(p["selects"]) >= 2:
+        ext["selects"] = p["selects"]
+    if isinstance(p.get("index"), int) and not isinstance(p.get("index"), bool) and p["index"] != 0:
+        ext["index"] = p["index"]
+    if ext:
+        sig.append(ext)
+    return sig
 
 
 def _don_k(mv):
     return (mv.get("payload") or {}).get("don_k")
 
 
+#: 集団の名前だけの指定（"r24"）が指す npz（`opcg_sim/data/learned/nrel_<名前>.npz`）。
+POOL_NET_DIR = E.MODELS
+#: 相手の引きの乱数の塩（局の seed と混ぜる・`decks.leader_pair` の `seed*7919+13` とずらす）。
+POOL_SALT = 0x1EA6E
+
+
+def parse_opp_pool(text):
+    """`r24:0.5,r23:0.2,…` → [(名前, npz のパス, 正規化した重み)]（並びは書いた順）。
+
+    名前だけ（`/` も `.npz` も含まない）なら `opcg_sim/data/learned/nrel_<名前>.npz`、それ以外はパス
+    （名前は拡張子を落としたファイル名）。重みは正の数・合計で割る。同じ名前を 2 度書けない。
+    """
+    out, seen = [], set()
+    for item in [x.strip() for x in str(text).split(",") if x.strip()]:
+        if ":" not in item:
+            raise ValueError(f"--opp-pool の項目は 名前:重み（{item!r}）")
+        ref, w = item.rsplit(":", 1)
+        w = float(w)
+        if not w > 0:
+            raise ValueError(f"--opp-pool の重みは正の数（{item!r}）")
+        if "/" in ref or ref.endswith(".npz"):
+            path, name = E.resolve_net(ref), os.path.splitext(os.path.basename(ref))[0]
+        else:
+            path, name = os.path.join(POOL_NET_DIR, f"nrel_{ref}.npz"), ref
+        if name in seen:
+            raise ValueError(f"--opp-pool に同じ名前が 2 度（{name}）")
+        seen.add(name)
+        out.append((name, path, w))
+    if not out:
+        raise ValueError("--opp-pool が空")
+    tot = sum(w for _n, _p, w in out)
+    return [(n, p, w / tot) for n, p, w in out]
+
+
+def _same_net(a, b):
+    return os.path.abspath(E.resolve_net(a)) == os.path.abspath(E.resolve_net(b))
+
+
+def learner_name(pool, net):
+    """学ぶ側のネットの名前（集団に同じ npz があればその名前・無ければファイル名）。"""
+    for name, path, _w in pool:
+        if _same_net(path, net):
+            return name
+    return os.path.splitext(os.path.basename(E.resolve_net(net)))[0]
+
+
+def opp_draw(seed, pool):
+    """局の seed → (学ぶ側の席, 相手の名前)。**seed だけで決まる**（プロセス・並列度に依らない）。
+
+    学ぶ側の席は seed の偶奇で交互（偶数＝p1・奇数＝p2）。相手は重みどおりに 1 本引く。
+    """
+    seat = "p1" if seed % 2 == 0 else "p2"
+    u = random.Random(int(seed) * 1000003 + POOL_SALT).random()
+    acc = 0.0
+    for name, _p, w in pool:
+        acc += w
+        if u < acc:
+            return seat, name
+    return seat, pool[-1][0]
+
+
 def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
-                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None):
+                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None, pool=None):
     E.engine()
     # `search`＝探索の設定の上書き（§20.8.6・波 29〜: worlds／select_rule／q_min_frac／
     # root_prior_temp）。None／空＝serve 既定のまま＝歴代の波と同じ。
+    # **学ぶ側を最初に読む**＝符号化の語彙は学ぶ側のネットのもの（`engine.load_net` は最初の語彙を使う）。
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
                             eps_target=eps_target,
                             prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}))
+    # 相手の集団（§7.56）: 名前 → 席。探索の設定は学ぶ側と同じ。学ぶ側と同じネットは同じ席を使い回す。
+    _G["pool"] = None
+    if pool:
+        specs = {}
+        for name, path, _w in pool:
+            specs[name] = (_G["spec"] if _same_net(path, _G["spec"].net) else
+                           E.SeatSpec(path, sims=sims, dirichlet_eps=dirichlet_eps,
+                                      temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
+                                      eps_target=eps_target,
+                                      prune_futile=E.GEN_PRUNE_FUTILE, **(search or {})))
+        _G["pool"] = {"entries": pool, "specs": specs,
+                      "learner_name": learner_name(pool, _G["spec"].net)}
     _G["db"] = D.load_db()
     _G["decks"] = decks
     _G["aux"] = bool(aux)
@@ -770,7 +875,14 @@ def play_one(seed):
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
                                      with_kinds=True)
-        res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=MAX_STEPS,
+        seats, nets = {"p1": spec, "p2": spec}, None
+        pool = _G.get("pool")
+        if pool:                                               # 相手の集団（§7.56）
+            lseat, oname = opp_draw(seed, pool["entries"])
+            oseat = "p2" if lseat == "p1" else "p1"
+            seats = {lseat: spec, oseat: pool["specs"][oname]}
+            nets = {lseat: pool["learner_name"], oseat: oname}
+        res = DR.run_game(seed, seats, p1, p2, max_steps=MAX_STEPS,
                           observer=rec, post=rec.post if aux_on else None, swap=rec.swap)
     except Exception:                                          # noqa: BLE001  1 局の失敗で止めない
         return None
@@ -824,6 +936,12 @@ def play_one(seed):
                                  "hold": rows["forced"].count(2),
                                  "target": rows["forced"].count(3)},
                       "removal_legal_rows": rec.removal_legal_rows}}
+    if nets:
+        # 相手の集団（§7.56）: その席を打ったネットの名前と「学ぶ側のネットか」の印（方策の教師の選び方に使う）
+        out["seat_net"] = np.array([nets[w] for w in rows["who"]])
+        out["learner"] = np.array([1 if seats[w] is spec else 0 for w in rows["who"]], np.int8)
+        out["_meta"]["nets"] = dict(nets)
+        out["_meta"]["learner_seat"] = lseat
     if aux_on:
         out.update({"aux": aux.astype(np.float16), "aux_tok": aux_tok.astype(np.float16),
                     "aux_mask": aux_mask,
@@ -878,6 +996,7 @@ _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加�
 _V4_KEYS = ("deck_kinds", "forced", "forced_sig", "pol_v0")   # v4 で追加（§20.8／§20.8.5／§20.8.9／§20.6.1）
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 _AUX_DEF_KEYS = ("aux_def", "aux_def_row")            # 守る側の補助教師（v5 で追加・P8・`2026-09-24_p8_defender_columns.md`）
+_POOL_KEYS = ("seat_net", "learner")                  # 相手の集団（§7.56・`--opp-pool` のときだけ）
 
 
 def main(argv=None):
@@ -899,7 +1018,7 @@ def main(argv=None):
                     help="【廃止・受けるだけ】dump v3 が既定になった（2026-09-07・§18.5）。"
                          "分散生成の古い指示書がこの旗を付けたまま回っても壊れないように残す")
     ap.add_argument("--decks", default=DEFAULT_DECKS,
-                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"),
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "synth_roles2", "user", "official", "real"),
                     help="デッキの中身（既定 synth＝歴代の波と同じ規約）。"
                          "synth_roles=除去の型を色ごとに差し込む（教材の対照・§20.8.1）")
     ap.add_argument("--no-aux", action="store_true",
@@ -938,12 +1057,27 @@ def main(argv=None):
                     help="1 局の点の数（枠の合計と一致を確かめるだけ）")
     ap.add_argument("--reanalyze-out", default=None,
                     help="再分析の dump の dir（既定 <--out>_rean・`n_rel_train.py --in` にそのまま渡せる・倍率が 1 つのときだけ）")
+    ap.add_argument("--opp-pool", default=None,
+                    help="相手の集団（§7.56）: `r24:0.5,r23:0.2,r22:0.15,r13d:0.15`。局ごとに片方の席を学ぶ側（--net）、"
+                         "もう片方を集団から重みどおりに引く（局の seed で決まる・学ぶ側の席は seed の偶奇で交互）。"
+                         "名前だけなら opcg_sim/data/learned/nrel_<名前>.npz。列 seat_net／learner を足す（既定＝集団なし＝自己対戦）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
+    opp_pool = None
+    if args.opp_pool:
+        try:
+            opp_pool = parse_opp_pool(args.opp_pool)
+        except ValueError as e:
+            ap.error(str(e))
+        for _n, path, _w in opp_pool:
+            if not os.path.exists(path):
+                ap.error(f"--opp-pool のネットが無い: {path}")
     rean = None
     mults = [int(x) for x in str(args.reanalyze_mult).split(",")]
     if any(m < 0 for m in mults) or (len(mults) > 1 and (min(mults) < 1 or len(set(mults)) != len(mults))):
         ap.error("--reanalyze-mult は 0 以上の整数（複数なら 1 以上で重複なし）")
+    if mults != [0] and opp_pool:
+        ap.error("--reanalyze-mult と --opp-pool は併用できない（相手の席の点を学ぶ側のネットで読み直すことになる）")
     if mults != [0]:
         quota = [int(x) for x in args.reanalyze_quota.split(",")]
         from opcg_sim.loop import reanalyze as RA
@@ -970,12 +1104,13 @@ def main(argv=None):
     if args.dump_v2:
         print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
     keys = (_ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS
-           + (() if args.no_aux else _AUX_KEYS + _AUX_DEF_KEYS))   # v5: aux_def／aux_def_row も同じ旗（P8）
+           + (() if args.no_aux else _AUX_KEYS + _AUX_DEF_KEYS)    # v5: aux_def／aux_def_row も同じ旗（P8）
+           + (_POOL_KEYS if opp_pool else ()))                         # 相手の集団（§7.56）
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
     initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
-                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean)
+                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean, opp_pool)
     nm = len(rean["mults"]) if rean else 0                   # 再分析の dump（--reanalyze-mult・倍率ごと）
     rbufs, rgames, rshard = [{k: [] for k in keys} for _ in range(nm)], [[] for _ in range(nm)], 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
@@ -1027,7 +1162,7 @@ def main(argv=None):
     with open(os.path.join(args.out, "meta_n_record.json"), "w") as f:
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
                    "dropped": n_drop, "sims": args.sims, "decks": args.decks,
-                   "enc_version": ENC_VERSION_V14,
+                   "enc_version": ENC_VERSION_V15,
                    "dump_version": 3 if args.no_aux else DUMP_VERSION,
                    "aux": not args.no_aux, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",
@@ -1038,7 +1173,12 @@ def main(argv=None):
                    "eps_target": args.eps_target,
                    "forced": forced, "removal_legal_rows": removal_legal,
                    # 探索の設定の上書き（§20.8.6・空＝serve 既定）
-                   "search": search},
+                   "search": search,
+                   # 相手の集団（§7.56）: 書くのは集団を使ったときだけ（既定の meta は今までと同じ）
+                   **({"opp_pool": [{"name": n, "net": p, "weight": w} for n, p, w in opp_pool],
+                       "opp_games": {n: sum(1 for g in games
+                                            if g["nets"][("p2" if g["learner_seat"] == "p1" else "p1")] == n)
+                                     for n, _p, _w in opp_pool}} if opp_pool else {})},
                   f, ensure_ascii=False)
     if rean:
         for j, d in enumerate(rean_outs):

@@ -1,0 +1,40 @@
+{
+ "points": 1064,
+ "wins": 1049,
+ "errors": 0,
+ "split_my_sequence": 577,
+ "split_after_own_hidden_any_deal": 26,
+ "split_after_own_hidden_all_diverging_deals": 17,
+ "own_hidden_seen_in_any_line": 62,
+ "by_opp_life": {
+  "0": {
+   "win": 857,
+   "split": 440,
+   "split_after_hidden": 20,
+   "seen_any": 45
+  },
+  "1": {
+   "win": 158,
+   "split": 110,
+   "split_after_hidden": 3,
+   "seen_any": 11
+  },
+  "2": {
+   "win": 30,
+   "split": 25,
+   "split_after_hidden": 2,
+   "seen_any": 5
+  },
+  "3": {
+   "win": 4,
+   "split": 2,
+   "split_after_hidden": 1,
+   "seen_any": 1
+  }
+ },
+ "true_status": {
+  "win": 1042,
+  "unknown": 2,
+  "no": 5
+ }
+}

@@ -1,0 +1,793 @@
+{
+ "a": "n1_results/lethal_root/redo/points_3012000_300.jsonl.gz",
+ "b": "n1_results/lethal_speed/judge_after.jsonl",
+ "points_a": 13497,
+ "points_b": 13497,
+ "joined": 13497,
+ "status_transitions": {
+  "no->no": 8449,
+  "unknown->no": 181,
+  "unknown->unknown": 3692,
+  "unknown->win": 25,
+  "win->win": 1150
+ },
+ "applies_transitions": {
+  "False->False": 1148,
+  "True->False": 1431,
+  "True->True": 10918
+ },
+ "win_a": 1150,
+ "win_b": 1175,
+ "win_lost": 0,
+ "win_move_changed": 0,
+ "win_new": 25,
+ "win_but_applies_off": 0,
+ "nodes": {
+  "a": 85528499,
+  "b": 80123476
+ },
+ "nodes_ratio": 0.9368,
+ "sec": {
+  "a": 1692.8,
+  "b": 617.7
+ },
+ "sec_ratio": 0.3649,
+ "nodes_by_status_a": {
+  "unknown": {
+   "n": 3898,
+   "nodes_a": 69588323,
+   "nodes_b": 67082860
+  },
+  "no": {
+   "n": 8449,
+   "nodes_a": 13587070,
+   "nodes_b": 10951780
+  },
+  "win": {
+   "n": 1150,
+   "nodes_a": 2353106,
+   "nodes_b": 2088836
+  }
+ },
+ "invariant_ok": true,
+ "win_lost_rows": [],
+ "win_move_changed_rows": [],
+ "win_new_rows": [
+  {
+   "key": [
+    3012010,
+    "p1",
+    11,
+    120
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "dd8924bc-74d4-4ed7-bca3-ba9904ba5f6a",
+      "target_ids": [
+       "2a3582d3-fcfc-4259-b89e-b1cdd6b57aa3"
+      ]
+     }
+    },
+    "nodes": 17233,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012019,
+    "p1",
+    11,
+    112
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "a4bde867-a004-4cf2-9488-8fec54a04153",
+      "target_ids": [
+       "b6cc1754-d62f-4eb9-8452-d019d1be8cf9"
+      ]
+     }
+    },
+    "nodes": 19614,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012019,
+    "p1",
+    11,
+    113
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "a4bde867-a004-4cf2-9488-8fec54a04153",
+      "target_ids": [
+       "b6cc1754-d62f-4eb9-8452-d019d1be8cf9"
+      ]
+     }
+    },
+    "nodes": 12938,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012021,
+    "p1",
+    15,
+    137
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ca50844a-7661-409c-a44b-d8a80bc2a4d5",
+      "target_ids": [
+       "6a2b2ec7-923b-424b-9db4-74a5428dbd5c"
+      ]
+     }
+    },
+    "nodes": 15363,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012038,
+    "p1",
+    13,
+    127
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "a697cf80-b59c-4042-8076-360cd0cac634",
+      "target_ids": [
+       "cf922604-bb96-4f39-8782-80c81717c116"
+      ]
+     }
+    },
+    "nodes": 10683,
+    "applies": true
+   },
+   "opp_life": 2
+  },
+  {
+   "key": [
+    3012067,
+    "p1",
+    11,
+    92
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8af71409-ca30-4cb2-a7c8-fa1ac3ded828"
+     }
+    },
+    "nodes": 17202,
+    "applies": true
+   },
+   "opp_life": 2
+  },
+  {
+   "key": [
+    3012092,
+    "p2",
+    12,
+    116
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 4452,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "6c52eca0-cdc6-49aa-b301-704b4127904e",
+      "target_ids": [
+       "bd4e8952-145c-4bed-a306-0b5bda665761"
+      ]
+     }
+    },
+    "nodes": 3606,
+    "applies": true
+   },
+   "opp_life": 2
+  },
+  {
+   "key": [
+    3012101,
+    "p2",
+    10,
+    79
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "66c944ae-3056-47a5-ad6e-83ac28e31a30",
+      "target_ids": [
+       "d6095dc1-605f-423d-9863-a40e76815a7d"
+      ]
+     }
+    },
+    "nodes": 13032,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012101,
+    "p2",
+    10,
+    80
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "66c944ae-3056-47a5-ad6e-83ac28e31a30",
+      "target_ids": [
+       "d6095dc1-605f-423d-9863-a40e76815a7d"
+      ]
+     }
+    },
+    "nodes": 12680,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    85
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "fce855ec-7303-4d51-b6fd-5b594a1516bb",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 2476,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    86
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "fce855ec-7303-4d51-b6fd-5b594a1516bb",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 3193,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    87
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "fce855ec-7303-4d51-b6fd-5b594a1516bb",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 3171,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    89
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ed4bc049-dff2-4235-a716-f109520d6641",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 1973,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    90
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ed4bc049-dff2-4235-a716-f109520d6641",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 1194,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012131,
+    "p1",
+    11,
+    91
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ed4bc049-dff2-4235-a716-f109520d6641",
+      "target_ids": [
+       "ae60e820-9324-4df9-bbb4-4637900f04e1"
+      ]
+     }
+    },
+    "nodes": 1789,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012145,
+    "p2",
+    14,
+    153
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "41c011c3-f85e-473e-8f8e-bee90b61deb7",
+      "target_ids": [
+       "438f4249-71f5-4259-88ee-280ef9e9c319"
+      ]
+     }
+    },
+    "nodes": 17342,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012172,
+    "p2",
+    12,
+    109
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "ebdf310b-2141-459b-9f36-1cc94a25c78a"
+     }
+    },
+    "nodes": 18401,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012189,
+    "p1",
+    15,
+    145
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "2f32643d-3638-42a2-a59b-7960f474b123",
+      "target_ids": [
+       "e507d23a-41be-40a3-b21d-7ad8a67eb265"
+      ]
+     }
+    },
+    "nodes": 16070,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012189,
+    "p1",
+    15,
+    146
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "2f32643d-3638-42a2-a59b-7960f474b123",
+      "target_ids": [
+       "e507d23a-41be-40a3-b21d-7ad8a67eb265"
+      ]
+     }
+    },
+    "nodes": 2750,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012189,
+    "p1",
+    15,
+    150
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "fe8126b0-ffc3-4575-be5f-f269a47bd96f",
+      "target_ids": [
+       "e507d23a-41be-40a3-b21d-7ad8a67eb265"
+      ]
+     }
+    },
+    "nodes": 855,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012189,
+    "p1",
+    15,
+    153
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "fe8126b0-ffc3-4575-be5f-f269a47bd96f",
+      "target_ids": [
+       "e507d23a-41be-40a3-b21d-7ad8a67eb265"
+      ]
+     }
+    },
+    "nodes": 2595,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012257,
+    "p2",
+    16,
+    194
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "10ffdb18-8dc9-4a0e-aac4-ec5b44c477f9",
+      "target_ids": [
+       "58893c76-dc03-46a3-bad8-bbe64c5cb564"
+      ]
+     }
+    },
+    "nodes": 9511,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012288,
+    "p1",
+    13,
+    135
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "60b891e7-9fdc-4b90-ab8b-fa2a5cb4018b"
+     }
+    },
+    "nodes": 796,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012288,
+    "p1",
+    13,
+    136
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "60b891e7-9fdc-4b90-ab8b-fa2a5cb4018b"
+     }
+    },
+    "nodes": 681,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012288,
+    "p1",
+    13,
+    137
+   ],
+   "a": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "b": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "60b891e7-9fdc-4b90-ab8b-fa2a5cb4018b"
+     }
+    },
+    "nodes": 743,
+    "applies": true
+   },
+   "opp_life": 1
+  }
+ ],
+ "win_but_applies_off_rows": []
+}

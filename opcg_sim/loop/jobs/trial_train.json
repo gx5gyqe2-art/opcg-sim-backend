@@ -1,0 +1,74 @@
+{
+ "kind": "train",
+ "section": "§7.42",
+ "ledger_grep": "7.42 WP `worker-jobs`",
+ "about": "試し: 訓練 1 周（試しの生成の 2 局）→ 評価帯",
+ "job": "trial-train",
+ "branch": "claude/worker-job-trial-train",
+ "base": {
+  "branch": "claude/worker-jobs"
+ },
+ "shards": 1,
+ "hours": 0.3,
+ "waves": [
+  {
+   "branch": "claude/worker-job-trial-gen-w{ww}",
+   "shards": 1,
+   "dest": "~/trialw",
+   "glob": "~/trialw/n_records/trial_w*_p[0-1]",
+   "expect": 2
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "1",
+  "--pi-teacher",
+  "q_improved",
+  "--fast",
+  "--save-each-epoch",
+  "--holdout-mod",
+  "2",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r13d.npz"
+ ],
+ "runs": [
+  {
+   "name": "trial",
+   "in": [
+    "~/trialw/n_records/trial_w*_p[0-1]"
+   ],
+   "out": "~/nrel_trial.npz",
+   "log": "~/train_trial.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/trialw/n_records/trial_w*_p[0-1]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r13d.npz",
+    "~/nrel_trial.npz",
+    "~/nrel_trial.ep0.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "2"
+   ],
+   "out": "~/band_trial.json",
+   "log": "~/band_trial.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "commit_message": "trial train"
+}

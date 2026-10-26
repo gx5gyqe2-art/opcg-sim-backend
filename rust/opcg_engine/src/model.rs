@@ -168,6 +168,10 @@ pub enum Seat {
 }
 
 impl Seat {
+    /// [`CardInstance::known_by`] でこの席を表す bit。
+    pub fn know_bit(self) -> u8 {
+        1u8 << (self as u8)
+    }
     pub fn other(self) -> Seat {
         match self {
             Seat::P1 => Seat::P2,
@@ -403,7 +407,7 @@ pub enum Zone {
 }
 
 /// 挿入位置（Python `move_card(dest_position="TOP"|"BOTTOM")`）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Position {
     Top,
     Bottom,
@@ -448,6 +452,9 @@ pub struct MasterTable {
     pub by_id: std::collections::HashMap<String, MasterIdx>,
     /// 全カードの能力（`CardMaster.ability_ids` が指す先）。
     pub abilities: crate::effects::ast::AbilityTable,
+    /// カードごとの本文の【ドン!!×N】の最大 N（`search::prune::master_don_cond`）。本文から
+    /// 決まる値を表ごとに 1 度だけ作って持つ。
+    pub don_cond: std::sync::OnceLock<Vec<Option<i32>>>,
 }
 
 /// `CardMaster` を作る際に読む欄（`export_effects_json.py` の出力と 1:1）。
@@ -571,6 +578,7 @@ impl MasterTable {
             masters: Vec::with_capacity(entries.len()),
             by_id: HashMap::with_capacity(entries.len()),
             abilities: crate::effects::ast::AbilityTable::default(),
+            don_cond: Default::default(),
         };
         for (key, card) in entries {
             table.add_master(card, &format!("effects json: cards.{key}"))?;
@@ -708,6 +716,15 @@ pub struct CardInstance {
     /// 記録 v3/v4 の `card_record` には**無い**（Python 側も動的属性で、`temp_zone` が空の
     /// 記録境界でしか観測されない）＝`from_record` では常に `false` で始まる。
     pub temp_origin_life: bool,
+    /// 席ごとの「この札の正体と位置を知っている」印（`search_efficiency_plan.md` §7.15・WP `rs-fair`）。
+    ///
+    /// bit `1 << seat`（[`Seat::know_bit`]）。意味を持つのは札が**隠れた領域**（手札・山札・裏向きの
+    /// ライフ・一時領域）にあるときだけ。探索の世界の引き直し（`reveal="fair"`・既定）が、引く席の bit が
+    /// 立った札をその位置に固定し、残りだけを混ぜる。更新は [`crate::journal::StateMut`] のゾーン操作が
+    /// 一手に担う（経路の表は `docs/SPEC.md` の探索の節）。**ルールの結果を変えない**＝効果の解決・
+    /// 合法手・手の適用・符号化はこれを読まない。記録（`card_record`）・盤面 JSON には載らない
+    /// （`from_record` では 0＝誰も知らない、で始まる）。
+    pub known_by: u8,
 }
 
 /// 記録 v2 の `card_record`（`rs_diff_replay.py::card_record`）が持つ欄。
@@ -853,6 +870,7 @@ impl CardInstance {
             timed_cost: f_i32(o, "timed_cost", ctx)?,
             timed_keywords: f_str_set(o, "timed_keywords", ctx)?,
             temp_origin_life: false, // 記録に無い（上のフィールド docstring 参照）
+            known_by: 0,             // 記録に無い（上のフィールド docstring 参照）
         })
     }
 }
@@ -941,7 +959,7 @@ fn don_from_record(rec: &Value, ctx: &str) -> Result<DonRecord, EngineError> {
 }
 
 /// 自己制限（Python `Player.restrictions[key] = {"expire": turn, "min_cost": Optional[int]}`）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Restriction {
     pub key: String,
     pub expire: i32,
@@ -974,7 +992,7 @@ pub struct PlayerState {
 }
 
 /// `Player.granted_replacements` の 1 件（Python の dict と 1:1・§11.8 #5）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GrantedReplacement {
     /// `REPLACE_EFFECT` の `status`（`_find_replacement` の `status_values` と突き合わせる）。
     pub status: String,
@@ -990,7 +1008,7 @@ pub struct GrantedReplacement {
 
 /// 進行中の戦闘（Python `GameManager.active_battle`）。`attacker_owner`／`target_owner` は
 /// Python の `_find_card_location` の持ち主（`owner_id` ではなく**所在**）。記録 v3 で追加（P2）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ActiveBattle {
     pub attacker: CardIdx,
     pub target: CardIdx,
@@ -1010,7 +1028,7 @@ pub struct ActiveBattle {
 /// `cpu_ai.py` が合法手を畳む**マクロ手**（`action_type: "DON_BOX"` → 実対局では先頭の
 /// `ATTACH_DON` へ展開される）であり、`active_interaction` には決して入らない。よって
 /// ここに変種は持たない（持つと Python に無い要求が盤面 dict に出て照合が落ちる）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InteractionKind {
     FieldOverflowTrash,
     /// `resolver._suspend_for_target_selection`。
@@ -1028,6 +1046,9 @@ pub enum InteractionKind {
     DeclareCost,
     /// `resolver._suspend_for_don_selection`（RETURN_DON の対象ドン!!選択）。
     SelectResource,
+    /// 同時に誘発した自分の効果のうち、どれを先に解決するか（WP `rs-trigger-simul`・
+    /// `effects/triggers.rs::order_front_bundle`）。フロントへは `SEARCH_AND_SELECT`（1 枚を選ぶ）で出す。
+    OrderTriggers,
 }
 
 impl InteractionKind {
@@ -1042,13 +1063,16 @@ impl InteractionKind {
             InteractionKind::ArrangeDeck => "ARRANGE_DECK",
             InteractionKind::DeclareCost => "DECLARE_COST",
             InteractionKind::SelectResource => "SELECT_RESOURCE",
+            InteractionKind::OrderTriggers => "ORDER_TRIGGERS",
         }
     }
     /// `get_pending_request` がフロントへ出す `action`
     /// （`SELECT_TARGET`／`FIELD_OVERFLOW_TRASH` → `SEARCH_AND_SELECT`・他は種別名そのまま）。
     pub fn front_action(self) -> &'static str {
         match self {
-            InteractionKind::FieldOverflowTrash | InteractionKind::SelectTarget => {
+            InteractionKind::FieldOverflowTrash
+            | InteractionKind::SelectTarget
+            | InteractionKind::OrderTriggers => {
                 "SEARCH_AND_SELECT"
             }
             other => other.action_type(),
@@ -1085,6 +1109,8 @@ pub struct Continuation {
     pub rest_replace: Option<RestReplaceContinuation>,
     /// 任意の効果除去置換の確認（`source_card` が除去されようとしているカード）。
     pub removal_replace: Option<RemovalReplaceContinuation>,
+    /// ORDER_TRIGGERS（同時に誘発した効果の解決順）が並べる待ち行列。
+    pub order_queue: Option<crate::journal::TriggerQueue>,
 }
 
 /// 任意の効果除去置換（「KOされる代わりに〜できる」）の continuation。
@@ -1102,7 +1128,7 @@ pub struct RemovalReplaceContinuation {
 }
 
 /// ARRANGE_DECK の continuation（Python の同名キー）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrangeContinuation {
     pub targets: Vec<CardIdx>,
     /// "DECK" | "LIFE"
@@ -1113,14 +1139,14 @@ pub struct ArrangeContinuation {
     pub fixed_position: Position,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ArrangeDest {
     Deck,
     Life,
 }
 
 /// 任意のバトル KO 置換（`battle._suspend_for_battle_ko_replacement`）の continuation。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BattleKoContinuation {
     pub target_owner: Seat,
     pub life_lost: i32,
@@ -1132,7 +1158,7 @@ pub struct BattleKoContinuation {
 /// レストにできる」（PRB02-006）のような、パーサが `REPLACE_EFFECT` にしない置換。
 /// 対象選択の中断にこの欄を付けておき、**0 枚を選んだ（＝置換を使わない）ときだけ
 /// 本来のレストを行う**。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RestReplaceContinuation {
     /// 本来レストされるカード（置換を使わなければこれがレストになる）。
     pub original: CardIdx,
@@ -1159,11 +1185,13 @@ pub struct RestReplaceContinuation {
 /// 分類そのもの（`ActionType`／`status`／値の符号からの判定表）は
 /// [`crate::effects::interact::classify_intent`] に1か所だけ置く（型はここ・判定はそちら、
 /// という分担）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SelectionIntent {
     Benefit,
     Cost,
     Unknown,
+    /// 同時に誘発した効果の解決順（[`InteractionKind::OrderTriggers`]）。既定解決は先頭＝積んだ順。
+    Order,
 }
 
 impl SelectionIntent {
@@ -1174,6 +1202,7 @@ impl SelectionIntent {
             SelectionIntent::Benefit => "BENEFIT",
             SelectionIntent::Cost => "COST",
             SelectionIntent::Unknown => "UNKNOWN",
+            SelectionIntent::Order => "ORDER",
         }
     }
 }
@@ -1252,7 +1281,7 @@ impl Interaction {
 }
 
 /// 期間付き効果 1 件（Python `effects/continuous.py::ContinuousEffect`）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContinuousEffect {
     pub target_uuid: String,
     pub kind: ContinuousKind,
@@ -1265,7 +1294,7 @@ pub struct ContinuousEffect {
 }
 
 /// Python `ContinuousEffect.kind`（"POWER" | "COST" | "FLAG" | "KEYWORD"）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ContinuousKind {
     Power,
     Cost,
@@ -1298,7 +1327,7 @@ pub struct ResolverStackFrame {
 }
 
 /// 「このターン終了時、〜」で予約した遅延アクション（Python `pending_end_of_turn` の要素）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DelayedAction {
     pub player: Seat,
     pub node: crate::effects::NodeRef,
@@ -1317,7 +1346,7 @@ pub struct DelayedAction {
 /// （`ability` は `CardMaster.ability_ids` への index）。型と待ち行列だけ先に置くのは、
 /// ターン進行・戦闘の分岐（「中断中／誘発が残っている間は進めない」）を Python と同じ
 /// 形で書くため。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PendingTrigger {
     pub player: Seat,
     pub card: CardIdx,
@@ -1326,6 +1355,21 @@ pub struct PendingTrigger {
     pub confirmed: bool,
     /// 誘発の契機になったカード（バトルした相手など）。解決時に文脈の `trigger_subject` へ載せる。
     pub subject: Option<CardIdx>,
+    /// 同時に誘発した束の中の並びの状態（WP `rs-trigger-simul`・`effects/triggers.rs::order_front_bundle`）。
+    pub bundle: TriggerBundle,
+}
+
+/// 待ち行列の 1 件が「同時に誘発した束」のどこにいるか（WP `rs-trigger-simul`）。
+///
+/// 積んだ直後は [`TriggerBundle::Fresh`]。消化を始めるとき、先頭から続く `Fresh` の並びを 1 つの束として
+/// 手番側 → 非手番側の順に並べ替え、同じプレイヤーの効果が（別の札で）2 つ以上ある組は `Choose`
+/// （そのプレイヤーが順を選ぶ）、それ以外は `Fixed` にする。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TriggerBundle {
+    #[default]
+    Fresh,
+    Choose,
+    Fixed,
 }
 
 /// 盤面全体（Python `GameManager`＋両 `Player`）。

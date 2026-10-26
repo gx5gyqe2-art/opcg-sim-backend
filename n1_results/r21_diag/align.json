@@ -1,0 +1,1580 @@
+{
+ "shards": {
+  "n49_w01": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 429,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 665,
+    "c_qimp_argmax_ne_rec_best": 693,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w01_p0",
+     "n49_w01_p1",
+     "n49_w01_p2",
+     "n49_w01_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 794
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 794
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w01",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 429,
+    "median": 0.7416173570019724,
+    "p10": 0.3730876325426351,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.023310023310023312
+   },
+   "cands_mean": 10.1975,
+   "sec": 1.6
+  },
+  "n49_w02": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 468,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 686,
+    "c_qimp_argmax_ne_rec_best": 736,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w02_p0",
+     "n49_w02_p1",
+     "n49_w02_p2",
+     "n49_w02_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w02",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 468,
+    "median": 0.7074893805454874,
+    "p10": 0.3488321509550639,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.038461538461538464
+   },
+   "cands_mean": 9.94375,
+   "sec": 1.5
+  },
+  "n49_w03": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 461,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 651,
+    "c_qimp_argmax_ne_rec_best": 692,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w03_p0",
+     "n49_w03_p1",
+     "n49_w03_p2",
+     "n49_w03_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 8,
+      "random": 792
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 8,
+      "random": 792
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w03",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 461,
+    "median": 0.7490996398559424,
+    "p10": 0.3607874648453194,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.03036876355748373
+   },
+   "cands_mean": 9.772916666666667,
+   "sec": 1.7
+  },
+  "n49_w04": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 463,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 671,
+    "c_qimp_argmax_ne_rec_best": 717,
+    "c_qimp_argmax_lowvisit": 1
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w04_p0",
+     "n49_w04_p1",
+     "n49_w04_p2",
+     "n49_w04_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 790
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 790
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w04",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 463,
+    "median": 0.7346938775510204,
+    "p10": 0.3757450139851636,
+    "share_lt_0.05": 0.0021598272138228943,
+    "share_lt_0.20": 0.012958963282937365
+   },
+   "cands_mean": 9.680416666666666,
+   "sec": 1.5
+  },
+  "n49_w05": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 446,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 630,
+    "c_qimp_argmax_ne_rec_best": 643,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w05_p0",
+     "n49_w05_p1",
+     "n49_w05_p2",
+     "n49_w05_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w05",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 446,
+    "median": 0.7402548725637181,
+    "p10": 0.3733531832788501,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.020179372197309416
+   },
+   "cands_mean": 10.01625,
+   "sec": 1.4
+  },
+  "n49_w06": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 479,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 668,
+    "c_qimp_argmax_ne_rec_best": 731,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w06_p0",
+     "n49_w06_p1",
+     "n49_w06_p2",
+     "n49_w06_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 0,
+      "random": 801
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 0,
+      "random": 801
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w06",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 479,
+    "median": 0.757527733755943,
+    "p10": 0.3753073332414602,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.020876826722338204
+   },
+   "cands_mean": 9.690833333333334,
+   "sec": 1.5
+  },
+  "n49_w07": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 489,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 752,
+    "c_qimp_argmax_ne_rec_best": 732,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w07_p0",
+     "n49_w07_p1",
+     "n49_w07_p2",
+     "n49_w07_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 795
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 795
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w07",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 489,
+    "median": 0.7486910994764397,
+    "p10": 0.36114527674160707,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.026584867075664622
+   },
+   "cands_mean": 9.9575,
+   "sec": 1.4
+  },
+  "n49_w08": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 470,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 686,
+    "c_qimp_argmax_ne_rec_best": 675,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n49_w08_p0",
+     "n49_w08_p1",
+     "n49_w08_p2",
+     "n49_w08_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 2,
+      "random": 799
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 2,
+      "random": 799
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n49_w08",
+     "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "6f2ce8ff6"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 470,
+    "median": 0.7550861413243105,
+    "p10": 0.4049148430787891,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.01276595744680851
+   },
+   "cands_mean": 10.115833333333333,
+   "sec": 1.5
+  },
+  "n50_w01": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 449,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 680,
+    "c_qimp_argmax_ne_rec_best": 665,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w01_p0",
+     "n50_w01_p1",
+     "n50_w01_p2",
+     "n50_w01_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 790
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 790
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w01",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 449,
+    "median": 0.7593037214885955,
+    "p10": 0.38879298463603873,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.017817371937639197
+   },
+   "cands_mean": 10.084166666666667,
+   "sec": 1.5
+  },
+  "n50_w02": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 472,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 700,
+    "c_qimp_argmax_ne_rec_best": 732,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w02_p0",
+     "n50_w02_p1",
+     "n50_w02_p2",
+     "n50_w02_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 2,
+      "random": 799
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 2,
+      "random": 799
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w02",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 472,
+    "median": 0.7782263132566795,
+    "p10": 0.3687141216991963,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.014830508474576272
+   },
+   "cands_mean": 10.001666666666667,
+   "sec": 1.5
+  },
+  "n50_w03": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 480,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 668,
+    "c_qimp_argmax_ne_rec_best": 709,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w03_p0",
+     "n50_w03_p1",
+     "n50_w03_p2",
+     "n50_w03_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 798,
+      "end_and_attack": 800,
+      "enel": 8,
+      "random": 794
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 798,
+      "end_and_attack": 800,
+      "enel": 8,
+      "random": 794
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w03",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 480,
+    "median": 0.7616769040890298,
+    "p10": 0.41738556258049164,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.022916666666666665
+   },
+   "cands_mean": 10.237083333333333,
+   "sec": 1.5
+  },
+  "n50_w04": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 455,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 684,
+    "c_qimp_argmax_ne_rec_best": 704,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w04_p0",
+     "n50_w04_p1",
+     "n50_w04_p2",
+     "n50_w04_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 797
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 797
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w04",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 455,
+    "median": 0.7447052089295936,
+    "p10": 0.38187116281216826,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.02197802197802198
+   },
+   "cands_mean": 10.12625,
+   "sec": 1.5
+  },
+  "n50_w05": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 438,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 641,
+    "c_qimp_argmax_ne_rec_best": 695,
+    "c_qimp_argmax_lowvisit": 1
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w05_p0",
+     "n50_w05_p1",
+     "n50_w05_p2",
+     "n50_w05_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 791
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 799,
+      "end_and_attack": 800,
+      "enel": 10,
+      "random": 791
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w05",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 438,
+    "median": 0.7328270388615217,
+    "p10": 0.37112152312955526,
+    "share_lt_0.05": 0.00228310502283105,
+    "share_lt_0.20": 0.0273972602739726
+   },
+   "cands_mean": 10.009583333333333,
+   "sec": 1.5
+  },
+  "n50_w06": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 464,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 705,
+    "c_qimp_argmax_ne_rec_best": 730,
+    "c_qimp_argmax_lowvisit": 0
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w06_p0",
+     "n50_w06_p1",
+     "n50_w06_p2",
+     "n50_w06_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 4,
+      "random": 796
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w06",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 464,
+    "median": 0.7632834005505409,
+    "p10": 0.36811797752808995,
+    "share_lt_0.05": 0.0,
+    "share_lt_0.20": 0.02586206896551724
+   },
+   "cands_mean": 10.055833333333334,
+   "sec": 1.5
+  },
+  "n50_w07": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 428,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 622,
+    "c_qimp_argmax_ne_rec_best": 677,
+    "c_qimp_argmax_lowvisit": 1
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w07_p0",
+     "n50_w07_p1",
+     "n50_w07_p2",
+     "n50_w07_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 12,
+      "random": 788
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 12,
+      "random": 788
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w07",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 428,
+    "median": 0.7431531541343557,
+    "p10": 0.35794321336580576,
+    "share_lt_0.05": 0.002336448598130841,
+    "share_lt_0.20": 0.009345794392523364
+   },
+   "cands_mean": 9.831666666666667,
+   "sec": 1.6
+  },
+  "n50_w08": {
+   "counts": {
+    "points": 2400,
+    "row_missing": 0,
+    "a_row_mismatch": 0,
+    "b_pol_mismatch": 0,
+    "b_rec_n_mismatch": 0,
+    "b_deep_n_mismatch": 0,
+    "b_deep_q_mismatch": 0,
+    "b_v0_mismatch": 0,
+    "b_chosen_sig_mismatch": 0,
+    "b_chosen_neg": 0,
+    "points_jsonl_missing": 0,
+    "c_qimp_argmax_ne_deep_best": 417,
+    "c_visits_argmax_ne_deep_best": 0,
+    "c_deep_best_ne_rec_best": 628,
+    "c_qimp_argmax_ne_rec_best": 669,
+    "c_qimp_argmax_lowvisit": 1
+   },
+   "bad_cols": {},
+   "meta": {
+    "enc_version": 15,
+    "rec_enc_version": 15,
+    "dump_version": 5,
+    "rec_dump_version": 5,
+    "has_pol_v0": true,
+    "rec_has_pol_v0": true,
+    "has_pol_p": true,
+    "tokens": [
+     22,
+     22
+    ],
+    "scalars": 127,
+    "rec_parts": [
+     "n50_w08_p0",
+     "n50_w08_p1",
+     "n50_w08_p2",
+     "n50_w08_p3"
+    ],
+    "search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "rec_search": {
+     "worlds": 1,
+     "select_rule": "q_min_n",
+     "q_min_frac": 0.125,
+     "root_prior_temp": 2.0,
+     "budget": 0
+    },
+    "reanalyzed": {
+     "mult": 4,
+     "budget": 0,
+     "points": 2400,
+     "points_by_rule": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 794
+     },
+     "games": 200,
+     "diverged": 0,
+     "unmapped": 0,
+     "lost_to_divergence": 0,
+     "selection": {
+      "early": 800,
+      "end_and_attack": 800,
+      "enel": 6,
+      "random": 794
+     },
+     "quota": [
+      4,
+      4,
+      2,
+      2
+     ],
+     "shard": "0/1",
+     "record_dir": "/root/rec/n_records/n50_w08",
+     "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
+     "engine_commit": "24ce7244f"
+    }
+   },
+   "qimp_argmax_visit_ratio_when_ne": {
+    "n": 417,
+    "median": 0.7338671691003297,
+    "p10": 0.35533003307971706,
+    "share_lt_0.05": 0.002398081534772182,
+    "share_lt_0.20": 0.02158273381294964
+   },
+   "cands_mean": 9.88875,
+   "sec": 1.4
+  }
+ },
+ "totals": {
+  "points": 38400,
+  "row_missing": 0,
+  "a_row_mismatch": 0,
+  "b_pol_mismatch": 0,
+  "b_rec_n_mismatch": 0,
+  "b_deep_n_mismatch": 0,
+  "b_deep_q_mismatch": 0,
+  "b_v0_mismatch": 0,
+  "b_chosen_sig_mismatch": 0,
+  "b_chosen_neg": 0,
+  "points_jsonl_missing": 0,
+  "c_qimp_argmax_ne_deep_best": 7308,
+  "c_visits_argmax_ne_deep_best": 0,
+  "c_deep_best_ne_rec_best": 10737,
+  "c_qimp_argmax_ne_rec_best": 11200,
+  "c_qimp_argmax_lowvisit": 4
+ },
+ "bad_cols": {},
+ "trainer_form": {
+  "tokens": [
+   22,
+   22
+  ],
+  "scalars": 127
+ },
+ "loader": {
+  "points": 38400,
+  "loader_points": 38400,
+  "mismatch": {
+   "n": 0,
+   "q": 0,
+   "p": 0,
+   "pi": 0,
+   "len": 0,
+   "chosen": 0,
+   "v0": 0,
+   "row_tok": 0,
+   "row_sc": 0,
+   "row_ci": 0,
+   "at": 0,
+   "si": 0,
+   "ti": 0
+  },
+  "val_points_seed_mod7": 5484
+ },
+ "forward": {
+  "net": "nrel_r13d.npz",
+  "points": 38400,
+  "argmax_agree": 0.9096875,
+  "l1_mean": 0.059428051859267514,
+  "l1_median": 7.778911456979461e-05,
+  "l1_p99": 0.3819554908666787,
+  "share_l1_gt_0.05": 0.2615625,
+  "root_prior_temp": 2.0
+ }
+}

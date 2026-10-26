@@ -39,6 +39,9 @@ use crate::model::{
 
 // --- フィールド識別子 --------------------------------------------------------
 
+/// [`CardInstance::known_by`](crate::model::CardInstance::known_by) の「両席が知る」（§7.15）。
+pub const KNOWN_BOTH: u8 = 0b11;
+
 /// `CardInstance` の bool フィールド。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardBoolField {
@@ -188,6 +191,10 @@ pub enum Undo {
     ResolvingEvent(Option<CardIdx>),
     /// 中断（対話）を丸ごと差し替えた（Python の `active_interaction = {...}`＝先頭置換）。
     InteractionReplace(Box<Interaction>),
+    /// `dons` へ 1 枚足した → 末尾を捨てる（符号化の登場時スキャンの一時ドン!!）。
+    DonPush,
+    /// [`CardInstance::known_by`](crate::model::CardInstance::known_by) の旧値（§7.15・WP `rs-fair`）。
+    CardKnown(CardIdx, u8),
 }
 
 /// P3 で足した `GameManager` の bool 欄。
@@ -256,9 +263,18 @@ pub struct Session {
     /// （`tests/harness/rs_golden.py::mask_shuffled_targets`）。journal の外＝巻き戻さない
     /// （記録は「実際に混ぜたか」を残す）。
     shuffled: Vec<Seat>,
+    /// イベントログを捨てる区間の中か（[`Session::discard_events`]）。journal の外。
+    events_muted: bool,
     /// いま対象ループで効果を実行している席（「自分の効果で」「相手の効果で」の判定用）。
     /// journal の外の一時値＝対象 1 枚の処理の前後で立てて戻す。効果の外（バトル等）は `None`。
     effect_actor: Option<(Seat, Option<CardIdx>)>,
+    /// いま実行スタックを処理している効果の入れ子の深さ（[`Session::enter_resolving`]）。
+    /// journal の外の一時値＝`process_stack` の前後で立てて戻す（中断しても戻る）。
+    /// 0 でない間は誘発の待ち行列を消化しない＝誘発は今解決中の効果を解決し切ってから解決する
+    /// （WP `rs-trigger-order`・`docs/reports/2026-10-22_trigger_order.md`）。
+    resolving: u32,
+    /// 誘発の待ち行列を消化している最中か（効果の終わりの消化を入れ子にしない）。journal の外。
+    draining: bool,
 }
 
 impl Session {
@@ -268,9 +284,36 @@ impl Session {
             journal: Journal::new(),
             rng: crate::search::rng::Rng::Replay,
             action_events: Vec::new(),
+            events_muted: false,
             shuffled: Vec::new(),
             effect_actor: None,
+            resolving: 0,
+            draining: false,
         }
+    }
+
+    /// 実行スタックを処理している効果の入れ子の深さ（0＝効果の外）。
+    pub fn resolving_depth(&self) -> u32 {
+        self.resolving
+    }
+
+    /// 効果の実行スタックの処理に入る／出る（`Resolver::process_stack` だけが呼ぶ）。
+    pub fn enter_resolving(&mut self) {
+        self.resolving += 1;
+    }
+
+    pub fn leave_resolving(&mut self) {
+        self.resolving = self.resolving.saturating_sub(1);
+    }
+
+    /// 誘発の待ち行列を消化している最中か。
+    pub fn draining(&self) -> bool {
+        self.draining
+    }
+
+    /// 消化中の印を立てる（戻り値は直前の値＝呼び出し側が戻す）。
+    pub fn set_draining(&mut self, on: bool) -> bool {
+        std::mem::replace(&mut self.draining, on)
     }
 
     /// 対象ループが処理中の効果の実行者（無ければ `None`）。
@@ -309,8 +352,32 @@ impl Session {
     }
 
     /// イベントを 1 件積む（Python の `manager.action_events.append({...})` と 1:1）。
+    ///
+    /// [`Session::discard_events`] の区間の中では積まない（区間を抜けると捨てる＝誰も読まない）。
     pub fn push_event(&mut self, event: serde_json::Value) {
-        self.action_events.push(event);
+        if !self.events_muted {
+            self.action_events.push(event);
+        }
+    }
+
+    /// イベントを積むか（[`Session::discard_events`] の区間の外か）。積まないなら、呼び出し側は
+    /// イベントの JSON を組まなくてよい（盤面・乱数・判定はイベントを読まない）。
+    pub fn events_on(&self) -> bool {
+        !self.events_muted
+    }
+
+    /// `f` の間のイベントログを捨てる（探索の降下・枝の評価）。
+    ///
+    /// `swap_events(Vec::new())` … `swap_events(saved)` と同じ見え方（入ると空・抜けると元のログ）で、
+    /// 区間の中では JSON を組まない。イベントログは盤面の外にあり、探索・ルール・符号化は
+    /// 読まない（読むのはフロント／記録へ返す入口だけ）＝打つ手は 1 bit も変わらない。
+    pub fn discard_events<R>(&mut self, f: impl FnOnce(&mut Session) -> R) -> R {
+        let saved = std::mem::take(&mut self.action_events);
+        let muted = std::mem::replace(&mut self.events_muted, true);
+        let out = f(self);
+        self.action_events = saved;
+        self.events_muted = muted;
+        out
     }
 
     /// 要求の先頭で空にする（Python の API ハンドラの `manager.action_events = []`）。
@@ -459,6 +526,69 @@ impl StateMut<'_> {
         }
         let old = std::mem::replace(slot, value);
         self.rec(Undo::CardBool(idx, field, old));
+        // 知識（§7.15）: 表向きにした札は両席が知る（ライフを表向きにする効果）。
+        if field == CardBoolField::IsFaceUp && value {
+            self.set_card_known(idx, KNOWN_BOTH);
+        }
+    }
+
+    // -- 知識（§7.15・WP `rs-fair`）-----------------------------------------
+    //
+    // 席ごとの「知っている札」の印（`CardInstance::known_by`）。**ルールは読まない**＝ここで何を
+    // 書いても効果・合法手・手の適用は変わらない。更新はゾーン操作（`card_zone_insert`／
+    // `card_zone_remove_at`／`set_slot`）と表向き化が自動で行い、効果が明示するのは「見る」
+    // 「公開する」だけ（`effects/actions`・`resolver.rs`）。規則（経路の表は `docs/SPEC.md`）:
+    //
+    // | 操作 | 印 |
+    // |---|---|
+    // | 場・トラッシュ・単一枠（リーダー・ステージ）・表向きのライフに入る／から出る | 両席 |
+    // | 手札・山札・裏向きのライフから出る | 持ち主の bit だけ残す（他席は行き先を追えない） |
+    // | 手札に入る | 持ち主の bit を足す |
+    // | 山札・裏向きのライフ・一時領域に入る／一時領域から出る | そのまま（直前の印を持ち越す） |
+    // | 山札を混ぜる（`shuffle_deck`） | その山札の全札を 0 |
+    // | 「見る」（`LOOK`・`LOOK_LIFE`）／「公開する」（`REVEAL`） | 見た席の bit／両席 |
+
+    /// 札の知識の印を書き換える（記録つき）。
+    pub fn set_card_known(&mut self, idx: CardIdx, mask: u8) {
+        let slot = &mut self.state.cards[idx as usize].known_by;
+        if *slot == mask {
+            return;
+        }
+        let old = std::mem::replace(slot, mask);
+        self.rec(Undo::CardKnown(idx, old));
+    }
+
+    /// 札の知識の印に `bits` を足す。
+    pub fn add_card_known(&mut self, idx: CardIdx, bits: u8) {
+        let cur = self.state.cards[idx as usize].known_by;
+        self.set_card_known(idx, cur | bits);
+    }
+
+    /// `zone`（席 `seat`）へ入った札の印（上の表）。
+    fn know_on_enter(&mut self, seat: Seat, zone: CardZone, card: CardIdx) {
+        match zone {
+            CardZone::Field | CardZone::Trash => self.set_card_known(card, KNOWN_BOTH),
+            CardZone::Hand => self.add_card_known(card, seat.know_bit()),
+            CardZone::Life if self.state.cards[card as usize].is_face_up => {
+                self.set_card_known(card, KNOWN_BOTH)
+            }
+            CardZone::Deck | CardZone::Life | CardZone::Temp => {}
+        }
+    }
+
+    /// `zone`（席 `seat`）から出た札の印（上の表）。
+    fn know_on_leave(&mut self, seat: Seat, zone: CardZone, card: CardIdx) {
+        let cur = self.state.cards[card as usize].known_by;
+        match zone {
+            CardZone::Field | CardZone::Trash => self.set_card_known(card, KNOWN_BOTH),
+            CardZone::Life if self.state.cards[card as usize].is_face_up => {
+                self.set_card_known(card, KNOWN_BOTH)
+            }
+            CardZone::Hand | CardZone::Deck | CardZone::Life => {
+                self.set_card_known(card, cur & seat.know_bit())
+            }
+            CardZone::Temp => {}
+        }
     }
 
     pub fn set_card_i32(&mut self, idx: CardIdx, field: CardI32Field, value: i32) {
@@ -516,6 +646,14 @@ impl StateMut<'_> {
         self.rec(Undo::DonBool(idx, field, old));
     }
 
+    /// ドン!!を 1 枚足す（添字は末尾）。巻き戻すと取り除く。
+    pub fn push_don(&mut self, don: DonInstance) -> DonIdx {
+        let idx = self.state.dons.len() as DonIdx;
+        self.state.dons.push(don);
+        self.rec(Undo::DonPush);
+        idx
+    }
+
     pub fn set_don_attached_to(&mut self, idx: DonIdx, value: Option<CardIdx>) {
         let slot = &mut self.state.dons[idx as usize].attached_to;
         if *slot == value {
@@ -533,6 +671,7 @@ impl StateMut<'_> {
     pub fn card_zone_insert(&mut self, seat: Seat, zone: CardZone, at: usize, card: CardIdx) {
         card_zone_mut(&mut self.state.players[seat as usize], zone).insert(at, card);
         self.rec(Undo::CardZoneInsert(seat, zone, at));
+        self.know_on_enter(seat, zone, card);
     }
 
     pub fn card_zone_push(&mut self, seat: Seat, zone: CardZone, card: CardIdx) {
@@ -543,6 +682,7 @@ impl StateMut<'_> {
     pub fn card_zone_remove_at(&mut self, seat: Seat, zone: CardZone, at: usize) -> CardIdx {
         let card = card_zone_mut(&mut self.state.players[seat as usize], zone).remove(at);
         self.rec(Undo::CardZoneRemove(seat, zone, at, card));
+        self.know_on_leave(seat, zone, card);
         card
     }
 
@@ -598,6 +738,10 @@ impl StateMut<'_> {
         }
         let old = std::mem::replace(place, value);
         self.rec(Undo::Slot(seat, slot, old));
+        // 知識（§7.15）: 単一枠（リーダー・ステージ）は公開の領域＝出入りする札は両席が知る。
+        for card in [old, value].into_iter().flatten() {
+            self.set_card_known(card, KNOWN_BOTH);
+        }
     }
 
     pub fn set_negate_onplay_until(&mut self, seat: Seat, value: i32) {
@@ -844,6 +988,9 @@ fn trigger_queue_mut(state: &mut GameState, which: TriggerQueue) -> &mut Vec<Pen
 
 fn apply_undo(state: &mut GameState, entry: Undo) {
     match entry {
+        Undo::CardKnown(idx, old) => {
+            state.cards[idx as usize].known_by = old;
+        }
         Undo::CardBool(idx, field, old) => {
             *card_bool_mut(&mut state.cards[idx as usize], field) = old;
         }
@@ -870,6 +1017,9 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         }
         Undo::CardZoneRemove(seat, zone, at, card) => {
             card_zone_mut(&mut state.players[seat as usize], zone).insert(at, card);
+        }
+        Undo::DonPush => {
+            state.dons.pop();
         }
         Undo::DonZoneInsert(seat, zone, at) => {
             don_zone_mut(&mut state.players[seat as usize], zone).remove(at);

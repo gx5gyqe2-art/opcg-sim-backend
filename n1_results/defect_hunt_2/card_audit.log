@@ -1,0 +1,21 @@
+OPCG_LOG_SILENT=1 python tests/scripts/card_effect_audit.py scan 
+# カード効果監査サマリ
+
+- DB 差分（HEAD 比）: 追加 0・本文変更 0・削除 0
+
+- 対象 289 枚（効果あり 4）・台帳: IMPL_CHANGED 4・UNREVIEWED 285
+
+## 指摘の集計（E=欠陥が確実／W=要確認／I=参考）
+
+| 重さ | 指摘 | 枚数 | 例 |
+|---|---|---|---|
+| W | ACTION_NOT_FIRED | 4 | OP15-003, OP15-017, OP15-023, OP16-084 |
+| W | QUALIFIER_GAP | 1 | OP16-084 |
+| I | DEFERRED | 1 | OP15-003 |
+
+- E/W の指摘なし（意味のレビューだけでよい）: 0 枚
+- 効果なし（バニラ）: 285 枚
+
+
+[scan] report: /tmp/card_effect_audit/report.json
+EXIT 0

@@ -10,73 +10,152 @@
 use crate::journal::Session;
 use crate::model::{CardIdx, CardType, GameState, MasterTable, Seat};
 use crate::state::EngineError;
-use serde_json::{json, Value};
+use serde_json::Value;
 
+use super::moves::{Move, Payload};
 use super::pending::{
-    get_pending_request, request_action, request_actor, ACT_MAIN_ACTION, ACT_MULLIGAN, ACT_PASS,
-    ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER,
+    blocker_candidates, counter_candidates, get_pending_request, pending_actor_action,
+    request_action, request_actor, ACT_MAIN_ACTION, ACT_MULLIGAN, ACT_PASS, ACT_SELECT_BLOCKER,
+    ACT_SELECT_COUNTER,
 };
 use super::{card_type, has_flag, has_keyword, has_timed_flag, KW_RUSH, KW_RUSH_CHAR};
 
-fn game_move(action_type: &str, payload: Value) -> Value {
-    json!({"kind": "game", "action_type": action_type, "payload": payload})
+/// 要求の `action` を、列挙が作る手の `action_type`（`'static`）へ写す（戦闘の 2 種だけ）。
+fn battle_action(action: &str) -> &'static str {
+    if action == ACT_SELECT_BLOCKER {
+        ACT_SELECT_BLOCKER
+    } else {
+        ACT_SELECT_COUNTER
+    }
 }
 
-fn battle_move(action_type: &str, card_uuid: Option<&str>) -> Value {
-    json!({"kind": "battle", "action_type": action_type,
-           "card_uuid": card_uuid.map(Value::from).unwrap_or(Value::Null)})
-}
-
-/// Python `GameManager.get_legal_actions(player)`。
+/// Python `GameManager.get_legal_actions(player)`（JSON の手＝境目の形）。
 pub fn get_legal_actions(
     s: &mut Session,
     masters: &MasterTable,
     seat: Seat,
 ) -> Result<Vec<Value>, EngineError> {
-    // Python も合法手列挙は request_id を読まない高速パスで要求を取る。
-    let Some(pending) = get_pending_request(s, masters, false) else {
+    Ok(get_legal_moves(s, masters, seat)?
+        .iter()
+        .map(Move::to_json)
+        .collect())
+}
+
+/// [`get_legal_actions`] の型の版（手は [`Move`]）。
+///
+/// 要求（`get_pending_request`）の dict を組むのは**効果対話のときだけ**（既定解決が読む）。
+/// マリガン／ブロック／カウンター／メインは要求の主体と種別（`pending_actor_action`＝
+/// `get_pending_request` と同じ判定・同じ副作用）と、要求の `selectable_uuids` を作る関数
+/// （`blocker_candidates`／`counter_candidates`）から直接作る＝同じ手が同じ並びで出る。
+pub fn get_legal_moves(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<Vec<Move>, EngineError> {
+    match pending_actor_action(s) {
+        None => Ok(Vec::new()),
+        Some((actor, _)) if actor != seat => Ok(Vec::new()),
+        Some((_, action)) => match action {
+            ACT_MULLIGAN | ACT_SELECT_BLOCKER | ACT_SELECT_COUNTER | ACT_MAIN_ACTION => {
+                decision_moves(s, masters, seat, action)
+            }
+            _ => {
+                // Python も合法手列挙は request_id を読まない高速パスで要求を取る。
+                let pending = get_pending_request(s, masters, false);
+                get_legal_moves_for(s, masters, seat, pending.as_ref())
+            }
+        },
+    }
+}
+
+/// 要求の dict を使わない手（マリガン／ブロック／カウンター／メイン）。`action` は
+/// `pending_actor_action` の種別（主体は `seat` と一致済み）。
+pub(crate) fn decision_moves(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    action: &str,
+) -> Result<Vec<Move>, EngineError> {
+    let st = s.state();
+    match action {
+        ACT_MULLIGAN => Ok(vec![
+            Move::game("MULLIGAN", Payload::Empty),
+            Move::game("KEEP_HAND", Payload::Empty),
+        ]),
+        ACT_SELECT_BLOCKER | ACT_SELECT_COUNTER => {
+            // `get_pending_request` の戦闘分岐と同じ候補（`selectable_uuids`）。
+            let Some(b) = st.active_battle.as_ref() else {
+                return Ok(Vec::new());
+            };
+            let cands = if action == ACT_SELECT_BLOCKER {
+                blocker_candidates(st, b.target_owner)
+            } else {
+                counter_candidates(st, masters, b.target_owner)
+            };
+            let at = battle_action(action);
+            let mut moves: Vec<Move> = Vec::with_capacity(cands.len() + 1);
+            moves.extend(
+                cands
+                    .iter()
+                    .map(|c| Move::battle(at, Some(st.card(*c).uuid.clone()))),
+            );
+            moves.push(Move::battle(ACT_PASS, None));
+            Ok(moves)
+        }
+        _ => main_actions(st, masters, seat),
+    }
+}
+
+/// [`get_legal_moves`] の、要求（`get_pending_request(s, masters, false)` の値）を外から渡す版。
+/// 探索の候補生成（`search::adapter::legal_actions`）は同じ盤面の要求を対話の分岐にも使う＝1 回だけ作る。
+pub fn get_legal_moves_for(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    pending: Option<&Value>,
+) -> Result<Vec<Move>, EngineError> {
+    let Some(pending) = pending else {
         return Ok(Vec::new());
     };
     // 要求先と異なるプレイヤーは合法手なし（手番/フェイズ外）。
-    if request_actor(&pending) != Some(seat) {
+    if request_actor(pending) != Some(seat) {
         return Ok(Vec::new());
     }
-    let action = request_action(&pending)
-        .ok_or_else(|| EngineError::BadPayload("pending: 'action' が読めない".into()))?
-        .to_owned();
+    let action = request_action(pending)
+        .ok_or_else(|| EngineError::BadPayload("pending: 'action' が読めない".into()))?;
 
     if action == ACT_MULLIGAN {
         return Ok(vec![
-            game_move("MULLIGAN", json!({})),
-            game_move("KEEP_HAND", json!({})),
+            Move::game("MULLIGAN", Payload::Empty),
+            Move::game("KEEP_HAND", Payload::Empty),
         ]);
     }
     if action == ACT_SELECT_BLOCKER || action == ACT_SELECT_COUNTER {
-        let mut moves: Vec<Value> = selectable_uuids(&pending)
-            .iter()
-            .map(|u| battle_move(&action, Some(u)))
+        let at = battle_action(action);
+        let mut moves: Vec<Move> = selectable_uuids(pending)
+            .map(|u| Move::battle(at, Some(u.to_owned())))
             .collect();
-        moves.push(battle_move(ACT_PASS, None));
+        moves.push(Move::battle(ACT_PASS, None));
         return Ok(moves);
     }
     if action == ACT_MAIN_ACTION {
         return main_actions(s.state(), masters, seat);
     }
     // 効果対話は「妥当な既定解決」を 1 手として返す。
-    let payload = default_interaction_payload(s.state(), masters, &pending);
-    Ok(vec![game_move("RESOLVE_EFFECT_SELECTION", payload)])
+    let payload = default_interaction_payload(s.state(), masters, pending);
+    Ok(vec![Move::game(
+        "RESOLVE_EFFECT_SELECTION",
+        Payload::Json(payload),
+    )])
 }
 
-fn selectable_uuids(pending: &Value) -> Vec<String> {
+fn selectable_uuids(pending: &Value) -> impl Iterator<Item = &str> {
     pending
         .get("selectable_uuids")
         .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
 }
 
 /// MAIN_ACTION の合法手（PLAY・ATTACK・ATTACH_DON・TURN_END）。
@@ -87,7 +166,7 @@ fn main_actions(
     state: &GameState,
     masters: &MasterTable,
     seat: Seat,
-) -> Result<Vec<Value>, EngineError> {
+) -> Result<Vec<Move>, EngineError> {
     let mut moves = Vec::new();
     let p = state.player(seat);
     let opponent = seat.other();
@@ -125,7 +204,7 @@ fn main_actions(
                 }
             }
         }
-        moves.push(game_move("PLAY", json!({"uuid": uuid(*c)})));
+        moves.push(Move::game("PLAY", Payload::Uuid(uuid(*c))));
     }
 
     // --- アタック（攻撃者 × 対象）-------------------------------------------------
@@ -186,9 +265,12 @@ fn main_actions(
             if super::attack_target_banned(state, masters, *atk, *tgt) {
                 continue;
             }
-            moves.push(game_move(
+            moves.push(Move::game(
                 "ATTACK",
-                json!({"uuid": uuid(*atk), "target_ids": [uuid(*tgt)]}),
+                Payload::Attack {
+                    uuid: uuid(*atk),
+                    target: uuid(*tgt),
+                },
             ));
         }
     }
@@ -197,7 +279,7 @@ fn main_actions(
     if don_active > 0 {
         let rested = p.field.iter().copied().filter(|c| state.card(*c).is_rest);
         for c in attackers.iter().copied().chain(rested) {
-            moves.push(game_move("ATTACH_DON", json!({"uuid": uuid(c)})));
+            moves.push(Move::game("ATTACH_DON", Payload::Uuid(uuid(c))));
         }
     }
 
@@ -210,11 +292,11 @@ fn main_actions(
             continue;
         }
         if has_activatable_main(state, masters, seat, c)? {
-            moves.push(game_move("ACTIVATE_MAIN", json!({"uuid": uuid(c)})));
+            moves.push(Move::game("ACTIVATE_MAIN", Payload::Uuid(uuid(c))));
         }
     }
 
-    moves.push(game_move("TURN_END", json!({})));
+    moves.push(Move::game("TURN_END", Payload::Empty));
     Ok(moves)
 }
 

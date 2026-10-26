@@ -18,37 +18,37 @@ use crate::testkit::{BoardBuilder, M_BIG, M_CHAR, M_RUSH};
 use serde_json::{json, Value};
 
 fn attach(uuid: &str) -> Move {
-    json!({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}})
+    Move::from_json(json!({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}}))
 }
 
 fn attack(uuid: &str, target: &str) -> Move {
-    json!({"kind": "game", "action_type": "ATTACK",
-           "payload": {"uuid": uuid, "target_ids": [target]}})
+    Move::from_json(json!({"kind": "game", "action_type": "ATTACK",
+           "payload": {"uuid": uuid, "target_ids": [target]}}))
 }
 
 fn turn_end() -> Move {
-    json!({"kind": "game", "action_type": "TURN_END", "payload": {}})
+    Move::from_json(json!({"kind": "game", "action_type": "TURN_END", "payload": {}}))
 }
 
 fn counter(uuid: &str) -> Move {
-    json!({"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": uuid})
+    Move::from_json(json!({"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": uuid}))
 }
 
 fn pass() -> Move {
-    json!({"kind": "battle", "action_type": "PASS", "card_uuid": Value::Null})
+    Move::from_json(json!({"kind": "battle", "action_type": "PASS", "card_uuid": Value::Null}))
 }
 
 fn types(moves: &[Move]) -> Vec<String> {
     moves
         .iter()
-        .map(|m| m["action_type"].as_str().unwrap_or("?").to_owned())
+        .map(|m| m.to_json()["action_type"].as_str().unwrap_or("?").to_owned())
         .collect()
 }
 
 fn don_ks(moves: &[Move]) -> Vec<i64> {
     moves
         .iter()
-        .map(|m| m["payload"]["don_k"].as_i64().unwrap_or(-1))
+        .map(|m| m.to_json()["payload"]["don_k"].as_i64().unwrap_or(-1))
         .collect()
 }
 
@@ -171,8 +171,8 @@ fn prune_futile_attacks_drops_only_unreachable_attacks() {
     ];
     let got = prune_futile_attacks(&state, &masters, Seat::P1, moves);
     assert_eq!(types(&got), vec!["ATTACK", "ATTACK", "TURN_END"]);
-    assert_eq!(got[0]["payload"]["uuid"], json!(big_u));
-    assert_eq!(got[1]["payload"]["uuid"], json!(big_u));
+    assert_eq!(got[0].to_json()["payload"]["uuid"], json!(big_u));
+    assert_eq!(got[1].to_json()["payload"]["uuid"], json!(big_u));
 }
 
 // --- don_alloc_candidates（配分箱）------------------------------------------------
@@ -188,8 +188,8 @@ fn don_alloc_candidates_uses_the_key_ks() {
     let u = uuid_of(&state, mine);
     let got = don_alloc_candidates(&state, &masters, Seat::P1, &[attach(&u)]);
     assert_eq!(don_ks(&got), vec![1, 3]);
-    assert!(got.iter().all(|m| m["payload"]["target_ids"] == json!([])));
-    assert!(got.iter().all(|m| m["action_type"] == json!("DON_BOX")));
+    assert!(got.iter().all(|m| m.to_json()["payload"]["target_ids"] == json!([])));
+    assert!(got.iter().all(|m| m.to_json()["action_type"] == json!("DON_BOX")));
 }
 
 /// 【ドン!!×N】持ちは「閾値を開ける枚数」も候補になる（`attached < N` のときだけ）。
@@ -240,7 +240,7 @@ fn attack_box_candidates_use_the_key_ks() {
     // 対象 5000: k_min = ceil((5000-3000)/1000) = 2 / k_two = ceil(7000-3000) = 4。
     let got = attack_box_candidates(&state, &masters, Seat::P1, &[attack(&u, &leader_u)]);
     assert_eq!(don_ks(&got), vec![0, 2, 4]);
-    assert!(got.iter().all(|m| m["payload"]["target_ids"] == json!([leader_u])));
+    assert!(got.iter().all(|m| m.to_json()["payload"]["target_ids"] == json!([leader_u])));
 }
 
 /// 既に上回っている攻撃者では k_min = 0＝素の攻撃と同じ箱に畳まれる（重複は出ない）。
@@ -429,8 +429,8 @@ fn legal_actions_keeps_futile_moves_when_pruning_is_off() {
 
 // --- determinize -----------------------------------------------------------------
 
-/// `_determinize_opponent`: 相手の手札枚数は保存し、中身は「山札＋手札」から渡された並びで
-/// 引き直す。自分側は一切変わらない。
+/// `_determinize_opponent`（＝`reveal="peek"`・2026-10-21 までの既定・§7.15 で測定用に残した）:
+/// 相手の手札枚数は保存し、中身は「山札＋手札」から渡された並びで引き直す。自分側は一切変わらない。
 #[test]
 fn determinize_resamples_only_the_opponent_hand() {
     let mut b = BoardBuilder::new();
@@ -494,7 +494,7 @@ fn apply_move_inplace_expands_a_don_box() {
     let mut s = Session::new(state);
     let mv = json!({"kind": "game", "action_type": "DON_BOX",
                     "payload": {"uuid": u, "target_ids": [], "don_k": 2}});
-    super::apply_move_inplace(&mut s, &masters, Seat::P1, &mv, true).unwrap();
+    super::apply_move_inplace(&mut s, &masters, Seat::P1, &Move::from_json((mv).clone()), true).unwrap();
     assert_eq!(s.state().card(mine).attached_don, 2);
     assert_eq!(s.state().player(Seat::P1).don_active.len(), 1);
     assert!(s.state().active_battle.is_none(), "配分箱は攻撃しない");
@@ -503,7 +503,36 @@ fn apply_move_inplace_expands_a_don_box() {
     let leader_u = uuid_of(s.state(), s.state().player(Seat::P2).leader.unwrap());
     let mv = json!({"kind": "game", "action_type": "DON_BOX",
                     "payload": {"uuid": u, "target_ids": [leader_u], "don_k": 1}});
-    super::apply_move_inplace(&mut s, &masters, Seat::P1, &mv, true).unwrap();
+    super::apply_move_inplace(&mut s, &masters, Seat::P1, &Move::from_json((mv).clone()), true).unwrap();
     assert_eq!(s.state().card(mine).attached_don, 3);
     assert!(s.state().active_battle.is_some(), "アタック箱は攻撃する");
+}
+
+/// opts JSON の `omniscient`（§7.10）: 省略・false は既定（false）、true だけが立つ。
+#[test]
+fn decide_options_json_reads_omniscient() {
+    let read = |j: &str| super::decide_options_from_json(&serde_json::from_str(j).unwrap());
+    assert!(!read("{}").omniscient);
+    assert!(!read(r#"{"omniscient": false}"#).omniscient);
+    assert!(read(r#"{"omniscient": true}"#).omniscient);
+}
+
+/// opts JSON の `reveal`（§7.11・§7.15）: 省略・null は既定（`fair`）、`fair`／`peek`／`opp_hand` が立つ。
+/// 知らない値・`omniscient` との同時指定（`"fair"` の明示も）は `decide_opts_and_carry` がエラーにする。
+#[test]
+fn decide_options_json_reads_reveal() {
+    use super::decide::Reveal;
+    let j = |s: &str| serde_json::from_str::<serde_json::Value>(s).unwrap();
+    let read = |s: &str| super::decide_opts_and_carry(&j(s)).map(|(o, _)| o.reveal);
+    assert_eq!(read("{}").unwrap(), Reveal::Fair);
+    assert_eq!(read(r#"{"reveal": null}"#).unwrap(), Reveal::Fair);
+    assert_eq!(read(r#"{"reveal": "opp_hand"}"#).unwrap(), Reveal::OppHand);
+    assert_eq!(read(r#"{"reveal": "fair"}"#).unwrap(), Reveal::Fair);
+    assert_eq!(read(r#"{"reveal": "peek"}"#).unwrap(), Reveal::Peek);
+    assert!(read(r#"{"reveal": "all"}"#).is_err());
+    assert!(read(r#"{"reveal": true}"#).is_err());
+    assert!(read(r#"{"reveal": "fair", "omniscient": true}"#).is_err());
+    assert!(read(r#"{"reveal": "peek", "omniscient": true}"#).is_err());
+    assert!(read(r#"{"reveal": "opp_hand", "omniscient": true}"#).is_err());
+    assert!(read(r#"{"omniscient": true}"#).is_ok());
 }

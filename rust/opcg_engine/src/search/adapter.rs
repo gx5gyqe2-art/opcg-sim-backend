@@ -11,13 +11,15 @@
 
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
-use crate::rules::pending::{get_pending_request, pending_actor_action, request_action, request_actor};
+use crate::rules::pending::{
+    get_pending_request, pending_actor_action, request_action, request_actor, ACT_MAIN_ACTION,
+    ACT_MULLIGAN, ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER,
+};
 use crate::state::EngineError;
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
 
 use super::prune::action_type;
-use super::{r#macro as boxes, prune, Move, SearchOptions};
+use super::{r#macro as boxes, prune, Move, Payload, SearchOptions};
 
 /// Python `action_api.ACT_RESOLVE_SELECTION`。
 pub const ACT_RESOLVE_SELECTION: &str = "RESOLVE_EFFECT_SELECTION";
@@ -38,11 +40,24 @@ pub fn legal_actions(
     masters: &MasterTable,
     opts: &SearchOptions,
 ) -> Result<Vec<Move>, EngineError> {
-    let Some((seat, _)) = pending_actor_action(s) else {
+    let Some((seat, action)) = pending_actor_action(s) else {
         return Ok(Vec::new());
     };
-    let base = crate::rules::legal::get_legal_actions(s, masters, seat)?;
-    let mut moves = merged_search_actions(s, masters, seat, base);
+    let mut moves = match action {
+        // 意思決定（マリガン／ブロック／カウンター／メイン）は要求の dict を組まずに列挙する
+        // （`rules::legal::get_legal_moves` と同じ規則）。対話の代替手の併合（`selection_moves`）は
+        // これらの要求では何も足さない（`CONFIRM_OPTIONAL`／`ARRANGE_DECK`／`SEARCH_AND_SELECT` だけ）。
+        ACT_MULLIGAN | ACT_SELECT_BLOCKER | ACT_SELECT_COUNTER | ACT_MAIN_ACTION => {
+            crate::rules::legal::decision_moves(s, masters, seat, action)?
+        }
+        _ => {
+            // 要求は 1 回だけ作り、合法手の列挙と対話の分岐の両方に渡す（`get_pending_request` が盤面に
+            // 触るのは冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
+            let pending = get_pending_request(s, masters, false);
+            let base = crate::rules::legal::get_legal_moves_for(s, masters, seat, pending.as_ref())?;
+            merged_search_actions_with(s, masters, seat, base, pending, true, !opts.confirm_trigger_legacy)
+        }
+    };
 
     if opts.prune_futile {
         moves = prune::prune_don_moves(s.state(), masters, seat, moves, opts.don_margin);
@@ -97,11 +112,7 @@ pub fn legal_actions(
 
 /// Python の `(m.get("payload") or {}).get("target_ids")` の真偽（空 list は偽）。
 fn has_target_ids(mv: &Move) -> bool {
-    mv.get("payload")
-        .and_then(|p| p.get("target_ids"))
-        .and_then(Value::as_array)
-        .map(|a| !a.is_empty())
-        .unwrap_or(false)
+    mv.payload().is_some_and(|p| p.has_target_ids())
 }
 
 // --- 対話の代替手の併合 ---------------------------------------------------------
@@ -113,43 +124,142 @@ pub fn merged_search_actions(
     seat: Seat,
     base_moves: Vec<Move>,
 ) -> Vec<Move> {
-    let Some(alts) = selection_moves(s, masters, seat) else {
+    let pending = get_pending_request(s, masters, false);
+    merged_search_actions_with(s, masters, seat, base_moves, pending, false, true)
+}
+
+/// [`merged_search_actions`] の、要求を外から渡す版。`base_is_listing=true` は `base_moves` が
+/// その要求の列挙（`get_legal_moves_for`）そのもの＝唯一の RESOLVE 手の payload が対話の既定解決
+/// （`default_interaction_payload`）と同じ値なので、分岐の土台に使い回す。
+fn merged_search_actions_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    base_moves: Vec<Move>,
+    pending: Option<Value>,
+    base_is_listing: bool,
+    confirm_trigger: bool,
+) -> Vec<Move> {
+    let alts = {
+        let dialog_payload = match base_moves.as_slice() {
+            [m] if base_is_listing && action_type(m) == Some(ACT_RESOLVE_SELECTION) => {
+                m.payload().map(|p| p.to_json())
+            }
+            _ => None,
+        };
+        selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_deref(), confirm_trigger)
+    };
+    let Some(alts) = alts else {
         return base_moves;
     };
     if alts.is_empty() {
         return base_moves; // Python: `if not alts` は空 list も素通し
     }
+    // 鍵は手から借りる＝先に「足すか」を決めてから足す（並びと判定は 1 手ずつ足すのと同じ）。
+    let keep: Vec<bool> = {
+        let mut seen: Vec<MergeKey<'_>> = base_moves.iter().map(MergeKey::of).collect();
+        alts.iter()
+            .map(|m| {
+                let k = MergeKey::of(m);
+                if seen.iter().any(|x| x.same(&k)) {
+                    false
+                } else {
+                    seen.push(k);
+                    true
+                }
+            })
+            .collect()
+    };
     let mut out = base_moves;
-    let mut seen: HashSet<String> = out.iter().map(selection_merge_key).collect();
-    for m in alts {
-        let k = selection_merge_key(&m);
-        if seen.insert(k) {
-            out.push(m);
-        }
-    }
+    out.extend(alts.into_iter().zip(keep).filter_map(|(m, k)| k.then_some(m)));
     out
 }
 
 /// Python `cpu_ai._selection_merge_key`
 /// （`(action_type, tuple(selected_uuids), accepted, index, position)`）。
 ///
-/// Rust では同じ 5 つ組を JSON 配列の文字列にして使う（tuple の等価性と同じ判別になる）。
-fn selection_merge_key(mv: &Move) -> String {
-    let null = Value::Null;
-    let p = mv.get("payload").unwrap_or(&null);
-    let su = p.get("selected_uuids").unwrap_or(&null);
-    json!([
-        mv.get("action_type").unwrap_or(&null),
-        su,
-        p.get("accepted").unwrap_or(&null),
-        p.get("index").unwrap_or(&null),
-        p.get("position").unwrap_or(&null),
-    ])
-    .to_string()
+/// 欄が無ければ `null`。等しさは**今まで鍵にしていた JSON 文字列の一致**と同じ（[`json_text_eq`]）。
+struct MergeKey<'a> {
+    /// `action_type`（文字列ならそのまま借りる）
+    at: KeyAt<'a>,
+    /// `selected_uuids`／`accepted`／`index`／`position`
+    vals: [std::borrow::Cow<'a, Value>; 4],
+}
+
+enum KeyAt<'a> {
+    Str(&'a str),
+    Json(std::borrow::Cow<'a, Value>),
+}
+
+impl<'a> MergeKey<'a> {
+    fn of(mv: &'a Move) -> MergeKey<'a> {
+        use std::borrow::Cow;
+        let null = || Cow::Owned(Value::Null);
+        let at = match mv.action_type() {
+            Some(a) => KeyAt::Str(a),
+            None => KeyAt::Json(mv.get("action_type").unwrap_or_else(null)),
+        };
+        let p = mv.payload();
+        let field = |k: &str| p.and_then(|p| p.get(k)).unwrap_or_else(null);
+        MergeKey {
+            at,
+            vals: [
+                field("selected_uuids"),
+                field("accepted"),
+                field("index"),
+                field("position"),
+            ],
+        }
+    }
+
+    fn same(&self, other: &MergeKey<'_>) -> bool {
+        let at_eq = match (&self.at, &other.at) {
+            (KeyAt::Str(a), KeyAt::Str(b)) => a == b,
+            (KeyAt::Str(a), KeyAt::Json(v)) | (KeyAt::Json(v), KeyAt::Str(a)) => {
+                v.as_str() == Some(*a)
+            }
+            (KeyAt::Json(a), KeyAt::Json(b)) => json_text_eq(a, b),
+        };
+        at_eq
+            && self
+                .vals
+                .iter()
+                .zip(other.vals.iter())
+                .all(|(a, b)| json_text_eq(a, b))
+    }
+}
+
+/// JSON の文字列（[`json_text_eq`] の dict 用）。
+fn json_text(v: &Value) -> String {
+    v.to_string()
+}
+
+/// `a.to_string() == b.to_string()`（JSON の文字列としての一致）を、文字列を組まずに判定する。
+///
+/// 配列は要素ごと・文字列／真偽／null は値・数は表記（`Number` の文字列化）で比べる。dict は
+/// 鍵の並びも表記に効くので文字列化して比べる（対話の鍵には現れない）。
+fn json_text_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::String(x), Value::String(y)) => x == y,
+        (Value::Number(x), Value::Number(y)) => {
+            if x.is_f64() || y.is_f64() {
+                x.to_string() == y.to_string()
+            } else {
+                x == y
+            }
+        }
+        (Value::Array(x), Value::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(a, b)| json_text_eq(a, b))
+        }
+        (Value::Object(_), Value::Object(_)) => json_text(a) == json_text(b),
+        _ => false,
+    }
 }
 
 fn resolve_move(payload: Value) -> Move {
-    json!({"kind": "game", "action_type": ACT_RESOLVE_SELECTION, "payload": payload})
+    Move::game(ACT_RESOLVE_SELECTION, Payload::Json(payload))
 }
 
 /// `default_interaction_payload` の複製に 1 欄だけ上書きした payload（Python の `dict(base)`）。
@@ -171,16 +281,39 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 ///
 /// 無ければ `None`（＝`merged_search_actions` は `base_moves` をそのまま返す）。
 pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Option<Vec<Move>> {
-    let pending = get_pending_request(s, masters, false)?;
-    if request_actor(&pending) != Some(seat) {
+    let pending = get_pending_request(s, masters, false);
+    selection_moves_with(s, masters, seat, pending.as_ref(), None, true)
+}
+
+/// [`selection_moves`] の、要求（`get_pending_request(s, masters, false)` の値）と、分かっていれば
+/// その既定解決の payload（`default_interaction_payload` の値）を外から渡す版。
+pub(crate) fn selection_moves_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    pending: Option<&Value>,
+    base_payload: Option<&Value>,
+    confirm_trigger: bool,
+) -> Option<Vec<Move>> {
+    let pending = pending?;
+    if request_actor(pending) != Some(seat) {
         return None;
     }
-    let action = request_action(&pending)?.to_owned();
+    let action = request_action(pending)?.to_owned();
     let state = s.state();
-    let base = crate::effects::interact::default_interaction_payload(state, masters, Some(&pending));
+    let base: std::borrow::Cow<'_, Value> = match base_payload {
+        Some(b) => std::borrow::Cow::Borrowed(b),
+        None => std::borrow::Cow::Owned(crate::effects::interact::default_interaction_payload(
+            state,
+            masters,
+            Some(pending),
+        )),
+    };
 
     // 任意確認（任意コスト／任意効果の発動可否）: accept / decline を採点させる。
-    if action == "CONFIRM_OPTIONAL"
+    // トリガーの発動確認（ライフの【トリガー】・任意の誘発）も同じ 2 手に割る（§7.44 の (B)・
+    // `confirm_trigger=false`＝旧い形〔`confirm_trigger_legacy`・測定専用〕は既定の「発動する」1 手だけ）。
+    if (action == "CONFIRM_OPTIONAL" || (confirm_trigger && action == "CONFIRM_TRIGGER"))
         && pending.get("can_skip").and_then(Value::as_bool).unwrap_or(false)
     {
         return Some(vec![
@@ -191,7 +324,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
 
     // 並び替え／上下選択: 「どれを先頭にするか」の回転 × 上/下だけを候補化する。
     if action == "ARRANGE_DECK" {
-        let uuids = selectable_uuids(&pending);
+        let uuids = selectable_uuids(pending);
         let allow_pos = pending.get("allow_position").and_then(Value::as_bool).unwrap_or(false);
         let allow_reorder = pending.get("allow_reorder").and_then(Value::as_bool).unwrap_or(false);
         if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
@@ -214,7 +347,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
         let mut moves = Vec::new();
         for order in &orders {
             for position in &positions {
-                let mut payload = base.clone();
+                let mut payload = base.as_ref().clone();
                 if let Some(order) = order {
                     payload = with_field(&payload, "selected_uuids", json!(order));
                 }
@@ -230,7 +363,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
     if action != SELECT_ACTION {
         return None;
     }
-    let uuids = selectable_uuids(&pending);
+    let uuids = selectable_uuids(pending);
     let constraints = pending.get("constraints");
     let min_n = constraints
         .and_then(|c| c.get("min"))
@@ -267,6 +400,119 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
         return if moves.is_empty() { None } else { Some(moves) };
     }
     None
+}
+
+/// [`selection_moves`]`(...).is_some()`（Python `cpu_ai._selection_moves(...) is not None`・
+/// `stop_at_select` の判定だけを写す）を、読み終えた `pending`（`get_pending_request` の値）から出す。
+///
+/// 手そのものは使わないので、**候補が何手になるか**だけを数える（既定解決の payload も候補の
+/// 並べ替えも作らない）。ドレイン（`apply::drain_own_interactions`・符号化の登場時スキャン）が使う。
+pub fn selection_branch_exists(pending: &Value, actor: Seat) -> bool {
+    if pending.get("player_id").and_then(|v| v.as_str()) != Some(actor.name()) {
+        return false;
+    }
+    let action = pending.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    let can_skip = pending
+        .get("can_skip")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if action == "CONFIRM_OPTIONAL" && can_skip {
+        return true; // accept / decline の 2 手
+    }
+    let uuids: Vec<&str> = pending
+        .get("selectable_uuids")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    if action == "ARRANGE_DECK" {
+        let allow_pos = pending
+            .get("allow_position")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let allow_reorder = pending
+            .get("allow_reorder")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
+            return false;
+        }
+        let n_orders = if allow_reorder && uuids.len() >= 2 {
+            1 + uuids.len().min(HARD_SELECT_CAP) - 1
+        } else {
+            1
+        };
+        let n_pos = if allow_pos { 2 } else { 1 };
+        return n_orders * n_pos >= 2;
+    }
+    if action != SELECT_ACTION || uuids.is_empty() {
+        return false;
+    }
+    let constraints = pending.get("constraints");
+    let min_n = constraints
+        .and_then(|c| c.get("min"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let max_n = constraints
+        .and_then(|c| c.get("max"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(uuids.len() as i64);
+    if max_n == 1 && min_n <= 1 {
+        return true;
+    }
+    if max_n >= 2 && (0..=max_n).contains(&min_n) {
+        let hi = max_n.min(uuids.len() as i64);
+        let lo = min_n.max(0);
+        return lo <= hi;
+    }
+    false
+}
+
+/// [`selection_branch_exists`] の、要求の dict を組まずに**進行中の中断**から読む版（ドレイン用）。
+///
+/// 読む欄は要求の対話分岐（`rules::pending::get_pending_request`）が出す値そのもの:
+/// `player_id`＝`player`・`action`＝`kind.front_action()`・`can_skip`・`selectable_uuids`
+/// （`selectable`／無ければ `candidates`）・`allow_position`／`allow_reorder`（ARRANGE_DECK だけ
+/// 出る＝他は欄が無い＝偽）・`constraints`（無ければ `null`）。
+pub fn selection_branch_exists_of(it: &crate::model::Interaction, actor: Seat) -> bool {
+    if it.player != actor {
+        return false;
+    }
+    let action = it.kind.front_action();
+    if action == "CONFIRM_OPTIONAL" && it.can_skip {
+        return true; // accept / decline の 2 手
+    }
+    let n_uuids = it.selectable.as_ref().unwrap_or(&it.candidates).len();
+    if action == "ARRANGE_DECK" {
+        let arrange = it.kind == crate::model::InteractionKind::ArrangeDeck;
+        let allow_pos = arrange && it.allow_position;
+        let allow_reorder = arrange && it.allow_reorder;
+        if n_uuids == 0 || !(allow_pos || (allow_reorder && n_uuids >= 2)) {
+            return false;
+        }
+        let n_orders = if allow_reorder && n_uuids >= 2 {
+            1 + n_uuids.min(HARD_SELECT_CAP) - 1
+        } else {
+            1
+        };
+        let n_pos = if allow_pos { 2 } else { 1 };
+        return n_orders * n_pos >= 2;
+    }
+    if action != SELECT_ACTION || n_uuids == 0 {
+        return false;
+    }
+    let (min_n, max_n) = match it.constraints {
+        Some((mn, mx)) => (i64::from(mn), i64::from(mx)),
+        None => (0, n_uuids as i64),
+    };
+    if max_n == 1 && min_n <= 1 {
+        return true;
+    }
+    if max_n >= 2 && (0..=max_n).contains(&min_n) {
+        let hi = max_n.min(n_uuids as i64);
+        let lo = min_n.max(0);
+        return lo <= hi;
+    }
+    false
 }
 
 /// Python `cpu_ai._rank_select_candidates`（自分＝価値の低い順／相手＝価値の高い順）。

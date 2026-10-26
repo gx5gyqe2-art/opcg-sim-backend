@@ -42,14 +42,14 @@
 //! `[自L, 相L, 自場×5, 相場×5, 手札×10, 自ステージ, 相ステージ]`（vocab index・0=PAD/UNK）。
 
 use crate::effects::resolver;
-use crate::journal::Session;
+use crate::journal::{DonZone, Session};
 use crate::model::{
-    CardIdx, CardType, DonIdx, DonInstance, GameState, MasterTable, Seat,
+    CardIdx, CardType, DonInstance, GameState, MasterTable, Seat,
 };
 use crate::state::EngineError;
 
 use super::{
-    Encoding, EncodeOptions, Vocab, D_SC, MAX_FIELD,
+    Encoding, EncodeOptions, OwnRemaining, Vocab, D_SC, MAX_FIELD,
     MAX_HAND, N_CARD_IDX, PER_CHAR,
 };
 
@@ -58,8 +58,6 @@ const FIELD_KEYWORDS: [&str; 4] = ["ブロッカー", "速攻", "ダブルアタ
 const KW_BLOCKER: &str = "ブロッカー";
 /// `cpu_ai._DRAIN_LIMIT`。
 const DRAIN_LIMIT: usize = 12;
-/// `cpu_ai.HARD_SELECT_CAP`。
-const HARD_SELECT_CAP: usize = 8;
 
 /// Python `encoder._char_feats`。
 fn char_feats(state: &GameState, masters: &MasterTable, card: CardIdx) -> [f32; PER_CHAR] {
@@ -77,26 +75,18 @@ fn char_feats(state: &GameState, masters: &MasterTable, card: CardIdx) -> [f32; 
 }
 
 /// Python `encoder._deck_aggregate`（自デッキ残の守り/資源 5 値）。
-fn deck_aggregate(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) -> [f32; 5] {
-    let mut n = 0f64;
-    let (mut counter_total, mut counter_cards, mut blockers, mut events, mut highcost) =
-        (0f64, 0f64, 0f64, 0f64, 0f64);
-    for c in deck {
-        let m = masters.get(state.card(*c).master);
-        n += 1.0;
-        counter_total += f64::from(m.counter);
-        if m.counter > 0 {
-            counter_cards += 1.0;
-        }
-        if m.keywords.iter().any(|k| k == KW_BLOCKER) {
-            blockers += 1.0;
-        }
-        if m.ty == CardType::Event {
-            events += 1.0;
-        } else if m.ty == CardType::Character && m.cost >= 7 {
-            highcost += 1.0;
-        }
-    }
+///
+/// 符号化 v15（§7.19）: 数える列は山札＋伏せたライフから作る**期待値**（[`OwnRemaining::expect`]）、
+/// 密度はそれ ÷ 山札の枚数。`deck_v14` の [`OwnRemaining`] なら v14 と 1 bit も変わらない。
+fn deck_aggregate(state: &GameState, masters: &MasterTable, rem: &OwnRemaining) -> [f32; 5] {
+    let m = |c: CardIdx| masters.get(state.card(c).master);
+    let counter_total = rem.expect(|c| f64::from(m(c).counter));
+    let counter_cards = rem.expect(|c| f64::from(u8::from(m(c).counter > 0)));
+    let blockers = rem.expect(|c| f64::from(u8::from(m(c).keywords.iter().any(|k| k == KW_BLOCKER))));
+    let events = rem.expect(|c| f64::from(u8::from(m(c).ty == CardType::Event)));
+    let highcost =
+        rem.expect(|c| f64::from(u8::from(m(c).ty == CardType::Character && m(c).cost >= 7)));
+    let n = rem.n_deck as f64;
     let density = if n > 0.0 { counter_cards / n } else { 0.0 };
     [
         (counter_total / (50.0 * 2000.0)) as f32,
@@ -108,9 +98,11 @@ fn deck_aggregate(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) ->
 }
 
 /// Python `encoder._deck_apex`（自デッキ残キャラの頂点 2 値）。
-fn deck_apex(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) -> [f32; 2] {
+///
+/// 符号化 v15: 山札にあると分かっている札と知らない札の全部の最大（＝山札に居うる頂点）。
+fn deck_apex(state: &GameState, masters: &MasterTable, rem: &OwnRemaining) -> [f32; 2] {
     let (mut max_power, mut max_cost) = (0f64, 0f64);
-    for c in deck {
+    for c in rem.candidates() {
         let m = masters.get(state.card(*c).master);
         if m.ty != CardType::Character {
             continue;
@@ -186,6 +178,14 @@ fn playable_chars(state: &GameState, masters: &MasterTable, me: Seat) -> i32 {
         .count() as i32
 }
 
+/// `format!("CHAR_KOED_{}", seat.name())` の固定文字列（符号化のたびに組まない）。
+fn char_koed_key(seat: Seat) -> &'static str {
+    match seat {
+        Seat::P1 => "CHAR_KOED_p1",
+        Seat::P2 => "CHAR_KOED_p2",
+    }
+}
+
 /// Python `manager._turn_events.get(key, 0)`。
 fn turn_event(state: &GameState, key: &str) -> i32 {
     state
@@ -198,88 +198,22 @@ fn turn_event(state: &GameState, key: &str) -> i32 {
 
 // --- 登場時オプション実測（符号化 v7）------------------------------------------
 
-/// 一時ドン!!を `n` 枚積んだ盤面の複製（Python はトランザクション内で `DonInstance` を足して
-/// 巻き戻す。Rust は複製を捨てるので同値＝journal に触れない）。
-fn with_temp_dons(state: &GameState, seat: Seat, n: usize) -> GameState {
-    let mut st = state.clone();
+/// 一時ドン!!を `n` 枚積む（Python はトランザクション内で `DonInstance` を足して巻き戻す）。
+///
+/// 呼び出し側が [`Session::isolated`] の中で呼ぶ＝抜けるときに巻き戻る。盤面を複製して
+/// 積んでいた旧い形（`with_temp_dons`）と同じ並び（`dons` の末尾・`don_active` の末尾）。
+fn push_temp_dons(s: &mut Session, seat: Seat, n: usize) {
     for k in 0..n {
-        let idx = st.dons.len() as DonIdx;
-        st.dons.push(DonInstance {
+        let mut e = s.edit();
+        let idx = e.push_don(DonInstance {
             owner: seat,
             uuid: format!("__onplay_tmp_don_{k}"),
             is_rest: false,
             attached_to: None,
             is_frozen: false,
         });
-        st.player_mut(seat).don_active.push(idx);
+        e.don_zone_push(seat, DonZone::Active, idx);
     }
-    st
-}
-
-/// Python `cpu_ai._selection_moves(...) is not None`（`stop_at_select` の判定だけを写す）。
-///
-/// 手そのものは使わないので、**候補が何手になるか**だけを数える。
-fn has_selection_branch(s: &mut Session, masters: &MasterTable, actor: Seat) -> bool {
-    let Some(pending) = crate::rules::pending::get_pending_request(s, masters, false) else {
-        return false;
-    };
-    if pending.get("player_id").and_then(|v| v.as_str()) != Some(actor.name()) {
-        return false;
-    }
-    let action = pending.get("action").and_then(|v| v.as_str()).unwrap_or("");
-    let can_skip = pending
-        .get("can_skip")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    if action == "CONFIRM_OPTIONAL" && can_skip {
-        return true; // accept / decline の 2 手
-    }
-    let uuids: Vec<&str> = pending
-        .get("selectable_uuids")
-        .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
-        .unwrap_or_default();
-    if action == "ARRANGE_DECK" {
-        let allow_pos = pending
-            .get("allow_position")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let allow_reorder = pending
-            .get("allow_reorder")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
-            return false;
-        }
-        let n_orders = if allow_reorder && uuids.len() >= 2 {
-            1 + uuids.len().min(HARD_SELECT_CAP) - 1
-        } else {
-            1
-        };
-        let n_pos = if allow_pos { 2 } else { 1 };
-        return n_orders * n_pos >= 2;
-    }
-    if action != "SEARCH_AND_SELECT" || uuids.is_empty() {
-        return false;
-    }
-    let constraints = pending.get("constraints");
-    let min_n = constraints
-        .and_then(|c| c.get("min"))
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
-    let max_n = constraints
-        .and_then(|c| c.get("max"))
-        .and_then(|v| v.as_i64())
-        .unwrap_or(uuids.len() as i64);
-    if max_n == 1 && min_n <= 1 {
-        return true;
-    }
-    if max_n >= 2 && (0..=max_n).contains(&min_n) {
-        let hi = max_n.min(uuids.len() as i64);
-        let lo = min_n.max(0);
-        return lo <= hi;
-    }
-    false
 }
 
 /// Python `cpu_ai._drain_own_interactions`（自分側の効果対話を既定解決でドレインする）。
@@ -302,14 +236,15 @@ fn drain_own_interactions(
         ) {
             return;
         }
-        if stop_at_select && has_selection_branch(s, masters, actor) {
-            return;
-        }
-        let Some(pending) = crate::rules::pending::get_pending_request(s, masters, false) else {
+        // ここに来るのは効果対話だけ＝要求の dict は組まず、要求の対話分岐（`get_pending_request`）が
+        // 出す値を進行中の中断から直接読む（`search::apply::drain_own_interactions` と同じ・WP `rs-speed-d`）。
+        let Some(it) = s.state().active_interaction() else {
             return;
         };
-        let payload =
-            crate::rules::legal::default_interaction_payload(s.state(), masters, &pending);
+        if stop_at_select && crate::search::adapter::selection_branch_exists_of(it, actor) {
+            return;
+        }
+        let payload = crate::effects::interact::default_interaction_payload_of(s.state(), masters, it);
         // Python はここで `manager.action_events = []` と置き直す＝直前までのイベントを捨てる。
         resolver::reset_effect_events();
         if crate::rules::actions::apply_game_action(
@@ -337,10 +272,10 @@ pub fn onplay_option_scan(
     actor: Seat,
 ) -> (i32, i32, f64) {
     let mut probe = Session::new(state.clone());
-    if !main_for(&mut probe, masters, actor) {
+    if !main_for(&mut probe, actor) {
         return (0, 0, 0.0);
     }
-    onplay_scan_body(state, masters, actor)
+    onplay_scan_body(&mut Session::new(state.clone()), masters, actor)
 }
 
 /// [`onplay_option_scan`] と同じ値を、入口の判定（保留中の要求）だけ `s` の上で読む版
@@ -348,25 +283,28 @@ pub fn onplay_option_scan(
 pub fn onplay_option_scan_in(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
     let ok = {
         let _prof = crate::prof::enter(crate::prof::Cat::EncOnplayProbe);
-        s.isolated(|s| main_for(s, masters, actor))
+        s.isolated(|s| main_for(s, actor))
     };
     if !ok {
         return (0, 0, 0.0);
     }
-    onplay_scan_body(s.state(), masters, actor)
+    onplay_scan_body(s, masters, actor)
 }
 
-/// メイン手番の要求が `actor` 宛てか（`get_pending_request` は `&mut Session` を取る）。
-fn main_for(s: &mut Session, masters: &MasterTable, actor: Seat) -> bool {
-    let pending = crate::rules::pending::get_pending_request(s, masters, false);
-    pending.as_ref().is_some_and(|p| {
-        p.get("action").and_then(|v| v.as_str()) == Some("MAIN_ACTION")
-            && p.get("player_id").and_then(|v| v.as_str()) == Some(actor.name())
-    })
+/// メイン手番の要求が `actor` 宛てか（`get_pending_request` の `action`／`player_id` だけを見る）。
+///
+/// 要求の JSON は組まず `pending_actor_action`（`get_pending_request` と同じ分岐・同じ書き換え
+/// ＝戦闘フェイズの正規化だけ。`MAIN_ACTION` を返す分岐は両者とも「メイン・手番の席」の 1 つ）で読む。
+fn main_for(s: &mut Session, actor: Seat) -> bool {
+    crate::rules::pending::pending_actor_action(s) == Some((actor, "MAIN_ACTION"))
 }
 
 /// [`onplay_option_scan`] の入口の判定より後（メイン手番が `actor` 宛てのとき）。
-fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
+///
+/// 試し打ちは `s` の上で [`Session::isolated`]（＝`Session::new(盤面の写し)` と同じ見え方で、
+/// 抜けると巻き戻る）の中で行う。盤面を複製しない。
+fn onplay_scan_body(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
+    let state = s.state();
     // 対象＝手札の ON_PLAY 持ち。
     let targets: Vec<CardIdx> = state
         .player(actor)
@@ -395,55 +333,50 @@ fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i
         .max()
         .unwrap_or(0)
         - n_active as i32;
-    let playable: Vec<String> = {
-        let mut sess = Session::new(with_temp_dons(state, actor, need_max.max(0) as usize));
-        match crate::rules::legal::get_legal_actions(&mut sess, masters, actor) {
+    let playable: Vec<String> = s.isolated(|sess| {
+        push_temp_dons(sess, actor, need_max.max(0) as usize);
+        match crate::rules::legal::get_legal_moves(sess, masters, actor) {
             Ok(moves) => moves
                 .iter()
-                .filter(|m| m.get("action_type").and_then(|v| v.as_str()) == Some("PLAY"))
-                .filter_map(|m| {
-                    m.get("payload")
-                        .and_then(|p| p.get("uuid"))
-                        .and_then(|v| v.as_str())
-                        .map(str::to_owned)
-                })
+                .filter(|m| m.action_type() == Some("PLAY"))
+                .filter_map(|m| m.payload_uuid().map(str::to_owned))
                 .collect(),
             Err(_) => Vec::new(), // Python `except: playable = set()`
         }
-    };
+    });
 
     let (mut n_live, mut n_dead, mut keep_live) = (0, 0, 0.0f64);
     for ci in &targets {
-        let uuid = state.card(*ci).uuid.clone();
-        let cost = masters.get(state.card(*ci).master).cost;
+        let uuid = s.state().card(*ci).uuid.clone();
+        let cost = masters.get(s.state().card(*ci).master).cost;
         let need = (cost - n_active as i32).max(0) as usize;
         let mut fired = false;
         if playable.contains(&uuid) {
-            let mut sess = Session::new(with_temp_dons(state, actor, need));
-            resolver::reset_effect_events();
-            let applied = crate::rules::actions::apply_game_action(
-                &mut sess,
-                masters,
-                actor,
-                "PLAY",
-                &serde_json::json!({"uuid": uuid}),
-            );
-            if applied.is_ok() {
-                drain_own_interactions(&mut sess, masters, actor, true);
-                let pend =
-                    crate::rules::pending::get_pending_request(&mut sess, masters, false);
-                let not_main = pend
-                    .as_ref()
-                    .and_then(|p| p.get("action"))
-                    .and_then(|v| v.as_str())
+            fired = s.isolated(|sess| {
+                push_temp_dons(sess, actor, need);
+                resolver::reset_effect_events();
+                let applied = crate::rules::actions::apply_game_action(
+                    sess,
+                    masters,
+                    actor,
+                    "PLAY",
+                    &serde_json::json!({"uuid": uuid}),
+                );
+                if applied.is_err() {
+                    return false;
+                }
+                drain_own_interactions(sess, masters, actor, true);
+                // 要求の `action` だけを読む＝`pending_actor_action`（`get_pending_request` と同じ分岐・
+                // 同じ書き換え）。
+                let not_main = crate::rules::pending::pending_actor_action(sess).map(|(_, a)| a)
                     != Some("MAIN_ACTION");
-                fired = not_main || resolver::effect_events() > 0;
-            }
+                not_main || resolver::effect_events() > 0
+            });
         }
         if fired {
             n_live += 1;
             keep_live += f64::from(crate::effects::interact::card_keep_value(
-                state, masters, *ci,
+                s.state(), masters, *ci,
             ));
         } else {
             n_dead += 1;
@@ -484,9 +417,11 @@ pub fn encode(
     };
     // マスター単位の要約は decide の中なら使い回す（`encode::decide_cache_scope`）。値は同じ。
     let mut caches = super::EncCaches::take(masters);
+    // 自分の残りの札の分け方（v15・16 列が共有する）。
+    let rem = OwnRemaining::of(s.state(), me, opts.deck_v14);
     let rel = {
         let _prof = crate::prof::enter(crate::prof::Cat::EncRel);
-        super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &mut caches.profiles)?
+        super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &rem, &mut caches.profiles)?
     };
 
     let leaders = &mut caches.leaders;
@@ -535,8 +470,8 @@ pub fn encode(
         p_opp.deck.len() as f32 / 50.0,
         p_me.trash.len() as f32 / 20.0,
         p_opp.trash.len() as f32 / 20.0,
-        turn_event(state, &format!("CHAR_KOED_{}", me.name())) as f32 / 3.0,
-        turn_event(state, &format!("CHAR_KOED_{}", opp.name())) as f32 / 3.0,
+        turn_event(state, char_koed_key(me)) as f32 / 3.0,
+        turn_event(state, char_koed_key(opp)) as f32 / 3.0,
     ]);
     // v3 (b): [自L, 相L, 自場5, 相場5] の 12 枠 × 2 種
     let slots12: Vec<Option<CardIdx>> = {
@@ -562,7 +497,7 @@ pub fn encode(
         });
     }
     // v4
-    vals.extend_from_slice(&deck_aggregate(state, masters, &p_me.deck));
+    vals.extend_from_slice(&deck_aggregate(state, masters, &rem));
     // v5
     vals.extend_from_slice(&field_aggregate(state, masters, &p_opp.field));
     vals.push(playable_chars(state, masters, me) as f32 / MAX_HAND as f32);
@@ -577,7 +512,7 @@ pub fn encode(
         p_me.don_deck.len() as f32 / 10.0,
         p_opp.don_deck.len() as f32 / 10.0,
     ]);
-    vals.extend_from_slice(&deck_apex(state, masters, &p_me.deck));
+    vals.extend_from_slice(&deck_apex(state, masters, &rem));
     // v11/v12: リーダー物理要約（自 12 → 相手 12）
     for seat in [me, opp] {
         let v = match state.player(seat).leader {
@@ -659,7 +594,7 @@ mod tests {
         b.put_deck(Seat::P1, M_EVENT);
         b.put_deck(Seat::P1, M_BIG);
         let (masters, state) = b.build();
-        let got = deck_aggregate(&state, &masters, &state.player(Seat::P1).deck);
+        let got = deck_aggregate(&state, &masters, &OwnRemaining::of(&state, Seat::P1, false));
         // counter_total = 1000*3 + 2000 = 5000 → /100000
         assert!((got[0] - 5000.0 / 100_000.0).abs() < 1e-7);
         // 4 枚ともカウンター持ち＝密度 1.0
@@ -675,7 +610,7 @@ mod tests {
         b.put_deck(Seat::P1, M_EVENT); // イベントは対象外
         b.put_deck(Seat::P1, M_BIG); // cost5 power9000
         let (masters, state) = b.build();
-        let got = deck_apex(&state, &masters, &state.player(Seat::P1).deck);
+        let got = deck_apex(&state, &masters, &OwnRemaining::of(&state, Seat::P1, false));
         assert!((got[0] - 0.9).abs() < 1e-7);
         assert!((got[1] - 0.5).abs() < 1e-7);
     }

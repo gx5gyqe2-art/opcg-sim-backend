@@ -1,0 +1,47 @@
+VERIFY todo 12 (done 0) k=24 both=True -> /home/user/opcg-sim-backend/n1_results/audit_verify_opp/blunder_verify_both.jsonl
+VERIFY seed=3301004 step=86 r13d=0.125 [-0.0897, 0.3397] r20=0.0833 [-0.1182, 0.2848] sec=73.9 (1/12 78s)
+VERIFY seed=3301005 step=107 r13d=0.0 [0.0, 0.0] r20=0.0 [0.0, 0.0] sec=218.7 (2/12 223s)
+VERIFY seed=3301004 step=31 r13d=0.25 [0.0373, 0.4627] r20=0.4583 [0.223, 0.6937] sec=281.9 (3/12 286s)
+VERIFY seed=3301011 step=107 r13d=0.2083 [0.0047, 0.412] r20=0.4583 [0.1951, 0.7216] sec=346.5 (4/12 351s)
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 544, in verify_point
+    game = replay(g, step)
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 258, in replay
+    apply(game, name, mv)
+    ~~~~~^^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 109, in apply
+    game.apply_game_action(actor, mv["action_type"], json.dumps(mv.get("payload") or {}, ensure_ascii=False))
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: ドン!!を付与する対象のカードが見つかりません。
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 785, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 780, in main
+    {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "verify": cmd_verify, "winstab": cmd_winstab, "summary": cmd_summary}[a.cmd](a)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 574, in cmd_verify
+    for i, r in enumerate(pool.imap_unordered(verify_point, jobs, chunksize=1)):
+                ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 873, in next
+    raise value
+ValueError: ドン!!を付与する対象のカードが見つかりません。
+VERIFY todo 8 (done 4) k=24 both=True -> /home/user/opcg-sim-backend/n1_results/audit_verify_opp/blunder_verify_both.jsonl
+VERIFY seed=3301043 step=118 error=replay: ValueError: ドン!!を付与する対象のカードが見つかりません。 (1/8)
+VERIFY seed=3301061 step=58 r13d=0.2083 [-0.027, 0.4437] r20=0.3333 [0.1074, 0.5592] sec=137.8 (2/8 140s)
+VERIFY seed=3301074 step=152 r13d=0.0 [0.0, 0.0] r20=0.0 [0.0, 0.0] sec=0.5 (3/8 140s)
+VERIFY seed=3301025 step=117 r13d=0.625 [0.3946, 0.8554] r20=0.5417 [0.338, 0.7453] sec=165.2 (4/8 167s)
+VERIFY seed=3301084 step=87 r13d=0.1667 [-0.1142, 0.4475] r20=0.4583 [0.2547, 0.662] sec=137.7 (5/8 278s)
+VERIFY seed=3301095 step=107 r13d=0.0417 [-0.1784, 0.2617] r20=0.375 [0.1771, 0.5729] sec=232.7 (6/8 400s)
+VERIFY seed=3301022 step=151 r13d=-0.25 [-0.4627, -0.0373] r20=0.125 [-0.194, 0.444] sec=700.9 (7/8 703s)
+VERIFY seed=3301018 step=102 r13d=0.0417 [-0.1441, 0.2274] r20=-0.0833 [-0.1963, 0.0296] sec=1295.2 (8/8 1297s)
+VERIFY_DONE

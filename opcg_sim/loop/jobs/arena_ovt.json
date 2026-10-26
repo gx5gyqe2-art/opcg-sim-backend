@@ -1,0 +1,74 @@
+{
+ "kind": "arena",
+ "section": "§7.47",
+ "ledger_grep": "7.47 トリガーを断る修正の本番アリーナ",
+ "about": "トリガーを断れる修正後 vs 必ず発動する旧い候補（両席 r22・出荷の設定・random×real）",
+ "job": "arena-ovt-w{KK}",
+ "branch": "claude/arena-ovt-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r22.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r22.npz"
+ },
+ "out_dir": "arena_ovt",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--confirm-trigger-legacy",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "2",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3471000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "ovt_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r22.npz (trigger confirm offers decline)",
+  "baseline": "nrel_r22.npz + confirm_trigger_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
+ "commit_message": "arena ovt shard {KK}",
+ "require": [
+  {
+   "file": "opcg_sim/loop/arena_shard.py",
+   "grep": "confirm-trigger-legacy"
+  }
+ ]
+}

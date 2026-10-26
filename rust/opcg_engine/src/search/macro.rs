@@ -17,9 +17,9 @@ use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use super::prune::{action_type, don_cond_max_n, first_target_id, own_units, payload_uuid};
-use super::quiesce::BOX_BRANCH_BUDGET;
-use super::{adapter, apply, Move};
+use super::prune::{action_type, first_target_id, master_don_cond, own_units, payload_uuid};
+use super::quiesce::{dialog_cards, TraceStep, BOX_BRANCH_BUDGET};
+use super::{adapter, apply, Move, Payload};
 
 /// CPython の「小さな非負 int だけの set」の**反復順**。
 ///
@@ -55,8 +55,14 @@ pub fn py_set_order(values: &[i64]) -> Vec<i64> {
 }
 
 fn don_box(uuid: &str, target_ids: Vec<&str>, don_k: i64) -> Move {
-    json!({"kind": "game", "action_type": "DON_BOX",
-           "payload": {"uuid": uuid, "target_ids": target_ids, "don_k": don_k}})
+    Move::game(
+        "DON_BOX",
+        Payload::DonBox {
+            uuid: uuid.to_owned(),
+            target_ids: target_ids.into_iter().map(str::to_owned).collect(),
+            don_k,
+        },
+    )
 }
 
 fn power(state: &GameState, masters: &MasterTable, card: CardIdx, is_my_turn: bool) -> i32 {
@@ -89,7 +95,8 @@ pub fn don_alloc_candidates(
     }
     let units = own_units(state, seat);
     let mut out: Vec<Move> = Vec::new();
-    let mut seen: HashSet<(String, i64)> = HashSet::new();
+    // 既出の（対象, k）。鍵は手から借りる（集合の判定だけに使う＝並びに影響しない）。
+    let mut seen: HashSet<(&str, i64)> = HashSet::new();
     for mv in attach_moves {
         if action_type(mv) != Some("ATTACH_DON") {
             continue;
@@ -99,14 +106,14 @@ pub fn don_alloc_candidates(
             continue;
         };
         let mut ks: Vec<i64> = vec![1, budget];
-        if let Some(n) = don_cond_max_n(&masters.get(state.card(card).master).effect_text) {
+        if let Some(n) = master_don_cond(masters, state.card(card).master) {
             let attached = state.card(card).attached_don;
             if attached < n {
                 ks.push((n - attached) as i64);
             }
         }
         for k in py_set_order(&ks) {
-            let key = (uuid.to_owned(), k);
+            let key = (uuid, k);
             if (1..=budget).contains(&k) && !seen.contains(&key) {
                 seen.insert(key);
                 out.push(don_box(uuid, Vec::new(), k));
@@ -130,7 +137,7 @@ pub fn attack_box_candidates(
     let attackers = own_units(state, seat);
     let targets = own_units(state, seat.other());
     let mut out: Vec<Move> = Vec::new();
-    let mut seen: HashSet<(String, String, i64)> = HashSet::new();
+    let mut seen: HashSet<(&str, &str, i64)> = HashSet::new();
     for mv in attack_moves {
         if action_type(mv) != Some("ATTACK") {
             continue;
@@ -149,7 +156,7 @@ pub fn attack_box_candidates(
         let k_min = ceil_don(l - p).max(0);
         let k_two = ceil_don(l + 2000 - p).max(0);
         for k in py_set_order(&[0, k_min, k_two]) {
-            let key = (uuid.to_owned(), tid.to_owned(), k);
+            let key = (uuid, tid, k);
             if (0..=budget).contains(&k) && !seen.contains(&key) {
                 seen.insert(key);
                 out.push(don_box(uuid, vec![tid], k));
@@ -180,12 +187,13 @@ pub fn defense_box_prune(
     moves: Vec<Move>,
 ) -> Vec<Move> {
     // Python の `kinds = {m.get("action_type") for m in moves}` は欄が無い手を `None` として
-    // 集合に入れる（＝`kinds <= {"SELECT_COUNTER","PASS"}` が偽になり窓を触らない）。同じにする。
-    let kinds: HashSet<Option<&str>> = moves.iter().map(action_type).collect();
-    if !kinds.contains(&Some("SELECT_COUNTER"))
-        || !kinds
-            .iter()
-            .all(|k| *k == Some("SELECT_COUNTER") || *k == Some("PASS"))
+    // 集合に入れる（＝`kinds <= {"SELECT_COUNTER","PASS"}` が偽になり窓を触らない）。同じにする
+    // （集合を作らず手を直接なめる＝「含む」「全部が部分集合」の判定は同じ）。
+    if !moves.iter().any(|m| action_type(m) == Some("SELECT_COUNTER"))
+        || !moves.iter().all(|m| {
+            let k = action_type(m);
+            k == Some("SELECT_COUNTER") || k == Some("PASS")
+        })
     {
         return moves;
     }
@@ -201,7 +209,7 @@ pub fn defense_box_prune(
         // Python: `(m.get("payload") or {}).get("uuid") or m.get("card_uuid")`。
         let uuid = payload_uuid(m)
             .filter(|u| !u.is_empty())
-            .or_else(|| m.get("card_uuid").and_then(Value::as_str));
+            .or_else(|| m.card_uuid());
         let card = uuid.and_then(|u| hand.iter().copied().find(|c| state.card(*c).uuid == u));
         let v = card
             .map(|c| crate::rules::current_counter(state, masters, c))
@@ -436,9 +444,9 @@ fn setup_box_move(base: &Move, selects: &SelectPath) -> Move {
     let mut payload = serde_json::Map::new();
     payload.insert(
         "uuid".into(),
-        base.get("payload")
+        base.payload()
             .and_then(|p| p.get("uuid"))
-            .cloned()
+            .map(std::borrow::Cow::into_owned)
             .unwrap_or(Value::Null),
     );
     // §20.7.2 の欄（最初の対象選択）。枝が 2 段目まで伸びた分は `selects` に入る。
@@ -454,14 +462,14 @@ fn setup_box_move(base: &Move, selects: &SelectPath) -> Move {
         Value::Array(selects.iter().map(|v| Value::Array(v.clone())).collect()),
     );
     // 素の手そのもの（PLAY / ACTIVATE_MAIN の payload をそのまま積み直すため）。
-    payload.insert("base".into(), base.clone());
+    payload.insert("base".into(), base.to_json());
     // 鍵（`move_sig`／`move_equiv_key`／記述子）が枝を区別できるように、選んだ対象を
     // DON_BOX と同じ欄名でも載せる（読む側は既存のまま）。
     if !selects.is_empty() {
         let flat: Vec<Value> = selects.iter().flatten().cloned().collect();
         payload.insert("selected_uuids".into(), Value::Array(flat));
     }
-    json!({"kind": "game", "action_type": "SETUP_BOX", "payload": Value::Object(payload)})
+    Move::game("SETUP_BOX", Payload::Json(Value::Object(payload)))
 }
 
 /// `payload.selects`（無ければ `first_select` 1 段）を枝の選択列として読む。
@@ -483,9 +491,9 @@ pub fn setup_box_first_primitive(mv: &Move) -> Move {
     if action_type(mv) != Some("SETUP_BOX") {
         return mv.clone();
     }
-    mv.get("payload")
+    mv.payload()
         .and_then(|p| p.get("base"))
-        .cloned()
+        .map(|b| Move::from_json(b.into_owned()))
         .unwrap_or_else(|| mv.clone())
 }
 
@@ -501,8 +509,8 @@ fn apply_setup_base(
     let at = action_type(base)
         .ok_or_else(|| EngineError::BadPayload("SETUP_BOX: base に action_type がありません。".into()))?;
     let empty = Value::Object(serde_json::Map::new());
-    let payload = base.get("payload").unwrap_or(&empty);
-    crate::rules::actions::apply_game_action(s, masters, actor, at, payload)
+    let payload = base.payload().map(|p| p.to_json());
+    crate::rules::actions::apply_game_action(s, masters, actor, at, payload.as_deref().unwrap_or(&empty))
 }
 
 fn resolve_one_default(
@@ -565,10 +573,16 @@ fn advance_to_first_select(
 }
 
 fn selected_uuids(mv: &Move) -> Option<Vec<Value>> {
-    mv.get("payload")
+    mv.payload()
         .and_then(|p| p.get("selected_uuids"))
-        .and_then(Value::as_array)
-        .cloned()
+        .and_then(|v| v.as_array().cloned())
+}
+
+/// `mv.get("payload").cloned().unwrap_or(Value::Null)`。
+fn payload_or_null(mv: &Move) -> Value {
+    mv.payload()
+        .map(|p| p.to_json().into_owned())
+        .unwrap_or(Value::Null)
 }
 
 /// 準備の手の対話を「枝の選択列 `selects`・尽きたら既定解決」で解く（in-place）。
@@ -579,13 +593,14 @@ fn resolve_setup_dialogs(
     masters: &MasterTable,
     seat: Seat,
     selects: &SelectPath,
-    mut trace: Option<&mut Vec<(Seat, Move)>>,
+    mut trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<(), EngineError> {
     let mut left = selects.iter();
     for _ in 0..apply::DRAIN_LIMIT {
         let Some(action) = own_dialog_action(s, seat) else {
             return Ok(());
         };
+        let cards = if trace.is_some() { dialog_cards(s.state()) } else { Vec::new() };
         let mut chosen: Option<Move> = None;
         if action == adapter::SELECT_ACTION {
             if let Some(alts) = adapter::selection_moves(s, masters, seat) {
@@ -600,7 +615,7 @@ fn resolve_setup_dialogs(
         }
         match chosen {
             Some(mv) => {
-                let payload = mv.get("payload").cloned().unwrap_or(Value::Null);
+                let payload = payload_or_null(&mv);
                 crate::rules::actions::apply_game_action(
                     s,
                     masters,
@@ -609,7 +624,7 @@ fn resolve_setup_dialogs(
                     &payload,
                 )?;
                 if let Some(tr) = trace.as_deref_mut() {
-                    tr.push((seat, mv));
+                    tr.push((seat, mv, cards));
                 }
             }
             None => {
@@ -630,8 +645,8 @@ fn resolve_setup_dialogs(
                 if let Some(tr) = trace.as_deref_mut() {
                     tr.push((
                         seat,
-                        json!({"kind": "game", "action_type": adapter::ACT_RESOLVE_SELECTION,
-                               "payload": payload}),
+                        Move::game(adapter::ACT_RESOLVE_SELECTION, Payload::Json(payload)),
+                        cards,
                     ));
                 }
             }
@@ -650,15 +665,15 @@ pub fn apply_setup_box(
     masters: &MasterTable,
     actor: Seat,
     mv: &Move,
-    trace: Option<&mut Vec<(Seat, Move)>>,
+    trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<(), EngineError> {
-    let null = Value::Null;
-    let p = mv.get("payload").unwrap_or(&null);
+    let p = payload_or_null(mv);
     let base = p
         .get("base")
         .cloned()
+        .map(Move::from_json)
         .ok_or_else(|| EngineError::BadPayload("SETUP_BOX: payload.base がありません。".into()))?;
-    let selects = selects_of(p);
+    let selects = selects_of(&p);
     // 素の手は**ドレインせずに**打つ（`apply_move_inplace` の既定ドレインに畳ませると
     // 枝の選択を当てる先が無くなり、コミットの手順からも SELECT_RESOURCE 等が落ちる）。
     // 対話はこの下で「枝の選択列・尽きたら既定」に、1 段ずつ trace へ積みながら解く。
@@ -672,8 +687,8 @@ pub fn setup_box_continuation(
     masters: &MasterTable,
     actor: Seat,
     mv: &Move,
-) -> Result<Vec<(Seat, Move)>, EngineError> {
-    let mut trace: Vec<(Seat, Move)> = Vec::new();
+) -> Result<Vec<TraceStep>, EngineError> {
+    let mut trace: Vec<TraceStep> = Vec::new();
     apply_setup_box(s, masters, actor, mv, Some(&mut trace))?;
     Ok(trace)
 }
@@ -798,8 +813,9 @@ pub fn setup_branch_weights(
 
 /// `SETUP_BOX` の枝の「1 段目の選択」（`payload.selects[0]`・無ければ空）。
 pub fn setup_box_first_select(mv: &Move) -> Vec<Value> {
-    mv.get("payload")
+    mv.payload()
         .and_then(|p| p.get("selects"))
+        .as_deref()
         .and_then(Value::as_array)
         .and_then(|a| a.first())
         .and_then(Value::as_array)
@@ -848,7 +864,7 @@ fn enumerate_select_paths(
         for (sess, path, alts) in open {
             for a in alts {
                 let mut w = Session::new(sess.state().clone());
-                let payload = a.get("payload").cloned().unwrap_or(Value::Null);
+                let payload = payload_or_null(&a);
                 if crate::rules::actions::apply_game_action(
                     &mut w,
                     masters,

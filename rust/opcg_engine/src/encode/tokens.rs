@@ -60,7 +60,6 @@
 //! `g <= 0` の境界を決めるので f64 で計算すると答えが変わりうる）。`threat_next` の
 //! 一括計算だけは Python も float64（`pool_arr` と生の整数）なので f64 で行う。
 
-use std::collections::HashMap;
 
 use crate::effects::ast::{ActionType, GameAction, PlayerRef, TriggerType};
 use crate::effects::EffectContext;
@@ -126,16 +125,26 @@ impl Profile {
 }
 
 /// マスター単位のキャッシュ（Python のモジュール辞書 `_PROFILES`／`_ROLES`／`_THR_ROWS`／`_STATIC`）。
+///
+/// 符号化 1 回で 100 回前後引かれるので、表はマスター添字で直接引く（`slot[mi]`＝`profiles` の
+/// 添字＋1・0＝未作成。ハッシュを回さない）。中身はマスターだけの関数＝引いた値は同じ。
 #[derive(Debug, Default)]
 pub struct ProfileCache {
-    map: HashMap<MasterIdx, Profile>,
+    slot: Vec<u32>,
+    profiles: Vec<Profile>,
 }
 
 impl ProfileCache {
     pub fn get(&mut self, masters: &MasterTable, mi: MasterIdx) -> &Profile {
-        self.map
-            .entry(mi)
-            .or_insert_with(|| build_profile(masters, mi))
+        let i = mi as usize;
+        if i >= self.slot.len() {
+            self.slot.resize(i + 1, 0);
+        }
+        if self.slot[i] == 0 {
+            self.profiles.push(build_profile(masters, mi));
+            self.slot[i] = self.profiles.len() as u32;
+        }
+        &self.profiles[self.slot[i] as usize - 1]
     }
 }
 
@@ -567,24 +576,26 @@ fn leader_act_avail(s: &mut Session, masters: &MasterTable, me: Seat) -> f32 {
         return 0.0;
     }
     let lu = s.state().card(leader).uuid.clone();
-    let Ok(legal) = crate::rules::legal::get_legal_actions(s, masters, me) else {
+    let Ok(legal) = crate::rules::legal::get_legal_moves(s, masters, me) else {
         return 0.0; // Python は例外を握って 0.0
     };
     for a in &legal {
-        if a.get("action_type").and_then(|v| v.as_str()) != Some("ACTIVATE_MAIN") {
+        if a.action_type() != Some("ACTIVATE_MAIN") {
             continue;
         }
-        let payload = a.get("payload");
-        let uuid = a
-            .get("card_uuid")
-            .and_then(|v| v.as_str())
-            .or_else(|| payload.and_then(|p| p.get("uuid")).and_then(|v| v.as_str()))
-            .or_else(|| {
+        // 主体は `card_uuid` → `payload.uuid` → `payload.card_uuid` の順（今までと同じ読み）。
+        let payload = a.payload();
+        let hit = match a.card_uuid().or_else(|| payload.and_then(|p| p.uuid())) {
+            Some(u) => u == lu,
+            None => {
                 payload
                     .and_then(|p| p.get("card_uuid"))
+                    .as_deref()
                     .and_then(|v| v.as_str())
-            });
-        if uuid == Some(lu.as_str()) {
+                    == Some(lu.as_str())
+            }
+        };
+        if hit {
             return 1.0;
         }
     }
@@ -598,6 +609,7 @@ pub fn encode_rel(
     masters: &MasterTable,
     me: Seat,
     with_relations: bool,
+    rem: &super::OwnRemaining,
     cache: &mut ProfileCache,
 ) -> Result<RelEncoding, EngineError> {
     let opp = me.other();
@@ -695,18 +707,16 @@ pub fn encode_rel(
         let mi = s.state().card(card).master;
         let m = masters.get(mi);
         let ty = m.ty;
-        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event, conds, act_idx) = {
-            let p = cache.get(masters, mi);
-            (
-                p.ret_norm(),
-                f32::from(p.trig_ko),
-                f32::from(p.trig_attack),
-                f32::from(p.trig_opp_attack),
-                p.counter_event,
-                p.conds.clone(),
-                p.act_idx.clone(),
-            )
-        };
+        // 要約はキャッシュから借りる（`conds`／`act_idx` を複製しない）。
+        let p = cache.get(masters, mi);
+        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event) = (
+            p.ret_norm(),
+            f32::from(p.trig_ko),
+            f32::from(p.trig_attack),
+            f32::from(p.trig_opp_attack),
+            p.counter_event,
+        );
+        let (conds, act_idx) = (&p.conds, &p.act_idx);
         let is_unit = ty == CardType::Leader || ty == CardType::Character;
         pw[i] = if is_unit {
             s.state().card(card).get_power(m, owner_turn)
@@ -747,7 +757,7 @@ pub fn encode_rel(
         tok[b + 16] = trig_oatk;
         if !conds.is_empty() {
             let owner = if own_side { me } else { opp };
-            let flags = cond_flags(s, masters, owner, card, &conds);
+            let flags = cond_flags(s, masters, owner, card, conds);
             tok[b + 10..b + 14].copy_from_slice(&flags);
         }
         if own_side && z != ZoneKind::Hand && has_pool_arr {
@@ -765,7 +775,7 @@ pub fn encode_rel(
         };
         // `act_avail`: 未使用の【起動メイン】を持つか（場の枠のみ）。
         tok[b + 21] = if on_board {
-            act_avail(s, card, &act_idx)
+            act_avail(s, card, act_idx)
         } else {
             0.0
         };
@@ -797,15 +807,16 @@ pub fn encode_rel(
     }
 
     // ---- 関係 R ----
-    let profs_owned: Vec<Option<Profile>> = slots
-        .iter()
-        .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
-        .collect();
-    let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
-    for i in 0..N_TOK {
-        profs[i] = profs_owned[i].as_ref();
-    }
+    // 要約の写しは関係を作るときだけ要る（作らないなら読まない）。
     let (rel_om, rel_oo) = if with_relations {
+        let profs_owned: Vec<Option<Profile>> = slots
+            .iter()
+            .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
+            .collect();
+        let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
+        for i in 0..N_TOK {
+            profs[i] = profs_owned[i].as_ref();
+        }
         relations_from_tokens(&profs, &tok)
     } else {
         (Vec::new(), Vec::new())
@@ -861,16 +872,27 @@ pub fn encode_rel(
     my_guard += 1000.0 * blockers as f32;
     ex[5] = ((opp_attack as f32 - my_guard) / 20000.0).clamp(-1.5, 1.5);
 
+    // 自デッキ残の役割（符号化 v15: 山札＋伏せたライフから作る期待値・[`super::OwnRemaining`]）。
+    // 役割は 0/1＝足し込みは整数で厳密。`deck_v14` の作りなら v14 と同じ値。
+    let mut sums = [[0f64; N_ROLES + N_ROLES2]; 2];
+    for (acc, set) in sums.iter_mut().zip([&rem.known, &rem.unknown]) {
+        for c in set {
+            let p = cache.get(masters, st.card(*c).master);
+            for k in 0..N_ROLES {
+                acc[k] += f64::from(p.roles[k]);
+            }
+            for k in 0..N_ROLES2 {
+                acc[N_ROLES + k] += f64::from(p.roles2[k]);
+            }
+        }
+    }
     let mut dr = [0.0f32; N_ROLES];
     let mut dr2 = [0.0f32; N_ROLES2];
-    for c in &st.player(me).deck {
-        let p = cache.get(masters, st.card(*c).master);
-        for k in 0..N_ROLES {
-            dr[k] += p.roles[k];
-        }
-        for k in 0..N_ROLES2 {
-            dr2[k] += p.roles2[k];
-        }
+    for k in 0..N_ROLES {
+        dr[k] = rem.combine(sums[0][k], sums[1][k]) as f32;
+    }
+    for k in 0..N_ROLES2 {
+        dr2[k] = rem.combine(sums[0][N_ROLES + k], sums[1][N_ROLES + k]) as f32;
     }
     for k in 0..N_ROLES {
         ex[6 + k] = dr[k].min(10.0) / 10.0;

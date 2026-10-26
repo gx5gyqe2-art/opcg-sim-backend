@@ -195,6 +195,36 @@ pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usi
     out
 }
 
+/// 木の中の相手に「こちらの手札」を見せない（`search_efficiency_plan.md` §7.14・**測定専用**）。
+///
+/// [`TreeMcts::expand`] が `me` 以外の席の番のノードを展開するとき、評価に使う盤面だけを
+/// [`determinize_self_with`](super::determinize::determinize_self_with)（`me` の手札＋山札＋裏向きの
+/// ライフを 1 つの山として混ぜ直した複製）に差し替える。合法手は本当の世界で作り、木の降下・手の
+/// 適用も本当の世界のまま＝木の整合は崩さない。
+pub struct OppBlind {
+    /// 探索している席（＝隠す側）
+    pub me: Seat,
+    /// 混ぜ直しの乱数（世界ごとに決定的・[`opp_blind_seed`](super::decide::opp_blind_seed) から作る）
+    rng: super::rng::Pcg32SearchRng,
+}
+
+impl OppBlind {
+    pub fn new(me: Seat, seed: u64) -> OppBlind {
+        OppBlind { me, rng: super::rng::Pcg32SearchRng::new(seed) }
+    }
+}
+
+/// テスト用: `opp_blind` で展開した相手ノードの (本当の盤面, 評価に使った盤面, 合法手, 展開後の本当の盤面)。
+#[cfg(test)]
+pub(in crate::search) type BlindTrace = Vec<(GameState, GameState, Vec<Move>, GameState)>;
+
+#[cfg(test)]
+thread_local! {
+    /// テスト用: [`BlindTrace`] の記録先。
+    pub(in crate::search) static BLIND_TRACE: std::cell::RefCell<Option<BlindTrace>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// 木の探索（Python `TreeMCTS`）。
 pub struct TreeMcts<'a, 'b> {
     pub ctx: &'a Ctx<'b>,
@@ -208,6 +238,12 @@ pub struct TreeMcts<'a, 'b> {
     pub q_min_frac: f64,
     /// 根の事前分布の平坦化（§20.5・既定 1.0＝何もしない）。
     pub root_prior_temp: f64,
+    /// 木の中の相手にこちらの手札を見せない（§7.14・既定 `None`＝今までどおり）。
+    pub opp_blind: Option<OppBlind>,
+    /// 根の直後の相手の応手の節点での詰みの証明（§7.21 `root_reply`・既定 `None`＝今までどおり）。
+    pub lethal_reply: Option<super::lethal::ReplyProof>,
+    /// 証明を回す節点（根の子で相手の番のもの・展開のときに 1 度だけ読む）
+    reply_nodes: Vec<usize>,
     nodes: Vec<Node>,
 }
 
@@ -222,6 +258,9 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             select_rule: SelectRule::Visits,
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
+            opp_blind: None,
+            lethal_reply: None,
+            reply_nodes: Vec::new(),
             nodes: Vec::new(),
         }
     }
@@ -242,7 +281,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         rng: &mut dyn SearchRng,
         st: &mut SearchState,
     ) -> Result<RunOut, EngineError> {
-        let world = super::determinize::determinize_with(real, me, rng)?;
+        let world = super::determinize::determinize_fair_with(real, me, rng)?; // 既定の `reveal="fair"`（§7.15）
         self.run_in_world(world, rng, st)
     }
 
@@ -349,9 +388,86 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
         let to_move = ctx.current_player(s);
         self.nodes[node].to_move = to_move;
-        let mut legal = ctx.legal_actions(s)?;
-        let mut leaf_v: Option<f64> = None;
+        let legal = ctx.legal_actions(s)?;
         let to_move_seat = to_move.expect("非終局なら手番が居る");
+
+        // §7.14 `opp_blind`: 相手の番のノードは、評価（箱の畳み・事前分布・葉の価値）だけを
+        // こちらの隠れ札を混ぜ直した複製の上で行う。合法手は上で本当の世界から作った。
+        // 盤面の乱数（CRN）は複製へ貸して、評価の後に基準へ戻す（評価の各経路も元から戻している）。
+        let blinded = match self.opp_blind.as_mut() {
+            Some(b) if b.me != to_move_seat => Some(super::determinize::determinize_self_with(
+                s.state(),
+                b.me,
+                &mut b.rng,
+            )?),
+            _ => None,
+        };
+        let Some(world) = blinded else {
+            return self.expand_eval(node, legal, to_move_seat, s, st);
+        };
+        #[cfg(test)]
+        let trace = BLIND_TRACE.with(|t| t.borrow().is_some()).then(|| (s.state().clone(), world.clone(), legal.clone()));
+        let base_rng = s.rng.snapshot();
+        let mut b = Session::new(world);
+        b.rng = std::mem::take(&mut s.rng);
+        let out = b.discard_events(|b| self.expand_eval(node, legal, to_move_seat, b, st));
+        s.rng = std::mem::take(&mut b.rng);
+        s.rng.restore(&base_rng);
+        #[cfg(test)]
+        if let Some((real, w, l)) = trace {
+            let after = s.state().clone();
+            BLIND_TRACE.with(|t| t.borrow_mut().as_mut().map(|v| v.push((real, w, l, after))));
+        }
+        out
+    }
+
+    /// [`expand`](Self::expand) の評価の部分（箱の畳み・事前分布・葉の価値）。`s` は評価に使う盤面
+    /// （既定では本当の世界そのもの・§7.14 の相手ノードでは混ぜ直した複製）、`legal` は本当の世界の合法手。
+    fn expand_eval(
+        &mut self,
+        node: usize,
+        mut legal: Vec<Move>,
+        to_move_seat: Seat,
+        s: &mut Session,
+        st: &mut SearchState,
+    ) -> Result<f64, EngineError> {
+        let ctx = self.ctx;
+        let mut leaf_v: Option<f64> = None;
+
+        // §7.21 `root_reply`: 根の直後の相手の応手の節点では、各応手の後にこちらの勝ちが証明できるかを先に読む。
+        // 証明できた応手は相手から見て負け＝相手は選ばない。証明できない応手が在ればそれだけを残す（箱の畳みも
+        // その中から選ぶ）。全部が証明できたら、全部の子を相手から見て -1 の終局に固定する。
+        let mut all_proven = false;
+        if let Some(rp) = self.lethal_reply.as_mut().filter(|_| self.reply_nodes.contains(&node)) {
+            let proven = rp.prove_children(ctx.masters, s, node, &legal)?;
+            if proven.iter().all(|p| *p) && !proven.is_empty() {
+                all_proven = true;
+            } else if proven.iter().any(|p| *p) {
+                legal = legal.into_iter().zip(&proven).filter(|(_, p)| !**p).map(|(m, _)| m).collect();
+            }
+        }
+        if all_proven {
+            let n = legal.len();
+            let mut kids = Vec::with_capacity(n);
+            for _ in 0..n {
+                let c = self.new_node();
+                let cn = &mut self.nodes[c];
+                cn.expanded = true;
+                cn.terminal = true;
+                cn.term_val = -1.0;
+                cn.to_move = Some(to_move_seat);
+                kids.push(Some(c));
+            }
+            let node = &mut self.nodes[node];
+            node.legal = legal;
+            node.n = vec![0.0; n];
+            node.w = vec![0.0; n];
+            node.p = vec![1.0 / n as f64; n];
+            node.p_f32 = false;
+            node.children = kids;
+            node.expanded = true;
+            return Ok(-1.0);
+        }
 
         // 木の中の箱化（`TREE_BOX_BATTLE`）: 戦闘窓は出口 value 最良の 1 手へ畳む。
         if ctx.box_battle && legal.len() > 1 && in_battle(s) {
@@ -444,7 +560,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         s: &mut Session,
         st: &mut SearchState,
         to_move: Seat,
-        trunk: Option<&(Seat, crate::net::Trunk)>,
+        trunk: Option<&super::quiesce::SeatTrunk>,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
         let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;
@@ -454,8 +570,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             return ctx.value_reusing(s, to_move, trunk);
         }
         let rng_state = s.rng.snapshot();
-        let saved = s.swap_events(Vec::new());
-        let out = s.transaction(|s| -> Result<f64, EngineError> {
+        let out = s.discard_events(|s| s.transaction(|s| -> Result<f64, EngineError> {
             if resolve_windows {
                 if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
                     resolve_battle_inplace(
@@ -485,8 +600,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 record_rollout(plies, capped);
             }
             ctx.value(s, to_move)
-        });
-        s.swap_events(saved);
+        }));
         s.rng.restore(&rng_state);
         out
     }
@@ -550,10 +664,10 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     ) -> Result<f64, EngineError> {
         let masters = self.ctx.masters;
         let to_move = self.nodes[node].to_move.expect("降下は手番のあるノードから");
-        let mv = self.nodes[node].legal[a].clone();
-        let saved = s.swap_events(Vec::new());
-        let out = s.transaction(|s| -> Result<f64, EngineError> {
-            let dead = match apply::apply_move_inplace(s, masters, to_move, &mv, true) {
+        s.discard_events(|s| s.transaction(|s| -> Result<f64, EngineError> {
+            // 手は複製せずに借りる（借用は適用が終われば切れる＝下の木の書き換えとは重ならない）。
+            let applied = apply::apply_move_inplace(s, masters, to_move, &self.nodes[node].legal[a], true);
+            let dead = match applied {
                 Ok(()) => false,
                 Err(e @ EngineError::Unimplemented(_)) => return Err(e),
                 Err(_) => true, // Python の `except Exception: dead = True`
@@ -566,13 +680,18 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 None => {
                     let c = self.new_child_after_apply(node, s);
                     self.nodes[node].children[a] = Some(c);
+                    // §7.21 `root_reply`: 根の子で相手の番の節点に印を付ける（展開のときに証明を回す）
+                    if node == 0 && self.lethal_reply.is_some() {
+                        let cn = &self.nodes[c];
+                        if !cn.terminal && cn.to_move.is_some() && cn.to_move != Some(to_move) {
+                            self.reply_nodes.push(c);
+                        }
+                    }
                     c
                 }
             };
             self.simulate(child, s, st)
-        });
-        s.swap_events(saved);
-        out
+        }))
     }
 
     /// Python `TreeMCTS._simulate`（node 手番視点の value を返す）。
@@ -672,7 +791,10 @@ mod tests {
             let n = &mut t.nodes[node];
             n.expanded = true;
             n.to_move = Some(Seat::P1);
-            n.legal = vec![serde_json::json!({}), serde_json::json!({})];
+            n.legal = vec![
+                Move::from_json(serde_json::json!({})),
+                Move::from_json(serde_json::json!({})),
+            ];
             n.p = vec![0.4, 0.6];
             n.n = vec![0.0, 0.0];
             n.w = vec![0.0, 0.0];

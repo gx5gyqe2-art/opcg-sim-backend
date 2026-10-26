@@ -117,6 +117,14 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 `dup_seeds`=0・`void` 率 ≤2% を確認 → 判定 → 台帳を `claude/n1-results` へ取り込む →
 `docs/reports/` に記録。昇格なら次の指示書（生成）の生成役を新ネットにする。
 
+> **1 ペアの組み方**（2026-10-23・WP `arena-pair-mirror`）: 1 ペアは同じ seed・**同じ組のデッキ・同じ席**で
+> ネットだけを入れ替えた 2 局（候補は 1 局目で p1、2 局目で p2）。台帳の `cand_leaders` は候補が実際に
+> 握ったリーダー（2 局で別のリーダー）。**同じネット同士なら全ペアがちょうど 1 勝 1 敗**＝対照の
+> 「off 対 off」を打って引く必要はもう無い。旧規約（〜2026-10-22・候補が 2 局とも la を握る）と比べて、
+> `real`／`user`／`official`・固定ミラーの結果は 1 ペアも変わらない。合成デッキ（`synth*`）の random 対面は
+> 変わる＝**2026-10-22 以前の synth 条件の台帳と 2026-10-23 以降の台帳を同じ判定に混ぜない**
+> （`docs/TEST_SPEC.md` §5.05-5・`docs/reports/2026-10-23_arena_pair_mirror.md`）。
+
 ## 5. RESULT.json の形式
 
 作業セッションは出力ブランチの直下に置く。最低限これだけ（追加は自由）:
@@ -176,6 +184,71 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 用途 | 帯 | 状態 |
 |---|---|---|
 | 検証 **r15／r15b vs r13d**（両席 160 回・各 16 シャード × 175 ペア・§7.16） | r15 主 1391000〜1406000／副 1411000〜1426000／r15b 主 1431000〜1446000／副 1451000〜1466000 | 使用済み（2026-10-20・r15 主 −1.6／副 0.0・r15b 主 +0.9／副 +13.9・どちらも非昇格・`2026-10-20_r15_judgment.md`） |
+| 検証 **世界 4 本 × 320 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・32 シャード × 88 ペア・§7.17） | 1471000〜1502000 | 使用済み（2026-10-20・2,724 ペア 0.4831 [0.4688, 0.4974]・−11.7・世界 4 本は有意に弱い・`2026-10-20_worlds4_and_policy_errors.md`） |
+| 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
+| 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
+| 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
+| 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2046149（本番・root と対照 off 対 off で共有・16 シャード × 150 ペア・§7.31）／2051000〜2062000（root_reply の本番は取りやめ・未使用） | 手元・監査は使用済み（2026-10-22・報告 2026-10-22_lethal_root.md）・本番は使用済み（2026-10-22・root 2,399 ペア 0.5075 [0.5045, 0.5105] +5.2・対照 0.5000・void 1） |
+| 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
+| 検証 **WP `rs-commit-hidden` の本番アリーナ**（修正後 vs `--commit-hidden-legacy`・出荷の設定・random × real・16 シャード × 150 ペア・§7.39） | 3271000〜3286149 | 使用済み（2026-10-23・2,397 ペア 0.5023 [0.4981, 0.5064] +1.6・void 3・採用） |
+| 検証 **WP `rs-window-tree-blocker` の本番アリーナ**（修正後 vs カウンターの窓にも木・出荷の設定・random × real・32 シャード × 84 ペア・search_efficiency_plan §7.45） | 3511000〜3542083 | 払い出し済み（r23 の本番の確認の後に起こす・ジョブ `arena_wtb`・ユーザ決定 2026-10-24「c をやりましょうか」） |
+| アリーナ **WP `rs-defense-proof` の本番アリーナ**（候補＝守りの窓で相手の詰みの証明 vs 今の形・両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・search_efficiency_plan §7.51） | 3721000〜3752083（シャード k の base は 3721000 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_dfp`・§7.52） |
+| アリーナ **WP `rs-lethal-nodes` の本番アリーナ**（候補＝根の証明の節点の上限を上げた形 vs 今の形・両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・search_efficiency_plan §7.49） | 3681000〜3712083（シャード k の base は 3681000 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_lnodes`・§7.51） |
+| 監査 **WP `weak-points` のトリガーの点の採集**（生成と同じ設定・生成役 r22・200 局・search_efficiency_plan §7.48） | 3671000〜3671199 | 指示済み（2026-10-24・claude/weak-points） |
+| 監査 **WP `long-game-cap`**（長い局の採集・生成と同じ設定・生成役 r22・800 局・search_efficiency_plan §7.47） | 3661000〜3661799 | 指示済み（2026-10-24・claude/long-game-cap） |
+| 監査 **WP `rs-unpayable-activate` の確かめ**（生成と同じ設定・生成役 r22・400 局・search_efficiency_plan §7.46） | 3651000〜3651399 | 指示済み（2026-10-24・claude/rs-unpayable-activate） |
+| 検証 **r23 vs r22・本番の設定**（両席 1,280 回・世界 2 本・証明 root・random × real・32 シャード × 84 ペア・§7.48） | 3611000〜3642083 | 使用済み（2026-10-24・2,685 ペア 0.5490 [0.5386, 0.5593] +34.1・void 3・出荷の基準を満たす） |
+| 検証 **r23 vs r22**（公平同士・両席 160 回・16 シャード × 175 ペア × 3 条件・§7.44） | 主 real 3551000〜3566174／副 ミラー 3571000〜3586174／参考 synth_roles2 3591000〜3606174 | 使用済み（2026-10-24・主 +25.3・副 −0.4・参考 +19.1・r23 は候補） |
+| 監査 **WP `defect-hunt-2`**（まだ見ていない切り口での欠陥探し・新しく打つ局・search_efficiency_plan §7.58） | 3961000〜3969999 | 払い出し済み（2026-10-25） |
+| 生成 **波 55L**（学ぶ側 r24・相手の集団 r24／r23／r22／r13d・規則の直しの後・`--decks real`・32 シャード × 480 局・§7.59 of n_loop_ops） | 2631000〜2646500（シャード k の base は 2630000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 払い出し済み（2026-10-25・ジョブ定義 `gen_n55l`・Sonnet） |
+| 検証 **世界 4 本の本番アリーナ**（世界 4 本 vs 2 本・両席 r24・出荷の設定・random × real・32 シャード × 84 ペア・§7.57） | 3921000〜3952083（シャード k の base は 3921000 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_w4p`・Sonnet） |
+| 検証 **r26 の本番の設定**（r26 vs r24・両席とも出荷の設定・random × real・32 シャード × 84 ペア・§7.60） | 4031000〜4062083（シャード k の base は 4031000 + (k−1)×1000） | 使用済み（2026-10-26・2,688 ペア 0.5272 [0.5169, 0.5374] +18.9・void 0・出荷の基準を満たす） |
+| 検証 **r26 の判定**（r26 vs r24・公平同士・両席 160 回・主 random × real／副 固定ミラー／参考 random × synth_roles2・16 シャード × 175 ペア・§7.59） | 主 3971000〜3985174・副 3991000〜4005174・参考 4011000〜4025174（シャード k の base は 各 + (k−1)×1000） | 使用済み（2026-10-26・主 +15.0［+8.1, +22.0］・副 +24.7・参考 +8.2・void 0・r26 は候補） |
+| 検証 **r25 の判定**（r25 vs r24・公平同士・両席 160 回・主 random × real／副 固定ミラー／参考 random × synth_roles2・16 シャード × 175 ペア・§7.56） | 主 3861000〜3875174・副 3881000〜3895174・参考 3901000〜3915174（シャード k の base は 各 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_r25`・Sonnet） |
+| 生成 **波 54**（生成役 r24・設定は波 53 と同じ・`--decks real`・32 シャード × 480 局・§7.56 of n_loop_ops） | 2611000〜2626500（シャード k の base は 2610000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 払い出し済み（2026-10-25・ジョブ定義 `gen_n54`・Sonnet） |
+| 検証 **r24 の本番の設定**（r24 vs r23・両席とも出荷の設定・random × real・32 シャード × 84 ペア・§7.54） | 3821000〜3852083（シャード k の base は 3821000 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_r24p`・Sonnet） |
+| 検証 **r24 の判定**（r24 vs r23・公平同士・両席 160 回・主 random × real／副 固定ミラー／参考 random × synth_roles2・16 シャード × 175 ペア・§7.50） | 主 3761000〜3775174・副 3781000〜3795174・参考 3801000〜3815174（シャード k の base は 各 + (k−1)×1000） | 払い出し済み（2026-10-25・ジョブ定義 `arena_r24`・Sonnet） |
+| 生成 **波 53**（生成役 r23・払えない起動の修正・手数の上限 1,000 の後・`--decks real`・32 シャード × 480 局・§7.50 of n_loop_ops） | 2591000〜2606500（シャード k の base は 2590000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 払い出し済み（2026-10-25・ジョブ定義 `gen_n53`・Sonnet） |
+| 生成 **波 52**（生成役 r22・直したエンジン〔rs-overflow-trigger の後〕・`--decks real`・32 シャード × 480 局・§7.44 of n_loop_ops） | 2571000〜2586500（シャード k の base は 2570000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 使用済み（2026-10-24・15,360 局・2,529,298 行・dropped 26・decks real・生成役 r22） |
+| 監査 **WP `rs-overflow-trigger` の決着せずの確かめ**（生成と同じ設定・生成役 r22・400 局・search_efficiency_plan §7.44） | 3461000〜3461399 | 指示済み（2026-10-24・claude/rs-overflow-trigger） |
+| 検証 **WP `rs-overflow-trigger` の本番アリーナ**（修正後 vs トリガーの旧い候補・出荷の設定・random × real・32 シャード × 84 ペア） | 3471000〜3502083 | 使用済み（2026-10-24・2,687 ペア 0.5073 [0.5019, 0.5126] +5.0・void 1・採用） |
+| 検証 **r22 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・証明 root・random × real・32 シャード × 84 ペア・§7.43） | 3421000〜3452083（シャード k の base は 3421000 + (k−1)×1000） | 使用済み（2026-10-24・2,684 ペア 0.5626 [0.5517, 0.5734] +43.7・void 4・出荷の基準を満たす） |
+| 検証 **r22／r22o vs r13d**（公平同士・両席 160 回・各 16 シャード × 175 ペア × 3 条件・同じ seed・§7.41） | 主 real 3361000〜3376174／副 ミラー 3381000〜3396174／参考 synth_roles2 3401000〜3416174 | 使用済み（2026-10-24・主 r22 +32.9／r22o +6.6・副 +24.7／−39.6・参考 +2.1／−36.7・r22 は候補） |
+| 生成 **波 51**（直したエンジン・生成役 r13d・v15・`--decks real`・32 シャード × 480 局・§7.41） | 2551000〜2566500（シャード k の base は 2550000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 使用済み（2026-10-24・15,360 局・2,470,208 行・dropped 23・decks real・直したエンジン） |
+| 監査 **WP `reaudit-wr`**（大きな損 100 局・守りの見逃し 300 局・§7.43 of search_efficiency_plan） | 3341000〜3341099／3351000〜3351299 | 指示済み（2026-10-24・claude/reaudit-wr） |
+| 監査 **WP `rs-window-read` の確かめ**（commit-audit のやり直し 300 局・§7.42） | 3311000〜3311299 | 指示済み（2026-10-23・claude/rs-window-read） |
+| 検証 **WP `rs-window-read` の本番アリーナ**（修正後 vs 旧い旗 3 つ・出荷の設定・random × real・16 シャード × 150 ペア・§7.42） | 3321000〜3336149 | 使用済み（2026-10-24・2,399 ペア 0.5463 [0.5364, 0.5561] +32.2・void 1・採用） |
+| 監査 **WP `blunder-audit`**（両席 r13d・出荷の設定・random × real・§7.41） | 3301000〜3301999 | 指示済み（2026-10-23・claude/blunder-audit） |
+| 監査 **WP `commit-audit`**（両席 r13d・出荷の設定・random × real・300 局・§7.40） | 3291000〜3291299 | 指示済み（2026-10-23・claude/commit-audit） |
+| 検証 **r21 vs r13d（再分析の方策・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.37）** | 主 real 3211000〜3226000／副 ミラー 3231000〜3246000／参考 synth_roles2 3251000〜3266000 | 使用済み（2026-10-23・主 −23.6／副 −84.0／参考 −47.2・void 0・非昇格） |
+| 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 使用済み（2026-10-23・2,397 ペア 0.5467 [0.5382, 0.5553] +32.6・void 3） |
+| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 使用済み（2026-10-23・2,398 ペア 0.5008 [0.4982, 0.5034] +0.6・void 2・採用） |
+| **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 使用済み（2026-10-23・16 本全部 200 局・38,400 点・再生率 1.00・深い最善 ≠ 記録 28.0%） |
+| 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
+| 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
+| 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 使用済み（2026-10-22・2,683 ペア 0.5052 [0.4948, 0.5156] +3.6・void 5・非昇格） |
+| 検証 **r19 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.32）** | 主 real 2081000〜2096000／副 ミラー 2101000〜2116000／参考 synth_roles2 2121000〜2136000 | 使用済み（2026-10-22・主 2,799 ペア 0.5179 [0.5075, 0.5282] +12.4・副 0.5116 [0.4995, 0.5237] +8.1・参考 0.4930 −4.8・void 1） |
+| 生成 **波 49**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.32） | 2521000〜2528500（シャード k の base は 2520000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,153,971 行・dropped 2・decks real） |
+| 検証 **r18 vs r13d・実デッキ帯 115 本**（ユーザの 4 本＋公式の構築例 111 本・`--decks real`・公平同士・両席 160 回・16 シャード × 175 ペア・§7.29） | 2061000〜2076000 | 使用済み（2026-10-22・2,800 ペア 0.5007・**+0.5**＝4 本での +11.2 は消えた・`2026-10-22_r18_realdeck115.md`） |
+| 検証 **r18 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.29）** | 主 synth_roles2 1951000〜1966000／副 ミラー 1971000〜1986000／実デッキ 1991000〜2006000／旧主 synth_roles 2011000〜2026000 | 使用済み（2026-10-22・主 synth_roles2 −1.5／副 +19.9／**実デッキ +11.2**／旧主 −13.7・規約では非昇格・採用はユーザ判断・`2026-10-22_r18_judgment.md`） |
+| 検証 **r13o／r13m／r17m vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.30）** | r13o 主 1831000〜1846000／副 1851000〜1866000・r13m 主 1871000〜1886000／副 1891000〜1906000・r17m 主 1911000〜1926000／副 1931000〜1946000 | 使用済み（2026-10-22・r13o 主 −8.3／r13m 主 −13.2／r17m 主 −9.1・**3 本とも非昇格**・`2026-10-22_omni_value_stage2.md`） |
+| 検証 **WP `rs-trigger-order` の手元アリーナ**（修正後 vs 修正前・40 ペア） | 1681000〜1681039 | 使用済み（2026-10-22・修正後 void 0・40 ペア中 37 ペアが旧新で同一・`2026-10-22_trigger_order.md`） |
+| 生成 **波 48**（合成デッキ v2・符号化 v15・生成役 r13d〔r17 昇格なら r17〕・§7.29） | 2511000〜2518500（シャード k の base は 2510000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,080,222 行・dropped 1・enc v15・claude/n48-w01〜w16） |
+| 検証 **WP `enc-v15` の手元アリーナ**（v15 vs v14・40 ペア） | 1680000〜1680039 | 使用済み（2026-10-22・決着 39 ペア 0.449・void 1〔誘発の順序の欠陥〕＝判定なし・`2026-10-22_enc_v15.md`） |
+| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 使用済み（2026-10-22・主 0.4987・−0.9／副 0.5021・+1.5・**非昇格**・`2026-10-22_r17_judgment.md`） |
+| 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,139,419 行・claude/n47-w01〜w16） |
+| 検証 **公平化の価格（新しい既定〔fair＋知識〕vs peek・12 シャード × 120 ペア・§7.27）** | 1651000〜1662000（共有） | 使用済み（2026-10-22・1,438 ペア 0.4687・**−21.8**・知識の固定は +0.008／ペア z 0.6・`2026-10-22_fair_default_arena.md`） |
+| 検証 **公平を既定にする WP `rs-fair` の手元アリーナ**（新しい既定 vs `peek`・40 ペア・`search_efficiency_plan.md` §7.15） | 1679000〜1679039 | 使用済み（2026-10-21・40 ペア 0.45・−34.9〔CI ±100 級〕・本番は §7.27） |
+| 検証 **木 1 本の方式の診断の手元アリーナ**（WP `rs-ismcts-diag`・88 ペア・`search_efficiency_plan.md` §7.5） | 1671000〜1671087 | 指示済み（2026-10-21・claude/rs-ismcts-diag） |
+| 検証 **伸びしろの探り A・B・C**（§7.26: 相手に手札を見せない／全部見える 5,120 回 vs 全部見える 1,280 回／実デッキでの世界 2 本・世代の伸び） | A・B は 1651000〜1662000（共有）／C は **1701000〜1712000**（実デッキ・新規） | 使用済み（2026-10-21・A oppblind 1,437 ペア **+2.9**〔効果なし〕／B omni5120 1,438 ペア **+44.0**・`2026-10-21_probe_ab_arena.md`／C rdw2 1,315 ペア **+13.5**／rdnet 1,194 ペア **−14.6**・`2026-10-21_realdeck_probe_c.md`） |
+| 計測 **相手の手札の当てやすさ**（WP `hand-infer-a`・両席 r13d・160 回・2,000 局・`search_efficiency_plan.md` §7.12）／**詰みの見逃し**（WP `lethal-audit`・出荷の設定・1,000 局・§7.13） | 3001000〜3002999／3011000〜3011999 | 使用済み（2026-10-21／22・`2026-10-21_hand_infer_a.md`・`2026-10-22_lethal_audit.md`〔4 シャード並走・各 250 局・claude/lethal-audit〔-s2/-s3/-s4〕〕） |
+| 検証 **見える範囲を分けた探索（相手の手札だけ／見えないものは全部混ぜ直す）vs 今の出荷**（各 12 シャード × 120 ペア・§7.25）／WP `rs-reveal` の手元 各 40 ペア | 1651000〜1662000（共有）／手元 1676000〜1676039・1677000〜1677039 | 使用済み（2026-10-21・相手の手札だけ 10 シャード 1,200 ペア **+76.5**／公平 1,436 ペア **−24.5**・`2026-10-21_reveal_arena.md`） |
+| 検証 **全部見える探索 vs 今の出荷**（同じ r13d・本番の設定・12 シャード × 120 ペア・§7.24）／WP `rs-omniscient` の手元アリーナ 40 ペア | 1651000〜1662000（共有）／手元 1675000〜1675039 | 使用済み（2026-10-21・手元 40 ペア +79.5／本番 1,438 ペア 0.6182・**+83.7**・`2026-10-21_omniscient_arena.md`） |
+| 検証 **世界 8 本 × 1,280 回／世界 1 本 × 5,120 回／直した木 1 本の方式 vs 今の出荷**（同じ r13d・本番の設定・各 12 シャード × 120 ペア・§7.23） | 1651000〜1662000（§7.20〜§7.22 と共有・腕の組の比較用） | w8・s5120・ismfix は使用済み（2026-10-21・+20.3／+21.8／−29.3・`2026-10-21_phase5_w8_s5120_ismfix.md`）。追加腕 w4 +22.3・s10240 +24.7 も使用済み（`2026-10-21_phase5_curve.md`） |
+| 検証 **迷う局面だけ世界 4 本で読み直す（τ 0.5／τ 0.9）vs 今の出荷**（同じ r13d・本番の設定・各 12 シャード × 120 ペア・§7.22） | 1651000〜1662000（§7.20／§7.21 と共有・腕の組の比較用） | 使用済み（2026-10-21・τ 0.5 1,437 ペア 0.5212・+14.8／τ 0.9 0.5146・+10.2・`2026-10-21_rethink_arena.md`） |
+| 検証 **世界 1 本 × 2,560 回 vs 今の出荷**（同じ r13d・本番の設定・12 シャード × 120 ペア・§7.21） | 1651000〜1662000（§7.20 と共有・腕の組の比較用） | 使用済み（2026-10-21・1,435 ペア 0.5105・+7.3・組の差 z 1.58） |
+| 検証 **世界 2 本 × 1,280 回 vs 今の出荷**（同じ r13d・本番の設定・12 シャード × 120 ペア・§7.20） | 1651000〜1662000 | 使用済み（2026-10-21・1,438 ペア 0.5261 [0.5060, 0.5462]・+18.1・`2026-10-21_worlds2_sims2560_arena.md`） |
+| 検証 **木 1 本で世界を引き直す（M=8／M=64）vs 今の出荷**（同じ r13d・本番の設定・各 16 シャード × 88 ペア・§7.19） | M=8 1611000〜1626000／M=64 1631000〜1646000 | 使用済み（2026-10-21・M=8 1,406 ペア 0.4164・−58.6／M=64 1,405 ペア 0.4178・−57.6・`2026-10-21_ismcts_arena.md`） |
 | 生成 **波45**（**r14 が昇格しなければ**・生成役 r13d のまま・設定は波 44 と同じ・§7.15） | 2451000〜2458500（シャード k の base は 2450000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-20・r14 非昇格・台帳 2+282） |
 | 生成 **波44**（r14 の教材・**生成役 r13d**・出荷と同じ読み・設定は波 43 と同じ・§7.15） | 2441000〜2448500（16 シャード × 480 局・シャード k の base は 2440000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 回収済み（2026-10-19 18:13 UTC・64/64・台帳 2+281） |
 | 検証 **r14 vs r13d**（両席 160 回・各 16 シャード × 175 ペア・`--bands 1`・§7.15） | 主 1351000〜1366000／副 1371000〜1386000 | 使用済み（2026-10-20・r14 非昇格・台帳 2+282） |
@@ -1156,6 +1229,8 @@ echo ALL_DONE
 - **予告（数を見る前）**: r13b vs r11a は +5〜15 Elo（160 回の +11.6 より縮む側。読みが深いほどネットの第一感の差は探索に埋もれる）。
   判定: 95% CI 下限 > 0.50 なら採用の根拠になる。跨げば「出荷の設定では差が見えない」。
 
+**結果（2026-10-22）**: 32 シャード全部完走。**0.5052 [0.4948, 0.5156]・+3.6 [−3.6, +10.8]**（void 5）＝下限が 0.50 を割る＝**非昇格・出荷は r13d のまま**。160 回の +12.4 は本番の深さで消えた。報告 `docs/reports/2026-10-22_r19_prod_arena.md`・台帳 2+334。
+
 作業セッション用の本文（`{K}`＝1〜32・`{KK}`＝01〜32）:
 
 ````
@@ -1686,6 +1761,2035 @@ echo ALL_DONE
 補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
 ````
 
+### 7.17 本番の設定のアリーナ——世界 4 本 × 320 回 vs 世界 1 本 × 1,280 回（同じ r13d・同じ計算量・32 セッション・2026-10-20）
+
+ユーザ決定（2026-10-20「c でお願いします」・報告 `2026-10-20_plateau_desk.md` の (a)）。台帳 2+286。
+机上の測定（同じ 41 局面を対戦 API の設定で種だけ変えて 4 回読み直し）で、**打つ手（訪問最多）が読み直しで同じになる割合**は
+世界 1 本 × 1,280 回 0.87・世界 4 本 × 320 回（同じ計算量）0.96・世界 4 本 × 1,280 回 0.95。**同じ計算量で手の揺れが 13% → 4%**。
+揺れが減ることが強さになるかをアリーナで測る。
+
+- 両席 **r13d**。基準席＝対戦 API と同じ（1,280 回・世界 1 本・`--budget 0`）。候補席＝`--cand-sims 320 --cand-worlds 4 --cand-budget 0`
+  （`sims` は世界 1 本あたり＝合計 1,280 回）。候補席は世界ぶんのスレッドを使う。
+- 主条件（random × synth_roles）のみ・`--bands 1`・**32 シャード × 88 ペア＝2,816 ペア**。シャード k の base は 1471000 + (k−1)×1000。`--pair-timeout 3600`。
+- **予告（数を見る前）**: +5〜+20 Elo（2026-09-13 の 160 回・世界 4 本は +12.6 だが 275 ペアで判定不能だった）。
+  判定: 95% CI 下限 > 0.50 なら対戦 API の既定を世界 4 本 × 320 回に変える提案をユーザに諮る。跨げば「揺れは減るが強さには乗らない」。
+- **結果（2026-10-20）**: 2,724 ペア 0.4831 [0.4688, 0.4974]・−11.7 Elo＝**有意に弱い**。対戦 API の既定は変えない。
+
+作業セッション用の本文（`{K}`＝1〜32・`{KK}`＝01〜32）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は世界 4 本 × 320 回・基準席は世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.17）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-w4-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-w4-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-w4-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_w4 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_w4
+
+次の内容を ~/runw.sh に保存し、`nohup bash ~/runw.sh > ~/runw.out 2>&1 &` で回す。runw.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_w4/*.jsonl"))
+print(json.dumps({"job": "arena-w4-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + worlds 4 x sims 320 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 88},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_w4 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena w4 shard $KK"; git push -q -u origin claude/arena-w4-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 320 --cand-worlds 4 --cand-budget 0 --pairs 88 --max-pairs 22 --bands 1 \
+    --seed-base $(( 1471000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_w4/w4_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 2〜3 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.18 教師を強くする——波 46（生成役 r13d・世界 4 本 × 1,280 回）→ r16・r16c（2026-10-20）
+
+ユーザ決定（2026-10-20「それでやってみましょう」）。台帳 2+289。推測（会話）: **頭打ちの根本は、探索が相手の手札と山札を 1 通り決め打ちして読むこと**——
+教師の最善手の 31% はその引き方で入れ替わり、ネットはその平均しか学べないので、「探索はネットより賢い分」が小さく、自己対戦が r13d の固定点に留まる。
+**教材の生成だけを世界 4 本 × 1,280 回**（各世界 1,280 回・計算量 4 倍）に上げて 1 周回し、教師の強さで伸びるかを確かめる。
+
+- **教材（波 46）**: 生成役 r13d・世界 4 本 × 1,280 回・枝予算なし・それ以外は波 45 と同じ。**64 シャード × 120 局（30 局 × 4 本）**＝7,680 局。
+  seed 2461000〜2492620（シャード k の base は 2460000 + ceil(k/2)×1000 + (k が偶数なら 500)）。実測（このコンテナ・2 局）: 1 局 約 330 秒（2 並列）＝1 シャード約 5.5 時間。
+- **2026-10-20 15:30 UTC 変更**: 同時に動けるセッションは約 50 で、64 シャードのうち w50〜w64 と教師のアリーナ 16 本が待ちになった。**波 46 は w01〜w49 の 49 シャード（5,880 局）で締め**、w50〜w64 は起動前に取り消した（seed 2485000〜2492620 は未使用）。r16c の π も波 45 から同じ 5,880 局にそろえる。
+- **訓練（2 本・どちらも warm-start r11a・価値は波 46＋45＋44〔どれも生成役 r13d〕）**:
+  - **r16**: π＝波 46（世界 4 本の教師）。
+  - **r16c（対照）**: π＝波 45（世界 1 本の教師・ほぼ同じ点数）。**違いは π の教師の強さだけ**。
+- **教師の強さのアリーナ（生成と並行・16 セッション）**: 同じ r13d で、候補席＝世界 4 本 × 1,280 回、基準席＝世界 1 本 × 1,280 回（どちらも枝予算なし）。主条件のみ・16 シャード × 88 ペア。seed 1511000〜1526000。
+- **判定のアリーナ（訓練の後）**: r16・r16c それぞれ vs r13d（§7.16 と同じ形・両席 160 回・主＋副・各 16 シャード × 175 ペア）。seed は指示のときに払い出す。
+- **予告（数を見る前）**: 教師の強さのアリーナ（世界 4 本 × 1,280 回）+15〜+40 Elo。r16 − r16c は +10 以上（どちらも r13d 比）。r16 vs r13d は 0〜+25。
+  **r16 ≒ r16c なら、教師の強さは律速ではない**（推測が外れ）。r16 が r13d の主の下限 0.50 を越えれば §7.12 の形で本番の設定でも測り、採用はユーザに諮る。
+- **結果（2026-10-21）**: 教師の強さ +30.2 Elo（有意）。r16 主 −5.3・r16c 主 −7.7（差 +2.4）＝**教師は強くなったがネットに移らない**。報告 `2026-10-21_r16_teacher_strength.md`。
+
+生成の作業セッション用の本文（`{K}`＝01〜64・`{BASE}`＝上の式）:
+
+````
+波 46 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.18）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.18 教師を強くする"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n46-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n46-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n46_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n46_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 46 shard ${K}"' \
+  'git push -q -u origin claude/n46-w${K} || echo PUSH_FAILED' > ~/save46.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run46.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run46.sh > ~/run46.out 2>&1 &` でバックグラウンドに回す（5 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run46.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run46.out; do sleep 30; done'; tail -n 1 ~/n46_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n46_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 30 --seed-base $((BASE + 30*J)) --workers 2 \
+    --sims 1280 --worlds 4 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles --shard-games 5 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n46_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n46_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n46-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 120,
+             "sims": 1280, "worlds": 4, "budget": 0, "decks": "synth_roles"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save46.sh
+done
+tail -n 2 ~/n46_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（30 局）約 80 分・4 本で約 5.5 時間（1 手で世界 4 本を 4 スレッドで読むので `--workers 2`）（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+訓練・評価帯の指示書（作業セッション用・1 セッション・波 46 の 49 シャード〔196 本〕が揃ってから）:
+
+```
+作業: r16／r16c の訓練 → 評価帯（docs/n_loop_ops.md §7.18）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for k in $(seq -w 1 49); do git fetch -q origin claude/n46-w$k:tmpw && mkdir -p ~/n46 && git archive tmpw n_records | tar -x -C ~/n46 && git branch -qD tmpw; done
+for N in 45 44; do for k in $(seq -w 1 16); do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n46/n_records/n46_w*_p[0-3] | wc -l      # 196（w01〜w49）
+
+P46="$HOME/n46/n_records/n46_w*_p[0-3]"
+P45="$HOME/n45/n_records/n45_w*_p[0-3]"
+Z44="$HOME/n44/n_records/n44_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+# r16＝π は波 46（世界 4 本の教師）・r16c＝π は波 45（世界 1 本の教師）。価値はどちらも波 46＋45＋44（同じ行）。
+# 2026-10-20 追記: 波 46 は 49 シャード（w01〜w49・196 本＝5,880 局）で締めた（同時に動けるセッション数の上限）。
+# r16c の π は波 45 から同じ局数（5,880 局＝49 本: w01〜w12 の全部と w13_p0）を取り、残りの 15 本は価値だけに回す＝価値の行は 2 本で同じ。
+P45A="$HOME/n45/n_records/n45_w0[1-9]_p[0-3] $HOME/n45/n_records/n45_w1[0-2]_p[0-3] $HOME/n45/n_records/n45_w13_p0"
+P45B="$HOME/n45/n_records/n45_w13_p[1-3] $HOME/n45/n_records/n45_w1[4-6]_p[0-3]"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P46" --z-in "$P45" "$Z44" $COMMON --out ~/nrel_r16.npz 2>&1 | tee ~/train_r16.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in $P45A --z-in "$P46" $P45B "$Z44" $COMMON --out ~/nrel_r16c.npz 2>&1 | tee ~/train_r16c.log
+（OOM なら notes に書いて止める。訓練開始時の RSS を notes に書く。）
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P46" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r16.npz ~/nrel_r16c.npz \
+         ~/nrel_r16.ep0.npz ~/nrel_r16.ep1.npz ~/nrel_r16c.ep0.npz ~/nrel_r16c.ep1.npz --policy --holdout-mod 7 --out ~/band_r16.json 2>&1 | tee ~/band_r16.log
+
+git checkout -B claude/train-r16
+mkdir -p n1_results && cp ~/nrel_r16*.npz n1_results/ && cp ~/train_r16.log ~/train_r16c.log ~/band_r16.json ~/band_r16.log .
+（RESULT.json〔§5 の形〕: inputs＝r16／r16c それぞれの warm_start・π dir 数と点数・z の波と行数・rss_gb／metrics＝それぞれ best_ep・各周の val／band／notes）
+git add -f n1_results/nrel_r16*.npz train_r16.log train_r16c.log band_r16.json band_r16.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r16／r16c のセット（訓練・評価帯）"
+git push -u origin claude/train-r16
+```
+
+教師の強さのアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は世界 4 本 × 1,280 回・基準席は世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.18）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-w4f-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-w4f-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-w4f-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_w4f 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_w4f
+
+次の内容を ~/runwf.sh に保存し、`nohup bash ~/runwf.sh > ~/runwf.out 2>&1 &` で回す。runwf.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_w4f/*.jsonl"))
+print(json.dumps({"job": "arena-w4f-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + worlds 4 x sims 1280 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 88},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_w4f RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena w4f shard $KK"; git push -q -u origin claude/arena-w4f-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 1280 --cand-worlds 4 --cand-budget 0 --pairs 88 --max-pairs 22 --bands 1 \
+    --seed-base $(( 1511000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_w4f/w4f_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 3〜4 時間。コミットメッセージにモデル名を入れない。
+````
+
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・`claude/train-r16` の push 後・2026-10-20 19:40 UTC 追記）。
+r16 主 1531000〜／副 1551000〜／r16c 主 1571000〜／副 1591000〜（各 16 シャード × 1000）:
+
+````
+アリーナ（r16／r16c vs r13d）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.18）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r16-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r16-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-r16-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r16 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r16:r16net && git show r16net:n1_results/nrel_r16.npz > ~/nrel_r16.npz && git show r16net:n1_results/nrel_r16c.npz > ~/nrel_r16c.npz
+mkdir -p arena_r16
+
+次の内容を ~/run16.sh に保存し、`nohup bash ~/run16.sh > ~/run16.out 2>&1 &` で回す。run16.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r16/*.jsonl"))
+print(json.dumps({"job": "arena-r16-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r16 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r16 shard $KK"; git push -q -u origin claude/arena-r16-w$KK || echo PUSH_FAILED; }
+for C in r16 r16c; do
+  if [ $C = r16 ]; then BM=1531000; BR=1551000; else BM=1571000; BR=1591000; fi
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r16/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r16/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+### 7.19 Phase 3 の本番アリーナ——木 1 本で世界を引き直す（WP `rs-ismcts`・2026-10-21）
+
+`docs/search_efficiency_plan.md` Phase 3・§7.1。実装は `claude/rs-ismcts`（`00ea2545c`・off で 1 bit 不変を golden 3 本と `make test` で確認済み）。
+同じ局面で測った 1 手の時間（4 コア容器・各 1 コア・1,284 判断点）: m=0（今）平均 311 ms／m=1 299／**m=8 232**／**m=64 217**（世界を切り替えると木が浅くなり評価回数が減る＝速くなる・作業セッションの仮説）。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。候補席＝`--cand-sims 1280 --cand-redeterminize-every M --cand-budget 0`。
+- **2 腕**: M=8（seed 1611000〜1626000）・M=64（1631000〜1646000）。主条件のみ・各 16 シャード × 88 ペア＝1,408 ペア（±20 Elo）。
+- **予告（数を見る前）**: M=8 +15〜+30・M=64 +5〜+20（引き直しが少ない＝平均される世界が少ない）。どちらも下限 > 0.50 なら 2,800 ペアに増やして確定し、4 本 × 1,280 回（+30.2）と並べる。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・`{M}`＝8 か 64・`{BASE}`＝M=8 は 1611000／M=64 は 1631000）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は木 1 本で {M} 回ごとに世界を引き直す × 1,280 回・基準席は今の出荷＝世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.19）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-ism{M}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/rs-ismcts && git checkout -q -B claude/arena-ism{M}-w$KK origin/claude/rs-ismcts
+git fetch -q origin claude/arena-ism{M}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_ism{M} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_ism{M}
+
+次の内容を ~/runi.sh に保存し、`nohup bash ~/runi.sh > ~/runi.out 2>&1 &` で回す。runi.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_ism{M}/*.jsonl"))
+print(json.dumps({"job": "arena-ism{M}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + redeterminize_every {M} x sims 1280 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 88},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_ism{M} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena ism{M} shard $KK"; git push -q -u origin claude/arena-ism{M}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 1280 --cand-redeterminize-every {M} --cand-budget 0 --pairs 88 --max-pairs 22 --bands 1 \
+    --seed-base $(( {BASE} + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_ism{M}/ism{M}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 2〜3 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.20 Phase 5 の先行腕——世界 2 本 × 1,280 回 vs 今の出荷（2026-10-21）
+
+ユーザ決定（2026-10-21「全部やってください」・高速化は打つ手を変えないので、強さの曲線の腕は速くなる前に測っても同じ値）。`docs/search_efficiency_plan.md` Phase 5。
+世界の軸の途中の点（1 本＝0・4 本＝+30.2）を取り、世界数と強さの関係を見積もる。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。候補席＝`--cand-sims 1280 --cand-worlds 2 --cand-budget 0`。
+- 主条件のみ・**12 シャード × 120 ペア＝1,440 ペア（±20 Elo）**。シャード k の base は 1651000 + (k−1)×1000。
+- **予告（数を見る前）**: +12〜+22 Elo（4 本の +30.2 に対し、世界の効きが鈍る形なら半分強）。下限 > 0.50 なら世界の軸は 2 本から効く。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は世界 2 本 × 1,280 回・基準席は世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.20）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-w2-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-w2-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-w2-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_w2 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_w2
+
+次の内容を ~/runw.sh に保存し、`nohup bash ~/runw.sh > ~/runw.out 2>&1 &` で回す。runw.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_w2/*.jsonl"))
+print(json.dumps({"job": "arena-w2-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + worlds 2 x sims 1280 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 120},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_w2 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena w2 shard $KK"; git push -q -u origin claude/arena-w2-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --pairs 120 --max-pairs 20 --bands 1 \
+    --seed-base $(( 1651000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_w2/w2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 20 ペアずつ進め（6 回目までに 120 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 3〜4 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.21 Phase 5 の先行腕——世界 1 本 × 2,560 回 vs 今の出荷（2026-10-21）
+
+ユーザ決定（2026-10-21「始めてください」・高速化は打つ手を変えないので、強さの曲線の腕は速くなる前に測っても同じ値）。`docs/search_efficiency_plan.md` Phase 5。
+回数の軸の最初の点（1,280 回＝0）。同じ計算量の世界 2 本（§7.21）と並べ、計算を世界と回数のどちらに使うのが得かを見る。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。候補席＝`--cand-sims 2560 --cand-budget 0`。
+- 主条件のみ・**12 シャード × 120 ペア＝1,440 ペア（±20 Elo）**。シャード k の base は 1651000 + (k−1)×1000（**§7.20 と同じ帯**＝同じ局面・同じ配りで世界 2 本と組にして比べる・`search_efficiency_plan.md` §1）。
+- **予告（数を見る前）**: +10〜+15 Elo（160 回→1,280 回が +46.5 で、倍ごとの伸びは鈍る）。世界 2 本と同じ計算量なので、ペア差で直接比べる。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は世界 1 本 × 2,560 回・基準席は世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.21）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-s2560-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-s2560-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-s2560-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_s2560 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_s2560
+
+次の内容を ~/runs.sh に保存し、`nohup bash ~/runs.sh > ~/runs.out 2>&1 &` で回す。runs.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_s2560/*.jsonl"))
+print(json.dumps({"job": "arena-s2560-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + worlds 1 x sims 2560 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 120},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_s2560 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena s2560 shard $KK"; git push -q -u origin claude/arena-s2560-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 2560 --cand-budget 0 --pairs 120 --max-pairs 20 --bands 1 \
+    --seed-base $(( 1651000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_s2560/s2560_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 20 ペアずつ進め（6 回目までに 120 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 3〜4 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.22 Phase 1 の本番アリーナ——迷う局面だけ世界 4 本で読み直す（WP `play-rethink`・2026-10-21）
+
+ユーザ決定（2026-10-21「全部やってください」）。`docs/search_efficiency_plan.md` Phase 1・§7.4。実装は `claude/play-rethink` `085308bf0`（off で不変・`make test`・`make audit-cross`）。
+読み直しの線（根の 2 位 ÷ 1 位の訪問数 ≥ τ）は実戦の計測（20 局・2,512 手）で決めた: τ 0.3 発動 28%・計算 ×3.2／**τ 0.5 発動 20%・×2.6**／τ 0.7 13%・×2.1／**τ 0.9 6%・×1.5**。τ 0.3 は常に世界 4 本（×3.8・+30.2）に近いので外し、**0.5 と 0.9 の 2 腕**にする（Phase 0 の予定 0.3／0.5 からの変更）。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。候補席＝`--cand-sims 1280 --cand-budget 0 --cand-rethink-ratio {T} --cand-rethink-worlds 4`。
+- 主条件のみ・**12 シャード × 120 ペア＝1,440 ペア（±20 Elo）**。シャード k の base は 1651000 + (k−1)×1000（**§7.22／§7.21 と同じ帯**＝組にして比べる）。
+- **予告（数を見る前）**: τ 0.5 は +15〜+25（計算 ×2.6・世界 2 本の +18.1 と同じ計算で同等以上なら、迷う局面に計算を集める価値がある）・τ 0.9 は +5〜+12（×1.5）。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12・`{T}`＝0.5 か 0.9・`{TT}`＝05 か 09）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は世界 1 本 × 1,280 回で読み、根の 2 位 ÷ 1 位の訪問数が {T} 以上なら世界 4 本 × 1,280 回で読み直す・基準席は世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.22）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-rt{TT}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/play-rethink && git checkout -q -B claude/arena-rt{TT}-w$KK origin/claude/play-rethink
+git fetch -q origin claude/arena-rt{TT}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_rt{TT} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_rt{TT}
+
+次の内容を ~/runr.sh に保存し、`nohup bash ~/runr.sh > ~/runr.out 2>&1 &` で回す。runr.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_rt{TT}/*.jsonl"))
+print(json.dumps({"job": "arena-rt{TT}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + sims 1280 + budget 0 + rethink ratio {T} worlds 4", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 120},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_rt{TT} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena rt{TT} shard $KK"; git push -q -u origin claude/arena-rt{TT}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 1280 --cand-budget 0 --cand-rethink-ratio {T} --cand-rethink-worlds 4 --pairs 120 --max-pairs 20 --bands 1 \
+    --seed-base $(( 1651000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_rt{TT}/rt{TT}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 20 ペアずつ進め（6 回目までに 120 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 3〜5 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.23 Phase 5 の腕その 3——世界 8 本 × 1,280 回・世界 1 本 × 5,120 回・直した木 1 本の方式（2026-10-21）
+
+ユーザ決定（2026-10-21「全部やる前提で」「打ち切りは考えない」）。`docs/search_efficiency_plan.md` Phase 3／Phase 5。台帳 2+301。
+高速化は本線に入った（`217d20331`・1 本 × 1,280 回で ×2.00・打つ手は不変）＝重い腕もこの本線で回す。木 1 本の方式は `claude/rs-ismcts-diag`（`8753fa78a`・欠陥 2 つを修正・手元 88 ペア −15.8 [−76, +44]・1 手は今の出荷の約 2 倍）。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。主条件のみ・**各 12 シャード × 120 ペア＝1,440 ペア**。
+- **seed は §7.20〜§7.22 と同じ帯**（シャード k の base は 1651000 + (k−1)×1000）＝これまでの腕すべてと組にして比べる。
+- 3 腕（`{ARM}`・候補席の設定 `{CAND}`・コード `{CODE}`）:
+  - `w8`: `--cand-sims 1280 --cand-worlds 8 --cand-budget 0`・`claude/cpu-spec-improvements-yw91jd`
+  - `s5120`: `--cand-sims 5120 --cand-budget 0`・`claude/cpu-spec-improvements-yw91jd`
+  - `ismfix`: `--cand-sims 1280 --cand-redeterminize-every 8 --cand-budget 0`・`claude/rs-ismcts-diag`
+  - **追加（2026-10-21・最初の 3 腕の結果を受けて）** `w4`: `--cand-sims 1280 --cand-worlds 4 --cand-budget 0`・`claude/cpu-spec-improvements-yw91jd`（§7.18 の +30.2 は別の帯だったので同じ帯で測り直す）
+  - **追加** `s10240`: `--cand-sims 10240 --cand-budget 0`・`claude/cpu-spec-improvements-yw91jd`（5,120 回が 2,560 回より有意に強かった＝回数の軸の続き）
+- **予告（数を見る前）**: w8 +35〜+45（1／2／4 本＝0／+18／+30 の鈍り方の延長）・s5120 +8〜+15（2,560 回で +7）・ismfix −10〜+10（計算 2 倍で世界 2 本の +18 に届かない読み）。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12・`{ARM}`・`{CAND}`・`{CODE}` は上の表）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は {CAND}・基準席は世界 1 本 × 1,280 回・枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.23・腕 {ARM}）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-{ARM}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin {CODE} && git checkout -q -B claude/arena-{ARM}-w$KK origin/{CODE}
+git fetch -q origin claude/arena-{ARM}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_{ARM} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_{ARM}
+
+次の内容を ~/runa.sh に保存し、`nohup bash ~/runa.sh > ~/runa.out 2>&1 &` で回す。runa.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_{ARM}/*.jsonl"))
+print(json.dumps({"job": "arena-{ARM}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + {CAND}", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 120, "code": "{CODE}"},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_{ARM} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena {ARM} shard $KK"; git push -q -u origin claude/arena-{ARM}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6 7 8 9 10 11; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 {CAND} --pairs 120 --max-pairs 10 --bands 1 \
+    --seed-base $(( 1651000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 7200 \
+    --out arena_{ARM}/{ARM}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 10 ペアずつ進め（12 回目までに 120 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。w8 は 1 局が重い（候補席は 8 本の世界を 4 コアで回す）ので全体で 6〜10 時間かかりうる。コミットメッセージにモデル名を入れない。
+````
+
+### 7.24 全部見える探索 vs 今の出荷（天井の切り分け・2026-10-21）
+
+ユーザ決定（2026-10-21「全部見える CPU との対戦もやってください」）。`docs/search_efficiency_plan.md` §7.10。台帳 2+306。
+§7.23 の本文をそのまま使い、`{ARM}`＝`omni`・`{CAND}`＝`--cand-sims 1280 --cand-omniscient --cand-budget 0`・`{CODE}`＝`claude/rs-omniscient`（WP の push 後）。seed は §7.20〜§7.23 と同じ帯。
+
+- **読み方（数を見る前）**: +100 以上なら天井は「見えないことの扱い」（世界の中のずれ・相手の手札の引き方）＝次は相手の手札の推定や、見えない前提での読み方を直す。
+  +20〜+50 程度なら天井の大半はネットの評価＝次は価値・方策の改善。どちらでも数字はそのまま「隠れ情報を完全に解決したときの上限」の目安になる。
+
+### 7.25 見える範囲を分けた探索 vs 今の出荷（2026-10-21）
+
+ユーザ決定（2026-10-21「a でお願いします」）。`docs/search_efficiency_plan.md` §7.11。台帳 2+311。§7.23 の本文をそのまま使い、`{CODE}`＝`claude/rs-reveal`（WP の push 後）・seed は §7.20〜§7.24 と同じ帯。
+- `{ARM}`＝`rvhand`・`{CAND}`＝`--cand-sims 1280 --cand-reveal opp_hand --cand-budget 0`（相手の手札だけ見える）
+- `{ARM}`＝`rvfair`・`{CAND}`＝`--cand-sims 1280 --cand-reveal fair --cand-budget 0`（自分の先の引き・ライフも混ぜ直す＝見えないものは全部見えない）
+- **読み方（数を見る前）**: rvhand が +60 前後なら相手の手札の推定に大きな上限がある／+20 以下なら +84 の大半は相手の山札の並び（推定できない）。
+  rvfair が大きく負なら、今の CPU の強さの一部は自分の先の引きを見ていることから来ている（＝出荷の CPU は少しずるをしている）。
+
+### 7.26 伸びしろの探り A・B・C（2026-10-21）
+
+ユーザ決定（2026-10-21「A、B、C でお願い」）。台帳 2+314。各腕 12 シャード × 120 ペア。
+
+| 腕 `{ARM}` | 問い | 候補席 `{CANDNET}`／`{CAND}` | 基準席 `{BASENET}`／`{BASEFLAGS}` | デッキ `{DECKS}` | seed `{BASE}` | コード `{CODE}` |
+|---|---|---|---|---|---|---|
+| `oppblind` | A: 相手に手札を見せない | r13d／`--cand-sims 1280 --cand-opp-blind --cand-budget 0` | r13d／`--sims 1280 --budget 0` | synth_roles | 1651000（共有） | `claude/rs-oppblind`（WP の push 後） |
+| `omni5120` | B: 情報が完全なら探索はまだ伸びるか | r13d／`--cand-sims 5120 --cand-omniscient --cand-budget 0` | r13d／`--sims 1280 --omniscient --budget 0` | synth_roles | 1651000（共有・基準が違うので他の腕との組の比較はしない） | `claude/rs-reveal` |
+| `rdw2` | C1: 世界 2 本の +18 は実デッキでも出るか | r13d／`--cand-sims 1280 --cand-worlds 2 --cand-budget 0` | r13d／`--sims 1280 --budget 0` | **user**（実デッキ 4 本・ホールドアウト） | 1701000 | 本線 |
+| `rdnet` | C2: 世代の伸び（r13b→r13d の +24.6）は実デッキでも出るか | **r13b**／`--cand-sims 1280 --cand-budget 0` | r13d／`--sims 1280 --budget 0` | **user** | 1701000（rdw2 と共有） | 本線 |
+
+- 予告（数を見る前）: A は −5〜+15（警戒のしすぎが実在すれば正）。B は +10〜+25（情報が完全でも探索が伸びるなら、ネットの葉の評価に粗さが残る）。C1 は +10〜+20（合成の +18 と同程度なら汎化に問題なし・半分以下なら教材の分布に伸びしろ）。C2 は −30〜−15（合成の −24.6 の裏返し・大きく縮めば世代の伸びは合成デッキに特化している）。
+- `--decks user` はリーダーを無視して seed から実デッキ 2 本を引く（`opcg_sim/loop/decks.py`）。**実デッキは訓練の教材にしない**（ホールドアウトの規約）。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12・残りは上の表）:
+
+````
+本番の設定のアリーナの 1 シャードを回してください。シャードは k={K}・腕 {ARM} です（docs/n_loop_ops.md §7.26）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-{ARM}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin {CODE} && git checkout -q -B claude/arena-{ARM}-w$KK origin/{CODE}
+git fetch -q origin claude/arena-{ARM}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_{ARM} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_{ARM}
+
+次の内容を ~/runb.sh に保存し、`nohup bash ~/runb.sh > ~/runb.out 2>&1 &` で回す。runb.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+CN=opcg_sim/data/learned/nrel_{CANDNET}.npz
+BN=opcg_sim/data/learned/nrel_{BASENET}.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_{ARM}/*.jsonl"))
+print(json.dumps({"job": "arena-{ARM}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_{CANDNET}.npz + {CAND}", "baseline": "nrel_{BASENET}.npz + {BASEFLAGS}", "decks": "{DECKS}", "pairs": 120, "code": "{CODE}"},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_{ARM} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena {ARM} shard $KK"; git push -q -u origin claude/arena-{ARM}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6 7 8 9 10 11; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $CN --baseline $BN \
+    {BASEFLAGS} {CAND} --pairs 120 --max-pairs 10 --bands 1 \
+    --seed-base $(( {BASE} + (k-1)*1000 )) --workers 4 --leaders random --decks {DECKS} --pair-timeout 7200 \
+    --out arena_{ARM}/{ARM}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 10 ペアずつ進め、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。omni5120 は候補席が 4 倍重い（2〜3 時間）。コミットメッセージにモデル名を入れない。
+````
+
+### 7.27 公平化の価格の本番アリーナ（2026-10-21・WP `rs-fair` の後）
+
+ユーザ決定（2026-10-21 判断 1 (a)・判断 2 (a)）。台帳 2+318。12 シャード × 120 ペア。**腕 `fairprod`**: 候補席＝**新しい既定**（`fair`＋知っている札の固定・r13d・`--cand-sims 1280 --cand-budget 0`・`reveal` 指定なし）／基準席＝**今までの動き**（r13d・`--sims 1280 --budget 0 --reveal peek`）。synth_roles・seed 1651000 帯（§7.20 以降と共有＝世界 2 本〔+18.1〕・公平〔知識なし・−24.5〕と同じ配りで組にできる）。コード `claude/rs-fair`（本線に取り込み済みの同じコミット）。
+予告: −25 前後（再訓練前の公平化の価格。知識の固定で −24.5 より少し戻るなら正）。本文は §7.26 の雛形で `{ARM}=fairprod`・`{CANDNET}={BASENET}=r13d`・`{CAND}=--cand-sims 1280 --cand-budget 0`・`{BASEFLAGS}=--sims 1280 --budget 0 --reveal peek`・`{DECKS}=synth_roles`・`{BASE}=1651000`・`{CODE}=claude/rs-fair`。
+
+### 7.28 波 47——公平な物差しで打つ最初の波（生成役 r13d・2026-10-21）
+
+ユーザ決定（2026-10-21「その方針で進めてください」）。台帳 2+319。**世界の引き直しの既定が公平になった最初の教材**（WP `rs-fair`・本線 `70ae591db` 以降。自分の山札の並びと伏せたライフを見ない・公開済みの札は固定）。
+波 44〜46 は r13d の固定点に留まり（r14／r15／r15b／r16／r16c いずれも非昇格・教師を強くしてもネットに移らない）、
+全部見える同士では探索が 2 倍伸びる（`2026-10-21_probe_ab_arena.md`）＝伸びしろはネットの葉の評価にある。この波は **公平な入力で育て直す土台**であり、
+次の訓練（r17）は (1) 公平な教材、(2) 入力の点検（§7.17 WP `enc-audit`）、(3) 全部見える評価の教師（§7.16 WP `omni-value`・間に合えば）を合わせて 1 本にする。
+
+- **教材（波 47）**: 生成役 **r13d**・設定は波 45 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・synth_roles・両方向 ε 3%）＝物差しは出荷と同じ読み（世界 1 本）。**`reveal` は指定しない＝公平が既定**。16 シャード × 480 局。
+  seed **2501000〜2508500**（シャード k の base は 2500000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練（r17・別の指示書）**: warm-start r11a・π＝波 47（公平な教材だけ）・価値＝波 47＋46＋45（生成役 r13d の波・CLAUDE.md の窓）。入力の点検の結果（符号化 v15 があれば）を入れる。
+- **判定（公平同士）**: r17 vs r13d・両席 160 回・主＋副・各 16 シャード × 175 ペア。**どちらの席も公平な既定で打つ**（今の出荷との比較は参考値・採用は公平同士の勝敗で決める）。seed は指示のときに払い出す。
+- **予告（数を見る前）**: r17 vs r13d（公平同士）主 +10〜+30（r13d は覗き見の教材で育ったので、公平な入力では価値がずれる。公平な教材で育て直した分が出る）。評価帯（波 47 holdout）の価値の誤差は r13d より小さい。
+
+
+**波 47 の結果（2026-10-22）**: 16 シャード全部完走・7,680 局・1,139,419 行・dropped 6・1 局平均 11.5 秒（高速化後）。
+
+**訓練 r17 の指示書**（作業セッション用・1 セッション・メモリ 12GB 以上・`claude/train-r17`）。π＝波 47（公平な教材だけ）・価値＝波 47＋46＋45（生成役 r13d の波・約 310 万行）・warm-start r11a・その他は r13d と同じ。符号化は v14 のまま（入力の点検 §7.17 の結果は r17b 以降）。
+評価帯＝波 47 holdout で r11a／r13d／r17（＋`.ep0`／`.ep1`）。判定のアリーナ（**公平同士**・両席 160 回・主＋副・各 16 シャード × 175 ペア）は訓練の後にコーディネータが出す: **主 1791000〜1806000／副 1811000〜1826000**（シャード k の base は + (k−1)×1000）。
+
+```
+作業: r17 の訓練 → 評価帯（docs/n_loop_ops.md §7.28）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 47 45; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+for k in $(seq -w 1 49); do
+  git fetch -q origin claude/n46-w$k:tmpw && mkdir -p ~/n46 && git archive tmpw n_records | tar -x -C ~/n46 && git branch -qD tmpw; done
+ls -d ~/n47/n_records/n47_w*_p[0-3] | wc -l      # 64
+ls -d ~/n46/n_records/n46_w*_p[0-3] | wc -l      # 196
+ls -d ~/n45/n_records/n45_w*_p[0-3] | wc -l      # 64
+
+P47="$HOME/n47/n_records/n47_w*_p[0-3]"
+Z46="$HOME/n46/n_records/n46_w*_p[0-3]"
+Z45="$HOME/n45/n_records/n45_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P47" --z-in "$Z46" "$Z45" $COMMON --out ~/nrel_r17.npz 2>&1 | tee ~/train_r17.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P47" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r17.npz ~/nrel_r17.ep0.npz ~/nrel_r17.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r17.json 2>&1 | tee ~/band_r17.log
+
+git checkout -B claude/train-r17
+mkdir -p n1_results && cp ~/nrel_r17*.npz n1_results/ && cp ~/train_r17.log ~/band_r17.json ~/band_r17.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・価値の波と行数・rss_gb／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r17*.npz train_r17.log band_r17.json band_r17.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r17 のセット（訓練・評価帯）"
+git push -u origin claude/train-r17
+```
+メモリが 14GB を超えそうなら `--z-in` から波 45 を外して波 47＋46（約 200 万行）で回し、notes に書く。
+
+**r17 の判定（2026-10-22）**: 主 2,798 ペア 0.4987 [0.4843, 0.5132]・−0.9／副 2,800 ペア 0.5021・+1.5 ＝**非昇格**（`2026-10-22_r17_judgment.md`）。波 48 の生成役は r13d のまま。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・2026-10-22 追記・r17 の評価帯: 価値の誤差 r13d 0.5550・r17 0.5578・方策 top1 r13d 0.5035・r17 0.5082〔波 47 holdout〕）:
+
+````
+アリーナ（r17 vs r13d・公平同士）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.28）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r17-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r17-w$KK 25a51f28a   # 判定のコードは公平が既定・符号化 v14 の本線に固定する
+git fetch -q origin claude/arena-r17-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r17 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r17:r17net && git show r17net:n1_results/nrel_r17.npz > ~/nrel_r17.npz
+mkdir -p arena_r17
+
+次の内容を ~/run17.sh に保存し、`nohup bash ~/run17.sh > ~/run17.out 2>&1 &` で回す。run17.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r17/*.jsonl"))
+print(json.dumps({"job": "arena-r17-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r17 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r17 shard $KK"; git push -q -u origin claude/arena-r17-w$KK || echo PUSH_FAILED; }
+for C in r17; do
+  BM=1791000; BR=1811000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r17/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r17/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 2 本＝約 25 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 47 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.28）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.28 波 47"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n47-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n47-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n47_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n47_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 47 shard ${K}"' \
+  'git push -q -u origin claude/n47-w${K} || echo PUSH_FAILED' > ~/save47.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run47.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run47.sh > ~/run47.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run47.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run47.out; do sleep 30; done'; tail -n 1 ~/n47_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n47_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n47_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n47_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n47-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "synth_roles"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save47.sh
+done
+tail -n 2 ~/n47_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+### 7.29 波 48——合成デッキ v2・符号化 v15 の最初の波（生成役 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「両方推奨で」）。台帳 2+322。**WP `enc-v15`（`search_efficiency_plan.md` §7.19）の合流後に起動する**（符号化が v15 でないと 16 列が漏れ入りのまま記録される）。
+- **教材（波 48）**: 生成役 **r13d**（r17 が公平同士の判定で昇格していれば r17 に替える・起動時にコーディネータが決める）・設定は波 47 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・両方向 ε 3%・公平が既定）、**デッキだけ `--decks synth_roles2`**（`2026-10-22_synth_decks_v2.md`）。16 シャード × 480 局。seed **2511000〜2518500**（シャード k の base は 2510000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **物差しの宣言**（v2 の教材で育てた世代の判定）: 主条件＝random × **synth_roles2**、副＝固定ミラー、**実デッキ帯（`--decks user`）を必ず 1 本添える**（v2 にした目的＝実デッキでの伸びの不足の切り分け）。旧主条件（synth_roles）は「旧分布への汎化」の副次条件として測る。
+- **訓練（r18・別の指示書）**: π＝波 48・価値＝波 48＋47（＋46 で 200 万行に届かせる）・warm-start は判定の結果で決める。価値の教師は omni-value 段階 2 の結果を見て決める（全部見える評価を混ぜるか）。
+
+
+**波 48 の結果（2026-10-22）**: 16 シャード全部完走・7,680 局・1,080,222 行・dropped 1・1 局平均 11.2 秒・記録の meta は enc_version 15・decks synth_roles2。
+
+**訓練 r18 の指示書**（作業セッション用・1 セッション・`claude/train-r18`）。π＝波 48・価値＝波 48＋47（どちらも生成役 r13d・約 222 万行＝下限 200 万を超える）・warm-start r11a・価値の教師は勝敗（段階 2 は 3 本とも非昇格）・その他は r13d と同じ。波 47 の 16 列は v14 の作り（漏れ入り）・波 48 は v15＝混在（`2026-10-22_enc_v15.md` §3）。
+評価帯＝波 48 holdout で r11a／r13d／r17／r18（＋`.ep0`／`.ep1`）。判定のアリーナ（公平同士・両席 160 回・**今の本線のコード**〔v15・誘発の順序の修正後〕）はコーディネータが訓練の後に出す: **主＝random × synth_roles2**（1951000〜1966000）・**副＝固定ミラー**（1971000〜1986000）・**実デッキ帯**（`--decks user`・1991000〜2006000）・**旧主条件 synth_roles**（2011000〜2026000）。各 16 シャード × 175 ペア。
+
+```
+作業: r18 の訓練 → 評価帯（docs/n_loop_ops.md §7.29）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 48 47; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n48/n_records/n48_w*_p[0-3] | wc -l      # 64
+ls -d ~/n47/n_records/n47_w*_p[0-3] | wc -l      # 64
+git fetch -q origin claude/train-r17:r17net && git show r17net:n1_results/nrel_r17.npz > ~/nrel_r17.npz
+
+P48="$HOME/n48/n_records/n48_w*_p[0-3]"
+Z47="$HOME/n47/n_records/n47_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P48" --z-in "$Z47" $COMMON --out ~/nrel_r18.npz 2>&1 | tee ~/train_r18.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P48" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r17.npz ~/nrel_r18.npz ~/nrel_r18.ep0.npz ~/nrel_r18.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r18.json 2>&1 | tee ~/band_r18.log
+
+git checkout -B claude/train-r18
+mkdir -p n1_results && cp ~/nrel_r18*.npz n1_results/ && cp ~/train_r18.log ~/band_r18.json ~/band_r18.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r18*.npz train_r18.log band_r18.json band_r18.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r18 のセット（訓練・評価帯）"
+git push -u origin claude/train-r18
+```
+
+
+**r18 の結果（訓練・評価帯・2026-10-22）**: 価値 2,219,641 行・best ep0。評価帯（波 48 holdout・152,176 行・r18 には訓練の波＝有利）: 価値の誤差 **r18 0.5881** < r11a 0.6241 < r13d 0.6264 < r17 0.6282・符号一致 r18 0.780（最良）・方策 top1 r18 0.5206 > r17 0.5166 > r13d 0.5133。2 周目は価値が過学習気味（val 0.636 → 0.657）。
+
+**r18 の判定（2026-10-22）**: 主 synth_roles2 0.4979・−1.5（未達）／副 0.5286・+19.9／**実デッキ 0.5161・+11.2（有意）**／旧主 synth_roles 0.4803・−13.7（有意に下）＝規約では非昇格・実デッキ帯の改善を採用の根拠にするかはユーザ判断（`2026-10-22_r18_judgment.md`）。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・1 シャードで主 synth_roles2 → 副ミラー → 実デッキ → 旧主 synth_roles の 4 本を順に）:
+
+````
+アリーナ（r18 vs r13d・公平同士・4 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.29）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r18-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r18-w$KK origin/claude/cpu-spec-improvements-yw91jd   # 今の本線（公平が既定・v15・誘発の順序の修正後）
+git fetch -q origin claude/arena-r18-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r18 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r18:r18net && git show r18net:n1_results/nrel_r18.npz > ~/nrel_r18.npz
+mkdir -p arena_r18
+
+次の内容を ~/run18.sh に保存し、`nohup bash ~/run18.sh > ~/run18.out 2>&1 &` で回す。run18.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r18/*.jsonl"))
+print(json.dumps({"job": "arena-r18-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r18 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r18 shard $KK"; git push -q -u origin claude/arena-r18-w$KK || echo PUSH_FAILED; }
+for C in r18; do
+  BM=1951000; BR=1971000; BU=1991000; BO=2011000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r18/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r18/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BU + B*1000 )) --workers 4 --leaders random --decks user \
+    --out arena_r18/${C}_user_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BO + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r18/${C}_old_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 4 本＝約 50 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+
+**r18 の測り直し——実デッキ帯を 115 本に広げて（2026-10-22）**: ユーザ決定（「その形で進めてください」）。実デッキ帯の拡張＝公式サイトの構築例 111 本（`tests/fixtures/decks/official_decks_20261022.json`・105 リーダー・ホールドアウト）を足した `--decks real`（ユーザの 4 本＋構築例・一様に 2 本を引く）。条件は r18 の判定と同じ（公平同士・両席 160 回・今の本線のコード）。16 シャード × 175 ペア・seed **2061000〜2076000**。予告: 4 本での +11.2 の半分以上が残る（+5〜+12）。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r18 vs r13d・公平同士・実デッキ帯 115 本）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.29）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r18real-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r18real-w$KK origin/claude/cpu-spec-improvements-yw91jd   # 今の本線（公平が既定・v15・誘発の順序の修正後）
+git fetch -q origin claude/arena-r18real-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r18real 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r18:r18net && git show r18net:n1_results/nrel_r18.npz > ~/nrel_r18.npz
+mkdir -p arena_r18real
+
+次の内容を ~/run18r.sh に保存し、`nohup bash ~/run18r.sh > ~/run18r.out 2>&1 &` で回す。run18r.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r18real/*.jsonl"))
+print(json.dumps({"job": "arena-r18real-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r18real RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r18real shard $KK"; git push -q -u origin claude/arena-r18real-w$KK || echo PUSH_FAILED; }
+for C in r18; do
+  BR2=2061000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR2 + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_r18real/${C}_real_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 48 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.29）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.29 波 48"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n48-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n48-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n48_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n48_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 48 shard ${K}"' \
+  'git push -q -u origin claude/n48-w${K} || echo PUSH_FAILED' > ~/save48.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run48.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run48.sh > ~/run48.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run48.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run48.out; do sleep 30; done'; tail -n 1 ~/n48_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n48_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles2 --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n48_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n48_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n48-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "synth_roles2"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save48.sh
+done
+tail -n 2 ~/n48_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+### 7.30 omni-value 段階 2——全部見える評価の付け直し（波 43・波 47）→ 訓練 → 公平同士の判定（2026-10-22）
+
+ユーザ決定（2026-10-21「その方針で進めてください」・段階 1 の結果を受けて 2026-10-22 に続行）。台帳 2+322。段階 1（`claude/omni-value`・本線に合流済み）の読み取り: 保留行で **全部見える評価と勝敗の相関 0.678・素の価値 0.635・二乗誤差 0.541 対 0.599**（9 ターン以降 0.784 対 0.740・序盤は差なし）。費用は 1 シャード 4 コアで約 7.7 分。根の探索がある行（6 割）にだけ付く（窓の行には付かない＝残りは z のまま）。
+- **付け直し（16 セッション・各 2 シャード＝8 本）**: 波 43（`claude/n43-wKK`・r13d の方策の教材）を `omni43-sK`（K=1〜8 が w(2K−1)・w(2K)。w01 は段階 1 で済み＝K=1 は w02 だけ）、波 47（`claude/n47-wKK`・公平な最初の波）を `omni47-sK`。結果は `claude/omni43-sK`／`claude/omni47-sK` の `n1_results/omni_value/omni_n4N_wKK_p*.npz`。
+- **訓練（段階 2・別の指示書・付け直しの回収後）**: (i) **r13o**＝r13d と同じ作り（warm-start r11a・π＝波 43・価値＝波 43＋42）で `--z-mode omni`、(ii) **r13m**＝同じで `--z-mode mix`。波 42 は付け直さない（z のまま）。(iii) r17 が昇格の候補なら **r17o**＝r17 と同じ作りで `--z-mode mix`（波 47 の付け直しを使う）。
+- **判定**: 公平同士（両席とも既定）・両席 160 回・主＋副・各 16 シャード × 175 ペア。基準 r13d。seed は訓練の後に払い出す。
+- **予告**: r13o／r13m vs r13d 主 +5〜+20（価値の教師が勝敗をよりよく当てる分。ただし全部見える評価は r13d 自身の偏りを受け継ぐ）。r13m ≧ r13o（混ぜたほうが偏りが薄まる）。
+
+
+**段階 2 の訓練の指示書**（作業セッション用・1 セッション・`claude/train-omni`・2026-10-22 追記・付け直しは 16 本とも完走〔波 43: 64 本・波 47: 64 本〕）。
+3 本: **r13o**（r13d と同じ作り・`--z-mode omni`）／**r13m**（同じ・`--z-mode mix`）／**r17m**（r17 と同じ作り・`--z-mode mix`・波 47 の付け直し）。評価帯は波 47 holdout で r13d／r17／r13o／r13m／r17m。
+
+```
+作業: omni-value 段階 2 の訓練 → 評価帯（docs/n_loop_ops.md §7.30）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 43 42 47 46 45; do
+  M=16; [ $N = 46 ] && M=49
+  for k in $(seq -w 1 $M); do git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+mkdir -p ~/omni
+for W in 43 47; do for K in 1 2 3 4 5 6 7 8; do
+  git fetch -q origin claude/omni$W-s$K:tmpo && git archive tmpo n1_results/omni_value | tar -x -C ~/omni && git branch -qD tmpo; done; done
+ls ~/omni/n1_results/omni_value/omni_n43_w*_p*.npz | wc -l   # 64
+ls ~/omni/n1_results/omni_value/omni_n47_w*_p*.npz | wc -l   # 64
+
+P43="$HOME/n43/n_records/n43_w*_p[0-3]"; Z42="$HOME/n42/n_records/n42_w*_p[0-3]"
+P47="$HOME/n47/n_records/n47_w*_p[0-3]"; Z46="$HOME/n46/n_records/n46_w*_p[0-3]"; Z45="$HOME/n45/n_records/n45_w*_p[0-3]"
+O43="$HOME/omni/n1_results/omni_value/omni_n43_w*_p*.npz"; O47="$HOME/omni/n1_results/omni_value/omni_n47_w*_p*.npz"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" --z-in "$Z42" $COMMON --z-mode omni --omni-in "$O43" --out ~/nrel_r13o.npz 2>&1 | tee ~/train_r13o.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" --z-in "$Z42" $COMMON --z-mode mix  --omni-in "$O43" --out ~/nrel_r13m.npz 2>&1 | tee ~/train_r13m.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P47" --z-in "$Z46" "$Z45" $COMMON --z-mode mix --omni-in "$O47" --out ~/nrel_r17m.npz 2>&1 | tee ~/train_r17m.log
+git fetch -q origin claude/train-r17:r17net && git show r17net:n1_results/nrel_r17.npz > ~/nrel_r17.npz
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P47" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r17.npz ~/nrel_r13o.npz ~/nrel_r13m.npz ~/nrel_r17m.npz \
+  --policy --holdout-mod 7 --out ~/band_omni.json 2>&1 | tee ~/band_omni.log
+
+git checkout -B claude/train-omni
+mkdir -p n1_results && cp ~/nrel_r13o*.npz ~/nrel_r13m*.npz ~/nrel_r17m*.npz n1_results/ && cp ~/train_r13o.log ~/train_r13m.log ~/train_r17m.log ~/band_omni.json ~/band_omni.log .
+（RESULT.json〔§5 の形〕: inputs＝3 本それぞれの warm_start・π dir 数・価値の波と行数・差し替えた行数〔ログの「z-mode … 差し替えた行」〕・rss_gb／metrics＝各 best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse・v_sign と方策の指標／notes）
+git add -f n1_results/nrel_r13o*.npz n1_results/nrel_r13m*.npz n1_results/nrel_r17m*.npz train_r13o.log train_r13m.log train_r17m.log band_omni.json band_omni.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "omni-value 段階 2（r13o・r13m・r17m の訓練・評価帯）"
+git push -u origin claude/train-omni
+```
+注意: 検証の v_mse は差し替えた教師に対して測られる（訓練ログの数字は z の版と比べられない）。比較は評価帯（z に対する誤差）で読む。メモリが 14GB を超えそうなら r17m の `--z-in` から波 45 を外して notes に書く。
+
+
+**段階 2 の結果（訓練・評価帯・2026-10-22）**: 差し替えた行 r13o／r13m 691,121（価値の 224 万行のうち 31%）・r17m 683,444。評価帯（波 47 holdout・z に対する誤差・小さいほど良い）: **r13o 0.5536 < r17m 0.5542 ≈ r13m 0.5542 < r13d 0.5550 < r17 0.5578**（差は 0.001〜0.004）。勝ち負けの符号の一致は r13d 0.7944 が最良（r13o 0.7936・r13m 0.7938）。方策はほぼ同じ。
+**判定のアリーナ**: 3 本とも基準 r13d・公平同士・両席 160 回・各 16 シャード × 175 ペア・コードは r17 と同じ `25a51f28a` に固定（同じ物差しで並べる）。seed: r13o 主 1831000〜／副 1851000〜・r13m 主 1871000〜／副 1891000〜・r17m 主 1911000〜／副 1931000〜。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r13o／r13m／r17m vs r13d・公平同士）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.30）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-omni2-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-omni2-w$KK 25a51f28a   # 判定のコードは公平が既定・符号化 v14 の本線に固定する
+git fetch -q origin claude/arena-omni2-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_omni2 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-omni:omninet && for C in r13o r13m r17m; do git show omninet:n1_results/nrel_$C.npz > ~/nrel_$C.npz; done
+mkdir -p arena_omni2
+
+次の内容を ~/runo2.sh に保存し、`nohup bash ~/runo2.sh > ~/runo2.out 2>&1 &` で回す。runo2.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_omni2/*.jsonl"))
+print(json.dumps({"job": "arena-omni2-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_omni2 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena omni2 shard $KK"; git push -q -u origin claude/arena-omni2-w$KK || echo PUSH_FAILED; }
+for C in r13o r13m r17m; do
+  case $C in r13o) BM=1831000; BR=1851000;; r13m) BM=1871000; BR=1891000;; r17m) BM=1911000; BR=1931000;; esac
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_omni2/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_omni2/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 6 本＝約 75 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+付け直しの作業セッション用の本文（`{WAVE}`＝43／47・`{K}`＝1〜8・`{SHARDS}`＝その K の w 番号の並び〔例 `03 04`。波 43 の K=1 は `02` だけ〕）:
+
+````
+全部見える評価の付け直しを回してください（docs/n_loop_ops.md §7.30）。波 {WAVE}・担当 K={K}・シャード {SHARDS}。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/omni{WAVE}-s{K} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/omni{WAVE}-s{K} origin/claude/cpu-spec-improvements-yw91jd
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+for KK in {SHARDS}; do git fetch -q origin claude/n{WAVE}-w$KK:tmpw && mkdir -p ~/n{WAVE} && git archive tmpw n_records | tar -x -C ~/n{WAVE} && git branch -qD tmpw; done
+mkdir -p n1_results/omni_value
+
+次を ~/runo.sh に保存し `nohup bash ~/runo.sh > ~/runo.out 2>&1 &` で回す。runo.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+cd ~/opcg-sim-backend
+for KK in {SHARDS}; do
+  ls n1_results/omni_value/omni_n{WAVE}_w${KK}_p3.npz >/dev/null 2>&1 && continue
+  OPCG_LOG_SILENT=1 python tests/scripts/omni_value_relabel.py run --in "$HOME/n{WAVE}/n_records/n{WAVE}_w${KK}_p*" --out-dir n1_results/omni_value --workers 4 >> ~/runo.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json
+fs = sorted(glob.glob("n1_results/omni_value/omni_n{WAVE}_w*_p*.npz"))
+print(json.dumps({"job": "omni{WAVE}-s{K}", "role": "relabel", "status": "partial", "inputs": {"wave": {WAVE}, "shards": "{SHARDS}", "decide": {"omniscient": True, "sims": 320, "worlds": 1, "budget": 0, "net": "nrel_r13d.npz"}}, "outputs": {"files": fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f n1_results/omni_value RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "omni relabel wave {WAVE} shard $KK"; git push -q -u origin claude/omni{WAVE}-s{K} || echo PUSH_FAILED
+done
+sed -i 's/"status": "partial"/"status": "done"/' RESULT.json
+git add -f RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "omni relabel wave {WAVE} K={K} done"; git push -q -u origin claude/omni{WAVE}-s{K} || echo PUSH_FAILED
+echo ALL_DONE
+
+補足: 1 シャード（4 本）約 8 分。コミットメッセージにモデル名を入れない。
+````
+
+### 7.32 波 49——実デッキ 115 本で打つ最初の波（生成役 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「b でお願いします」＝実デッキ 115 本をすべて教材に使う・実デッキでリーダーをほぼ網羅できたため）。台帳 2+331。CLAUDE.md の開発判断の前提に追記済み。
+- **教材（波 49）**: 生成役 **r13d**（r17・r18 は非昇格）・設定は波 48 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・両方向 ε 3%・公平が既定・符号化 v15）、**デッキだけ `--decks real`**（ユーザの 4 本＋公式の構築例 111 本から一様に 2 本）。16 シャード × 480 局。seed **2521000〜2528500**（シャード k の base は 2520000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練（r19・別の指示書）**: π＝波 49・価値＝波 49＋48（どちらも生成役 r13d・約 220 万行）・warm-start r11a・価値の教師は勝敗。
+- **判定**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア。**主＝random × real**（新しい seed 帯）・副＝固定ミラー・参考＝random × synth_roles2（合成デッキへの汎化）。seed は訓練の後に払い出す。
+- **予告（数を見る前）**: r19 vs r13d 主（real）+10〜+25（教材の分布と判定の帯が一致する最初の世代）・synth_roles2 では −10〜+5（合成への汎化は少し落ちうる）。
+
+
+**波 49 の結果（2026-10-22）**: 16 シャード全部完走・7,680 局・1,153,971 行・dropped 2・1 局平均 13.6 秒・decks real。
+
+**訓練 r19 の指示書**（作業セッション用・1 セッション・`claude/train-r19`）。π＝波 49（実デッキ 115 本）・価値＝波 49＋48（どちらも生成役 r13d・約 223 万行）・warm-start r11a・価値の教師は勝敗・その他は r13d と同じ。評価帯＝波 49 holdout で r11a／r13d／r18／r19（＋`.ep0`／`.ep1`）。
+判定（訓練の後にコーディネータ）: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア・今の本線のコード。**主＝random × real 2081000〜2096000**・副＝固定ミラー 2101000〜2116000・参考＝random × synth_roles2 2121000〜2136000。
+
+```
+作業: r19 の訓練 → 評価帯（docs/n_loop_ops.md §7.32）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 49 48; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n49/n_records/n49_w*_p[0-3] | wc -l      # 64
+ls -d ~/n48/n_records/n48_w*_p[0-3] | wc -l      # 64
+git fetch -q origin claude/train-r18:r18net && git show r18net:n1_results/nrel_r18.npz > ~/nrel_r18.npz
+
+P49="$HOME/n49/n_records/n49_w*_p[0-3]"
+Z48="$HOME/n48/n_records/n48_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P49" --z-in "$Z48" $COMMON --out ~/nrel_r19.npz 2>&1 | tee ~/train_r19.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P49" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r18.npz ~/nrel_r19.npz ~/nrel_r19.ep0.npz ~/nrel_r19.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r19.json 2>&1 | tee ~/band_r19.log
+
+git checkout -B claude/train-r19
+mkdir -p n1_results && cp ~/nrel_r19*.npz n1_results/ && cp ~/train_r19.log ~/band_r19.json ~/band_r19.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r19*.npz train_r19.log band_r19.json band_r19.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r19 のセット（訓練・評価帯）"
+git push -u origin claude/train-r19
+```
+
+
+**r19 の結果（訓練・評価帯・2026-10-22）**: 価値 2,234,193 行・best ep0。評価帯（波 49 holdout・163,355 行・r19 には訓練の波＝有利）: 価値の誤差 **r19 0.5250**（ep1 0.5205）< r18 0.5834 < r13d 0.6000・符号一致 r19 0.806・方策 top1 r19 0.5155 > r18 0.5096 > r13d 0.5079。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・1 シャードで主 real → 副ミラー → 参考 synth_roles2 の 3 本を順に）:
+
+````
+アリーナ（r19 vs r13d・公平同士・3 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.32）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r19-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r19-w$KK origin/claude/cpu-spec-improvements-yw91jd   # 今の本線（公平が既定・v15・誘発の順序の修正後）
+git fetch -q origin claude/arena-r19-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r19 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+mkdir -p arena_r19
+
+次の内容を ~/run19.sh に保存し、`nohup bash ~/run19.sh > ~/run19.out 2>&1 &` で回す。run19.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r19/*.jsonl"))
+print(json.dumps({"job": "arena-r19-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r19 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r19 shard $KK"; git push -q -u origin claude/arena-r19-w$KK || echo PUSH_FAILED; }
+for C in r19; do
+  BM=2081000; BR=2101000; BS=2121000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_r19/${C}_real_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r19/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BS + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r19/${C}_synth2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 3 本＝約 40 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+**r19 の判定の結果（2026-10-22）**: 16 シャード全部完走。主（random × real）**0.5179 [0.5075, 0.5282]・+12.4**（予告 +10〜+25 の下端）・副（固定ミラー）0.5116 [0.4995, 0.5237]・+8.1・参考（synth_roles2）0.4930 [0.4790, 0.5071]・−4.8。void は主の 1 ペアのみ。運用の規約（主の下限 > 0.50・副の下限 ≥ 0.45）を満たす＝採用の候補（ユーザ判断待ち）。報告 `docs/reports/2026-10-22_r19_judgment.md`・台帳 2+332。
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 49 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.32）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.29 波 49"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n49-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n49-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n49_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n49_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 49 shard ${K}"' \
+  'git push -q -u origin claude/n49-w${K} || echo PUSH_FAILED' > ~/save49.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run49.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run49.sh > ~/run49.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run49.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run49.out; do sleep 30; done'; tail -n 1 ~/n49_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n49_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks real --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n49_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n49_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n49-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "real"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save49.sh
+done
+tail -n 2 ~/n49_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+### 7.33 r19 の本番の設定での確認（対 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「a で行きましょうか」＝本番と同じ読みの深さで確かめてから、強ければ切り替える）。台帳 2+333。
+- 両席とも**出荷の設定**: 1,280 回・世界 2 本・枝予算なし・公平（既定）。候補 r19（`claude/train-r19` の n1_results・ep0）・基準 r13d（同梱）。
+  基準席にも世界 2 本を持たせるため `arena_shard --worlds` を本線に足した（WP `rs-lethal-root` の同じ旗だけを先に取り込み・既定は今までどおり 1 本）。
+- 主条件のみ＝random × real（115 本）。**32 シャード × 84 ペア＝2,688 ペア**（r13d の採用時の 2,678 ペアと同じ規模）。シャード k の base は **2141000 + (k−1)×1000**（2141000〜2172083）。
+- 採用の規約: 勝率の 95% CI 下限 > 0.50（主）。副条件は §7.32 の 160 回の固定ミラー（下限 0.4995 ≥ 0.45）を使う。
+- **予告（数を見る前）**: +10〜+25（160 回で +12.4。r13d の採用時は 160 回 +21.5 → 本番 +24.6 で、深い読みで差は縮まなかった）。
+
+作業セッション用の本文（`{K}`＝1〜32・`{KK}`＝01〜32）:
+
+````
+アリーナ（r19 vs r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.33）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r19p-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r19p-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n '"--worlds"'    # 基準席の世界の本数の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-r19p-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r19p 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+mkdir -p arena_r19p
+
+次の内容を ~/run19p.sh に保存し、`nohup bash ~/run19p.sh > ~/run19p.out 2>&1 &` で回す。run19p.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r19p/*.jsonl"))
+print(json.dumps({"job": "arena-r19p-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r19.npz", "baseline": "nrel_r13d.npz", "both": "sims 1280 x worlds 2 x budget 0 (fair)", "pairs": 84},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r19p RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r19p shard $KK"; git push -q -u origin claude/arena-r19p-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r19.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --sims 1280 --worlds 2 --budget 0 --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --pairs 84 --max-pairs 21 --bands 1 \
+    --seed-base $(( 2141000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_r19p/r19p_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 21 ペアずつ進め（4 回目までに 84 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。世界 2 本は 2 スレッド使うので --workers 2。全体で 1〜3 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.34 波 50——実デッキ 115 本の 2 波目（生成役 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「b で行きましょう」＝次の教材も r13d が打つ・r19 は本番の深さで差が出なかったため）。台帳 2+335。
+- **教材（波 50）**: 生成役 **r13d**・設定は波 49 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・両方向 ε 3%・公平が既定・符号化 v15・`--decks real`）。16 シャード × 480 局。seed **2531000〜2538500**（シャード k の base は 2530000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練（r20・別の指示書）**: π＝波 50＋49（どちらも生成役 r13d・同じ打ち筋）・価値＝波 50＋49（約 230 万行）・warm-start r11a。教材の量を倍にして本番の深さで伸びるかを見る。伸びなければネットの作りを見直す段へ。
+- **判定**: 160 回の 3 条件（§7.32 と同じ）に加え、**採用の前に本番の深さ（§7.33）で確かめる**。
+- **予告（数を見る前）**: r20 vs r13d 160 回 × real +10〜+20・本番の深さ 0〜+10。
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 50 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.34）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.34 波 50"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n50-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n50-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n50_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n50_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 50 shard ${K}"' \
+  'git push -q -u origin claude/n50-w${K} || echo PUSH_FAILED' > ~/save50.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run50.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run50.sh > ~/run50.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run50.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run50.out; do sleep 30; done'; tail -n 1 ~/n50_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n50_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks real --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n50_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n50_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n50-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "real"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save50.sh
+done
+tail -n 2 ~/n50_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+**切り分け（ユーザ決定 2026-10-22「一旦教材のデッキの切り分けとして教師の作成も訓練もやってしまいましょう」）**: 教材のデッキだけを変えた対照を同時に作る。台帳 2+336。
+- **波 50s**: 生成役 r13d・設定は波 50 と同じ・**デッキだけ `--decks synth_roles2`**（合成デッキ v2）。16 シャード × 480 局。seed **2541000〜2548500**（シャード k の base は 2540000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練**: r20＝π・価値とも波 50＋49（実デッキ・生成役 r13d）／**r20s＝π・価値とも波 50s＋48（合成 v2・生成役 r13d）**。warm-start r11a・更新量・その他は同じ。違いは教材のデッキだけ。
+- **判定**: 両方を対 r13d で random × real・random × synth_roles2・固定ミラー（160 回）、良い方は本番の深さでも。
+- **予告（数を見る前）**: real 帯で r20 − r20s ≈ +10（r19 と r18 の差 +12 に近い）・synth_roles2 帯で r20s − r20 ≈ +5。本番の深さでは両方とも差が縮む。
+
+波 50s の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 50s（合成デッキ v2）の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.34）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.34 波 50s"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n50s-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n50s-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n50s_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n50s_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 50s shard ${K}"' \
+  'git push -q -u origin claude/n50s-w${K} || echo PUSH_FAILED' > ~/save50s.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run50s.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run50s.sh > ~/run50s.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run50s.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run50s.out; do sleep 30; done'; tail -n 1 ~/n50s_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n50s_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles2 --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n50s_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n50s_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n50s-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "synth_roles2"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save50s.sh
+done
+tail -n 2 ~/n50s_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+**波 50／50s の結果（2026-10-22）**: どちらも 16 シャード全部完走・各 7,680 局。波 50（実）1,149,881 行・dropped 5・1 局平均 13.5 秒／波 50s（合成 v2）1,083,501 行・dropped 2・11.7 秒。
+
+**訓練 r20／r20s の指示書**（作業セッション用・各 1 セッション・`claude/train-r20`／`claude/train-r20s`）。π・価値とも 2 波（r20＝波 50＋49・r20s＝波 50s＋48）・warm-start r11a・その他は r19 と同じ。評価帯は波 50 holdout と波 50s holdout の両方で r13d／r19／自分（＋`.ep0`／`.ep1`）。r20 の本文（r20s は `r20`→`r20s`・`n50`→`n50s`・`n49`→`n48` に読み替えた同じもの）:
+
+```
+作業: r20 の訓練 → 評価帯（docs/n_loop_ops.md §7.34・教材のデッキの切り分け）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+r20＝π・価値とも波 50＋49（実デッキ 115 本・生成役 r13d）。対照の r20s と、教材のデッキ以外はすべて同じ。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in n50 n49 n50 n50s; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  [ -d ~/$N/n_records ] && [ $(ls -d ~/$N/n_records/${N}_w*_p[0-3] 2>/dev/null | wc -l) -ge 64 ] && break
+  git fetch -q origin claude/$N-w$k:tmpw && mkdir -p ~/$N && git archive tmpw n_records | tar -x -C ~/$N && git branch -qD tmpw; done; done
+for N in n50 n49 n50 n50s; do echo $N $(ls -d ~/$N/n_records/${N}_w*_p[0-3] | wc -l); done      # どれも 64
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+
+PA="$HOME/n50/n_records/n50_w*_p[0-3]"
+PB="$HOME/n49/n_records/n49_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$PA" "$PB" $COMMON --out ~/nrel_r20.npz 2>&1 | tee ~/train_r20.log
+# メモリ（cgroup 14GB）で落ちたら: --in "$PA" --z-in "$PB" に替えて 1 回だけやり直し、notes に「π は新しい波だけ」と書く（相手の訓練と揃わなくなる旨も）。
+
+for BAND in n50 n50s; do
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$HOME/$BAND/n_records/${BAND}_w*_p[0-3]" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r19.npz ~/nrel_r20.npz ~/nrel_r20.ep0.npz ~/nrel_r20.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r20_$BAND.json 2>&1 | tee ~/band_r20_$BAND.log
+done
+
+git checkout -B claude/train-r20
+mkdir -p n1_results && cp ~/nrel_r20*.npz n1_results/ && cp ~/train_r20.log ~/band_r20_*.json ~/band_r20_*.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π の dir 数と行数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝帯（n50・n50s）ごと・ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r20*.npz train_r20.log band_r20_*.json band_r20_*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r20 のセット（訓練・評価帯）"
+git push -u origin claude/train-r20
+```
+
+**r20／r20s の結果（訓練・評価帯・2026-10-22）**: どちらも完走・メモリで落ちず（rss 7.9／7.5 GB）・best ep1。π 約 96 万点／93 万点・価値 230 万行／216 万行。評価帯（holdout・価値の誤差）:
+
+| 帯 ＼ ネット | r13d | r19 | r20（実で訓練） | r20s（合成で訓練） |
+|---|---|---|---|---|
+| 波 50（実デッキ） | 0.637 | 0.561 | **0.541** | 0.610 |
+| 波 50s（合成 v2） | 0.573 | 0.558 | 0.621 | **0.550** |
+
+方策（top1）は帯をまたいでもほぼ同じ（0.50〜0.53）。**価値は教材のデッキの帯でだけ良くなり、もう一方の帯では r13d より悪くなりうる**（r20 は合成の帯で 0.621＞r13d 0.573）。各帯は同じ帯で訓練したネットに有利（holdout でも同じ局の分布）。
+
+判定（r20・r20s のそれぞれ vs r13d・公平同士・両席 160 回・各 16 シャード × 175 ペア・本線 dfc24929e に固定）: 主 random × real 3101000〜3116000・副 固定ミラー 3121000〜3136000・参考 random × synth_roles2 3141000〜3156000（**r20 と r20s で同じ seed**＝対にして比べる）。
+予告（数を見る前）: real で r20 − r20s ≈ +10・synth_roles2 で r20s − r20 ≈ +5〜+15（評価帯の価値の逆転から、前の予告より大きめ）。
+
+**判定の結果（2026-10-22）**: どちらも非昇格。r20（実で訓練）主 0.4975 −1.7・副 +2.9・参考 **−39.0**／r20s（合成で訓練）主 0.5052 +3.6・副 +13.3・参考 −6.1。同じ seed の対の差（r20 − r20s）は real −0.8%・synth_roles2 −4.7%。予告（real で r20 が +10）は外れ。報告 `docs/reports/2026-10-22_r20_deck_isolation.md`・台帳 2+339。
+
+判定の作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r20 と r20s のそれぞれ vs r13d・公平同士・3 条件・教材のデッキの切り分け）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.34）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r20-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r20-w$KK dfc24929e   # 本線 dfc24929e に固定（全シャードで同じコード）
+git fetch -q origin claude/arena-r20-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r20 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r20:r20net && git show r20net:n1_results/nrel_r20.npz > ~/nrel_r20.npz
+git fetch -q origin claude/train-r20s:r20snet && git show r20snet:n1_results/nrel_r20s.npz > ~/nrel_r20s.npz
+mkdir -p arena_r20
+
+次の内容を ~/run20.sh に保存し、`nohup bash ~/run20.sh > ~/run20.out 2>&1 &` で回す。run20.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r20/*.jsonl"))
+print(json.dumps({"job": "arena-r20-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r20 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r20 shard $KK"; git push -q -u origin claude/arena-r20-w$KK || echo PUSH_FAILED; }
+for C in r20 r20s; do
+  BM=3101000; BR=3121000; BS=3141000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_r20/${C}_real_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r20/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BS + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r20/${C}_synth2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 3〜4 分 × 6 本（2 ネット × 3 条件）＝約 25 分。r20 と r20s は同じ seed（対にして比べる）（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+### 7.31 詰みの証明の本番アリーナ（WP `rs-lethal-root` の取り込み後・2026-10-22）
+
+WP `rs-lethal-root` を本線に取り込んだ（cad5869c7・`make test` green・`make audit-cross` void 0・既定 off で出力不変）。報告 `docs/reports/2026-10-22_lethal_root.md`。台帳 2+337。
+- **設計の変更（指示書の 2 本 root／root_reply から）**: `root_reply` は手元で費用 +103%・応手の証明 0.43%・局を 1 つも変えなかった＝本番では測らない。代わりに**対照 off 対 off を同じ seed で打つ**（両席とも同じネット・同じ設定でも、ペアの 2 局で候補席のリーダーが入れ替わらないので勝率は 0.5 にならない。off 対 off を引くと差はちょうど 0 になる＝局が替わった少数の局だけが情報になる・報告 §5）。
+- 腕: 候補席 r13d＋`--cand-lethal-proof root` ／ 対照: 候補席 r13d＋`off`。基準席はどちらも r13d（off）。両席とも出荷の設定（1,280 回・世界 2 本・枝予算なし・公平）。random × real。
+- **16 シャード × 150 ペア＝各 2,400 ペア**。シャード k の base は **2031000 + (k−1)×1000**（2031000〜2046149・2 腕で同じ seed）。
+- 読み方: root の勝率 − off 対 off の勝率（同じ seed の対の差）。
+- **予告（数を見る前）**: 差は +0〜+1%（取り損ねの手番が 0.78% → 0.62%・見逃して負けた局は 100 局で 4 → 0 の規模）。手元の 160 局では負けが勝ちに替わった局は 0。
+
+**結果（2026-10-22）**: 16 シャード全部完走。**root vs off 0.5075 [0.5045, 0.5105]・+5.2 [+3.1, +7.3]**・対照 off vs off 0.5000（全ペア 1 勝 1 敗）。同じ seed の対の差 +0.75%［+0.45, +1.05］・勝ち数が変わったペア 56（良 46／悪 10）。報告 `docs/reports/2026-10-22_lethal_prod_arena.md`・台帳 2+340。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（詰みの証明 root vs off と、対照の off vs off・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.31）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-lethal-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-lethal-w$KK cad5869c7   # 詰みの証明の取り込み後に固定
+git show HEAD:opcg_sim/loop/arena.py | grep -n '"--cand-lethal-proof"'    # 候補席の詰みの証明の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-lethal-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_lethal 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_lethal
+
+次の内容を ~/runL.sh に保存し、`nohup bash ~/runL.sh > ~/runL.out 2>&1 &` で回す。runL.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_lethal/*.jsonl"))
+print(json.dumps({"job": "arena-lethal-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + lethal_proof root (root_*.jsonl) / off (off_*.jsonl)", "baseline": "nrel_r13d.npz", "both": "sims 1280 x worlds 2 x budget 0 (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_lethal RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena lethal shard $KK"; git push -q -u origin claude/arena-lethal-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6 7; do
+  for ARM in root off; do
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+      --sims 1280 --worlds 2 --budget 0 --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof $ARM \
+      --pairs 150 --max-pairs 25 --bands 1 \
+      --seed-base $(( 2031000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+      --out arena_lethal/${ARM}_w$KK.jsonl
+    save
+  done
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ root → off の順に進め（6 回目までに各 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。2 本は同じ seed（off 対 off は対照＝同じ配りで局が替わったかを見る）。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5〜2 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.34 守りの照合の修正の本番アリーナ（WP `rs-commit-sig` の取り込み後・2026-10-23）
+
+WP `rs-commit-sig` を本線に取り込んだ（2eebbf9f0・`make test` green・`make audit-cross` void 0）。報告 `docs/reports/2026-10-23_commit_sig.md`（守りの再監査 300 局で乙の見逃し 28 → 7・その手番に負けた 22 → 5・golden の a1 再生 47 局が commit のカウンターの札で変わり、旧い署名で完全に再現）。台帳 2+358。
+- 候補席＝修正後（既定）・基準席＝`--commit-sig-legacy`。両席 r13d・出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）・random × real・新しい組み方（同じネット同士は 0.5 ちょうど）。
+- **16 シャード × 150 ペア＝2,400 ペア**。シャード k の base は **3171000 + (k−1)×1000**（3171000〜3186149）。
+- **予告（数を見る前）**: +10〜+25 Elo（守りの監査の「その手番に負けた」22 → 5 は 1 席あたり約 3% の負けが消える規模・守った後に結局負ける局が在るので下がる）。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（守りの照合の修正後 vs 旧い照合・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.34）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-csig-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-csig-w$KK 2eebbf9f0   # 守りの照合の修正の取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'commit-sig-legacy'    # 基準席の旧い照合の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-csig-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_csig 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_csig
+
+次の内容を ~/runC.sh に保存し、`nohup bash ~/runC.sh > ~/runC.out 2>&1 &` で回す。runC.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_csig/*.jsonl"))
+print(json.dumps({"job": "arena-csig-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (fixed commit signature)", "baseline": "nrel_r13d.npz + commit_sig_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_csig RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena csig shard $KK"; git push -q -u origin claude/arena-csig-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-sig-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3171000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_csig/csig_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
+**§7.34 の結果（2026-10-23）**: 16 シャード全部完走。**修正後 vs 旧い照合 0.5467 [0.5382, 0.5553]・+32.6 [+26.6, +38.6]**（void 3）。予告 +10〜+25 を上回った。報告 `docs/reports/2026-10-23_commit_sig_arena.md`・台帳 2+361。
+
+### 7.35 方策の教材の再分析——波 50＋49 の局面を 4 倍の読みで打ち直す（r21 の教材・2026-10-23）
+
+ユーザ決定（2026-10-23「2 は 1 を取り込んだあと行ってください」＝守りの照合の修正の取り込み後に、方策の教材を深い読みで作り直す）。台帳 2+359。
+根拠: WP `value-to-move`（`docs/reports/2026-10-22_value_to_move.md`）——ネットによる手の変化の約 7 割は方策の最大の手が違う局面で起き、価値の改善は手を動かさない。r11a（2026-10-17 採用）は記録の局面を 4 倍の読みで打ち直した方策の教師で伸びた（`docs/reports/2026-10-16_reanalysis_pilot.md`・§7.5〜§7.6）。
+- **対象**: 波 49（実デッキ・記録のコミット 6f2ce8ff6）と波 50（実デッキ・24ce7244f）の各 w01〜w08。各シャードの先頭 200 局 × 12 点（規則ごとの枠 4・4・2・2）・`--mult 4`（1,280 回 → 5,120 回）・`--budget 0`。両コミットの Rust は同一。
+- **再生は記録を作ったコミットの wheel で回す**（今の本線は守りの照合・誘発の順の修正で手が分岐する）。器 `reanalyze.py` は本線の最新を worktree へ写す（§7.5 と同じ手順）。
+- 16 セッション × 約 2,400 点 ＝ **約 38,000 点**（r11a の教材と同じ規模）。
+- **訓練 r21（回収の後に別の指示書）**: r11a の形＝π は再分析の点だけ（`--in`・`--pi-steps-mult 4`）・価値は波 50＋49 の全部（`--z-in`・勝敗）・warm-start r11a・`--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --fast`。
+- **判定**: 160 回の 3 条件（random × real・固定ミラー・random × synth_roles2）→ 規約を満たせば本番の深さ。あわせて WP `move-judge`（§7.32）の判定役で「r21 の手が r13d の手より良いか」を見る。
+- **予告（数を見る前）**: 再分析で「深い最善 ≠ 記録の手」の点は 25〜35%。r21 vs r13d は 160 回で +10〜+25・本番の深さで +5〜+15。
+
+作業セッション用の本文（`{W}`＝49 か 50・`{XX}`＝01〜08）:
+
+````
+方策の教材の再分析（§7.35・波 {W} の記録の先頭 200 局を 4 倍の読みで打ち直す）を 1 シャードぶん回してください。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.35 方策の教材の再分析"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/reanalyze.py | grep -n -- "--quota"
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた局は飛ばす）。
+
+--- ブロック 1（準備）---
+export W={W} XX={XX}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/rean-n${W}-w${XX} origin/claude/cpu-spec-improvements-yw91jd
+# 前のコンテナの途中経過があれば戻す（無ければ何もしない）
+git fetch -q origin claude/rean-n${W}-w${XX} 2>/dev/null && git checkout -q FETCH_HEAD -- n${W}_rean 2>/dev/null || true
+if [ "$W" = 49 ]; then export EC=6f2ce8ff6; else export EC=24ce7244f; fi   # 記録を作ったコミット（エンジンは同じ）
+[ -d ~/wt$W ] || git worktree add -q --detach ~/wt$W $EC
+if [ ! -d ~/eng$W/opcg_engine ]; then
+  (cd ~/wt$W/rust/opcg_engine && CARGO_TARGET_DIR=~/target$W maturin build --release -o ~/wheel$W) > ~/build$W.log 2>&1
+  rm -rf ~/eng$W && mkdir -p ~/eng$W && (cd ~/eng$W && unzip -q -o ~/wheel$W/*.whl)
+fi
+cp opcg_sim/loop/reanalyze.py ~/wt$W/opcg_sim/loop/reanalyze.py
+export NET=~/wt$W/opcg_sim/data/learned/nrel_r13d.npz   # 記録の生成役
+if [ ! -d ~/rec/n_records/n${W}_w${XX} ]; then
+  git fetch -q origin claude/n${W}-w${XX}:tmpw && mkdir -p ~/rec && git archive tmpw n_records/n${W}_w${XX} | tar -x -C ~/rec && git branch -qD tmpw
+fi
+# 効果 JSON を先に作る（同時に作らせると壊れる）
+[ -f ~/wt$W/opcg_sim/data/opcg_effects.json ] || (cd ~/wt$W && PYTHONPATH=~/eng$W:~/wt$W python -m opcg_sim.tools.export_effects_json --out ~/wt$W/opcg_sim/data/opcg_effects.json > /dev/null)
+export OUT=~/opcg-sim-backend/n${W}_rean/w${XX}; mkdir -p $OUT
+# 保全のスクリプト（RESULT.json を書いて commit・push）。中身は opcg_sim/loop/reanalyze.py の --result を呼ぶだけ
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'python -m opcg_sim.loop.reanalyze --result "$OUT" --job "rean-n${W}-w${XX}" --record "claude/n${W}-w${XX}:n_records/n${W}_w${XX}" --engine-commit "$EC" --net "$NET" --target-games 200 > RESULT.json' \
+  'cp ~/rean_n${W}_w${XX}.log . 2>/dev/null' \
+  'git add -f n${W}_rean/w${XX} RESULT.json rean_n${W}_w${XX}.log' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "rean wave ${W} shard ${XX}"' \
+  'git push -q -u origin claude/rean-n${W}-w${XX}' > ~/rean_save.sh
+
+--- ブロック 2（実行と保全・50 局ごとと終了時に push）---
+cd ~/wt$W
+OPCG_LOG_SILENT=1 PYTHONPATH=~/eng$W:~/wt$W nohup python -m opcg_sim.loop.reanalyze --in ~/rec/n_records/n${W}_w${XX} --out $OUT \
+  --mult 4 --budget 0 --games 200 --quota 4,4,2,2 --engine-commit $EC --net $NET >> ~/rean_n${W}_w${XX}.log 2>&1 &
+RPID=$!
+last=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+while kill -0 $RPID 2>/dev/null; do
+  sleep 300
+  n=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+  if [ "$n" -ge $((last + 50)) ]; then bash ~/rean_save.sh; last=$n; fi
+done
+bash ~/rean_save.sh
+tail -n 3 ~/rean_n${W}_w${XX}.log
+
+補足:
+- 所要は約 2〜3 時間（記録は 1,280 回で打った局なので、4 倍＝5,120 回の読み）（同じコンテナで他の重い処理を並べると 3 倍まで遅くなる）。
+- ログで `bad_step=` が数値の行は、記録と手が分岐した局（その点から先は捨てる）。完走後の RESULT.json の replay_rate が 0.9 を割ったら、notes に書く。
+- ビルドや効果 JSON で落ちたら、~/build${W}.log の末尾を notes に書き、status を failed にして push する。
+````
+
+### 7.36 詰みの証明の払える守りの本番アリーナ（WP `lethal-deal-cost` の取り込み後・2026-10-23）
+
+WP `lethal-deal-cost` を本線に取り込んだ（6e22f1a58・`make test` green・`make audit-cross` void 0・不変量: 12,710 点で証明 1,064 → 860・旧い配り方の旗で全点一致）。報告 `docs/reports/2026-10-23_lethal_deal_cost.md`。台帳 2+360。
+- 候補席＝修正後（既定）・基準席＝`--lethal-deal-legacy`。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3191000 + (k−1)×1000**（§7.33 で払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば旗の既定を戻す。
+- **予告**: 0.495〜0.505。
+- 起動は §7.34 のアリーナが終わってセッション枠が空いてから。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（詰みの証明の払える守り vs 旧い配り方・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.36）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-ldc-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-ldc-w$KK 6e22f1a58   # 払える守りの取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'lethal-deal-legacy'    # 基準席の旧い配り方の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-ldc-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_ldc 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_ldc
+
+次の内容を ~/runD.sh に保存し、`nohup bash ~/runD.sh > ~/runD.out 2>&1 &` で回す。runD.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_ldc/*.jsonl"))
+print(json.dumps({"job": "arena-ldc-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (payable counter events in defensive deals)", "baseline": "nrel_r13d.npz + lethal_deal_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_ldc RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena ldc shard $KK"; git push -q -u origin claude/arena-ldc-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --lethal-deal-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3191000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_ldc/ldc_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
+**§7.35 再分析の結果（2026-10-23）**: 16 本全部完走・各 200 局・**38,400 点**・再生率 1.00（分岐 0）。**深い最善が記録の手と違う点 28.0%**（規則別: 序盤 23%・終える手と攻撃 32%・乱数 30%）＝予告 25〜35% の中。台帳 2+362。
+
+**訓練 r21 の指示書**（作業セッション用・1 セッション・`claude/train-r21`）:
+
+```
+作業: r21 の訓練 → 評価帯（docs/n_loop_ops.md §7.35・方策の教材の再分析）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+r21＝π は再分析の点だけ（波 49・50 の w01〜w08・各 200 局 × 12 点＝38,400 点・4 倍の読みで打ち直した方策）・価値は波 50＋49 の全部（勝敗）・warm-start r11a（r11a のときの形）。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for W in 49 50; do for XX in 01 02 03 04 05 06 07 08; do
+  [ -d ~/rean/n${W}_rean/w$XX ] && continue
+  git fetch -q origin claude/rean-n$W-w$XX:tmpr && mkdir -p ~/rean && git archive tmpr n${W}_rean/w$XX | tar -x -C ~/rean && git branch -qD tmpr; done; done
+ls -d ~/rean/n49_rean/w* ~/rean/n50_rean/w* | wc -l      # 16
+for N in n50 n49; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  [ -d ~/$N/n_records ] && [ $(ls -d ~/$N/n_records/${N}_w*_p[0-3] 2>/dev/null | wc -l) -ge 64 ] && break
+  git fetch -q origin claude/$N-w$k:tmpw && mkdir -p ~/$N && git archive tmpw n_records | tar -x -C ~/$N && git branch -qD tmpw; done; done
+for N in n50 n49; do echo $N $(ls -d ~/$N/n_records/${N}_w*_p[0-3] | wc -l); done      # どれも 64
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+git fetch -q origin claude/train-r20:r20net && git show r20net:n1_results/nrel_r20.npz > ~/nrel_r20.npz
+
+ZA="$HOME/n50/n_records/n50_w*_p[0-3]"
+ZB="$HOME/n49/n_records/n49_w*_p[0-3]"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/rean/n49_rean/w*" "$HOME/rean/n50_rean/w*" --z-in "$ZA" "$ZB" \
+  --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 4 --fast --save-each-epoch \
+  --warm-start opcg_sim/data/learned/nrel_r11a.npz --out ~/nrel_r21.npz 2>&1 | tee ~/train_r21.log
+# メモリ（cgroup 14GB）で落ちたら: --z-in を "$ZA" だけにして 1 回だけやり直し、notes に書く。
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$ZA" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r19.npz ~/nrel_r20.npz ~/nrel_r21.npz ~/nrel_r21.ep0.npz ~/nrel_r21.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r21.json 2>&1 | tee ~/band_r21.log
+# 再分析の点の上で方策の一致（深い最善の手との一致）も見る（帯の器が --in に再分析の dir を受けるなら）:
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$HOME/rean/n50_rean/w*" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r20.npz ~/nrel_r21.npz --policy --holdout-mod 7 --out ~/band_r21_rean.json 2>&1 | tee ~/band_r21_rean.log || true
+
+git checkout -B claude/train-r21
+mkdir -p n1_results && cp ~/nrel_r21*.npz n1_results/ && cp ~/train_r21.log ~/band_r21*.json ~/band_r21*.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π の dir 数と点数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標〔波 50 holdout と再分析の点〕／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r21*.npz train_r21.log band_r21*.json band_r21*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r21 のセット（訓練・評価帯）"
+git push -u origin claude/train-r21
+```
+
+**判定（訓練の後にコーディネータ）**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア・新しい組み方。主 random × real・副 固定ミラー・参考 random × synth_roles2（seed は回収の時に台帳で払い出す）。規約を満たせば本番の深さ（§7.33 の形）。あわせて WP `move-judge` の判定役で「r21 の手が r13d の手より良いか」。
+
+### 7.37 r21 の判定（再分析の方策の教師・2026-10-23）
+
+**訓練 r21 の結果**: 完走・best ep1・π 38,400 点（4 倍の読み）・価値 234 万行（波 50＋49）。評価帯（波 50 holdout）: 価値の誤差 r21 0.543 ≈ r20 0.541 < r19 0.561 < r13d 0.637。**方策の一致は r21 が低い**（記録の手〔1,280 回〕との top1: r21 0.529・r20 0.560・r13d 0.543＝教師が 4 倍の読みに変わったので予想どおり）が、**再分析の点（holdout 2,736 点）の上でも r21 は r20・r13d を上回らない**（top1_visits r21 0.560・r20 0.584・r13d 0.588）。評価帯は判定の主ではないので、アリーナで読む。台帳 2+363。
+
+判定: r21 vs r13d・公平同士・両席 160 回・各 16 シャード × 175 ペア・新しい組み方・本線 f87ccb9e9 に固定（守りの照合・払える守りの修正の後）。主 random × real 3211000〜3226000・副 固定ミラー 3231000〜3246000・参考 random × synth_roles2 3251000〜3266000。
+**予告（数を見る前）**: 評価帯の方策の一致が上がっていないので、前の予告（+10〜+25）より下げて 0〜+15。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r21 vs r13d・公平同士・3 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.37）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r21-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r21-w$KK f87ccb9e9   # 本線に固定（守りの照合・払える守りの修正の後）
+git fetch -q origin claude/arena-r21-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r21 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r21:r21net && git show r21net:n1_results/nrel_r21.npz > ~/nrel_r21.npz
+mkdir -p arena_r21
+
+次の内容を ~/run21.sh に保存し、`nohup bash ~/run21.sh > ~/run21.out 2>&1 &` で回す。run21.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r21/*.jsonl"))
+print(json.dumps({"job": "arena-r21-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r21 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r21 shard $KK"; git push -q -u origin claude/arena-r21-w$KK || echo PUSH_FAILED; }
+for C in r21; do
+  BM=3211000; BR=3231000; BS=3251000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_r21/${C}_real_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r21/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BS + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r21/${C}_synth2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 3 本＝約 40 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+**§7.37 の結果（2026-10-23）**: **非昇格**。主（random × real）0.4661 [0.4558, 0.4763]・**−23.6**／副（固定ミラー）0.3814・**−84.0**／参考（synth_roles2）0.4325・−47.2。報告 `docs/reports/2026-10-23_r21_judgment.md`・台帳 2+364。
+
+### 7.38 r21 が崩れた原因の切り分け（調査と再訓練・作業セッション用・opus・2026-10-23）
+
+ユーザ決定（2026-10-23「a でお願いします」）。台帳 2+365。根拠 `docs/reports/2026-10-23_r21_judgment.md`（r21 は主 −23.6・ミラー −84.0・合成 −47.2。再分析の点の holdout でも方策の一致が r13d を下回る＝教師に近づいていない）。
+**手順（作業セッション 1 本・`claude/r21-diag`）**:
+1. **照合（読み取りだけ・先に）**: 再分析の dir（`claude/rean-n{49,50}-w{01..08}` の `n{W}_rean/w{XX}`）の各点について、(a) 局面の符号化（`card_idx`・`scalars`・トークン）が元の記録（`claude/n{W}-w{XX}` の同じ局・同じ手番の行）と一致するか、(b) 候補の並び（`pol_sig`）が元の記録と同じ順で同じ手か、(c) 教師の分布（深い訪問・`q_improved`）の最大の手が `reanalyze.py` の記録した「深い最善」と一致するか、(d) 訓練の読み込み（`n_rel_train.py` の dump v2 の読み）で点の手の添字が候補の並びと揃っているか、を全点で数える。符号化の版（v15）・`meta` の版・`pol_v0` の有無も確かめる。今日の `move_sig` の修正（戦闘の手の札・本線 2eebbf9f0）が記録の `sig` との突き合わせに入り込んでいないかも見る。
+2. **ずれが見つかったら**: 原因を報告し、直し方（再分析をやり直すか・点の対応だけ付け直すか）を決めて直す。直した教材で r21 と同じ設定の訓練 r21x を 1 本。
+3. **ずれが無ければ**（教材は正しい）: 次の 2 本を訓練して評価帯で並べる（同じ価値の教師・warm-start と更新量だけ替える）——**r21b**＝`--pi-steps-mult 1`（更新量を 1 倍に）・**r21c**＝warm-start **r13d**（出荷のネットから）・`--pi-steps-mult 1`。評価帯は波 50 holdout と再分析の点の holdout（`--policy`）で r13d／r20／r21／r21b／r21c。
+4. 報告 `docs/reports/2026-10-23_r21_diag.md`（照合の表・原因・訓練した版の評価帯）・`RESULT.json`・npz を `claude/r21-diag` の `n1_results/` に push。判定のアリーナはコーディネータが別に起こす。
+**予告**: 照合で何か 1 つずれが見つかる（6 割）。見つからない場合、r21b は再分析の点の holdout で r13d を上回り（top1 0.59〜0.61）、r21c はさらに上（0.60〜0.62）。
+**完了条件**: エンジン・既定の挙動は変えない（照合の器は `tests/scripts/` に・1 回きり＝テストは足さない）。`make test` green。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
 ## 8. コーディネータが守ること
 
 - 指示書を出したら、**その指示書の内容（入力・帯・判断基準）を本書 §6 と
@@ -1700,6 +3804,61 @@ echo ALL_DONE
 旧計器（`legacy/` の `human_replay_divergence.py`／`coach_gate.py`）は使わない。**Rust の
 `Game`（`from_hidden`＋`decide` の trace）だけで新規に作った**（API は無い・CLI のみ）。
 判定は人・**分析（盤面の要約・人間の方針との比較）はコーディネータ（Claude）の役割**。
+
+### 7.39 続きの中の見えていなかった札の修正の本番アリーナ（WP `rs-commit-hidden` の取り込み後・2026-10-23）
+
+WP `rs-commit-hidden` を本線に取り込んだ（150f889ac・`make test` green・`make audit-cross` void 0）。報告 `docs/reports/2026-10-23_commit_hidden.md`（守りの再監査 300 局: 確かめ後の見逃し 7 → 6・消えたのはこの型の 1 点・golden は a1 帯 2 局だけ変化・旧い旗で全一致）。台帳 2+368。
+- 候補席＝修正後（既定）・基準席＝`--commit-hidden-legacy`。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3271000 + (k−1)×1000**（払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば旗の既定を戻す。
+- **予告**: 0.497〜0.505（監査で消えた見逃しは 300 局で 1 点・正しさの修正なので退行しないことの確認が主）。
+- **結果（2026-10-23）**: 2,397 ペア **0.5023 [0.4981, 0.5064]・+1.6 [−1.3, +4.5]**・void 3＝**採用（既定のまま）**。報告 `docs/reports/2026-10-23_commit_hidden_arena.md`。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（続きの中の見えていなかった札の修正後 vs 旧い形・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.39）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-chid-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-chid-w$KK 150f889ac   # rs-commit-hidden の取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'commit-hidden-legacy'    # 基準席の旧い形の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-chid-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_chid 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_chid
+
+次の内容を ~/runH.sh に保存し、`nohup bash ~/runH.sh > ~/runH.out 2>&1 &` で回す。runH.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_chid/*.jsonl"))
+print(json.dumps({"job": "arena-chid-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (hidden-card continuations re-read)", "baseline": "nrel_r13d.npz + commit_hidden_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_chid RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena chid shard $KK"; git push -q -u origin claude/arena-chid-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-hidden-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3271000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_chid/chid_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
 
 ### シナリオの書き方
 
@@ -1748,3 +3907,523 @@ shuffle する）と探索乱数（`search_seed`）の両方に効く。出力�
 "outputs": "scenario_out/", "unrestorable_rules": "…（`frame_to_hidden` が復元できない条件の要約）"}`。
 
 確認は `make test`（`tests/test_scenario_play.py` が復元の往復と `play` の出力契約を見る）。
+
+### 7.40 応手と対話の決め方の修正の本番アリーナ（WP `rs-window-read`・取り込みの前に起こす・2026-10-23）
+
+WP `rs-window-read`（`docs/search_efficiency_plan.md` §7.42）のコード（`claude/rs-window-read` の fe51a3ac8）で起こす。コーディネータの手元で fe51a3ac8 の `make test` green（859 passed）・作業セッションの `make audit-cross` void 0。
+作業セッションは守りの再監査（約 3.5 時間）だけが残り、コードは変えない前提（変わったらこのアリーナは取り直す）。報告の下書き `docs/reports/2026-10-23_window_read.md`（commit-audit の (A)(B)(C) の点 0・窓の揺れ 19.5% → 7.1%・1 局の実時間 +0.9%）。台帳 2+374。
+- 候補席＝修正後（既定）・基準席＝`--window-carry-legacy --window-worlds-legacy --window-tree-legacy`（3 つ立てると修正前と 1 bit も同じ）。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3321000 + (k−1)×1000**（払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば 3 つの旗を分けて測り直す。
+- **予告**: 0.51〜0.53（§7.42）。
+- **結果（2026-10-24）**: 2,399 ペア **0.5463 [0.5364, 0.5561]・+32.2 [+25.4, +39.2]**・void 1＝**採用（既定のまま）**。報告 `docs/reports/2026-10-24_window_read_arena.md`。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（応手と対話の決め方の修正後 vs 旧い決め方・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.40）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-wr-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/rs-window-read && git checkout -q -B claude/arena-wr-w$KK fe51a3ac8   # WP rs-window-read のコードに固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'window-tree-legacy'    # 基準席の旧い形の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-wr-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_wr 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_wr
+
+次の内容を ~/runW.sh に保存し、`nohup bash ~/runW.sh > ~/runW.out 2>&1 &` で回す。runW.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_wr/*.jsonl"))
+print(json.dumps({"job": "arena-wr-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (window read: continuations re-read, 16-world windows, short tree at low life)", "baseline": "nrel_r13d.npz + window_{carry,worlds,tree}_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_wr RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena wr shard $KK"; git push -q -u origin claude/arena-wr-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --window-carry-legacy --window-worlds-legacy --window-tree-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3321000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_wr/wr_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.41 波 51——直したエンジンで打つ最初の波と r22（生成役 r13d・2026-10-24）
+
+ユーザ決定（2026-10-24「a と b を並行で進めてください」の b）。台帳 2+378。
+**問い**: r17〜r21 の 9 世代が r13d を超えられなかった原因の一部は、**教材を打ったエンジンの欠陥**か。波 49・50 は守りの照合の欠陥（カウンターの札の取り違え・golden a1 の 47／50 局が変わった）と浅い応手（48／50 局が変わった）を含んだまま打たれた。
+- **教材（波 51）**: 生成役 **r13d**・設定は波 50 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・両方向 ε 3%・公平・v15・`--decks real`）・**エンジンは今の本線**（守りの照合・払える守り・見えていなかった札・応手と対話の修正の後）。**32 シャード × 480 局＝15,360 局**（1 波で約 230 万行＝価値の窓の下限を新しいエンジンの局だけで満たす）。seed **2551000〜2566500**（シャード k の base は 2550000 + ceil(k/2)×1000 + (k が偶数なら 500)・k＝1〜32）。
+- **訓練（別の指示書・波 51 が揃った後）**: **r22**＝warm-start r13d・π＝波 51・価値＝波 51 だけ（直したエンジンの局だけ）。**対照 r22o**＝warm-start r13d・π＝波 50・価値＝波 50＋49（直す前のエンジン・行数をそろえる）。違いは教材を打ったエンジンだけ。
+- **判定**: 公平同士・両席 160 回・基準 r13d・今の本線のコード・各 16 シャード × 175 ペア・主 random × real・副 固定ミラー・参考 random × synth_roles2（r22 と r22o は同じ seed）。候補なら本番の深さ（§7.33）でも。
+- **予告（数を見る前）**: r22 − r22o（主）+5〜+15。r22 vs r13d 主 0〜+15（教材の質が律速の一部なら正、方策の壁が主因なら 0 付近で r22o と差なし）。
+
+生成の作業セッション用の本文（`{K}`＝01〜32・`{BASE}`＝上の式）:
+
+````
+波 51 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.41）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.41 波 51"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n51-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n51-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n51_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n51_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 51 shard ${K}"' \
+  'git push -q -u origin claude/n51-w${K} || echo PUSH_FAILED' > ~/save51.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run51.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run51.sh > ~/run51.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run51.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run51.out; do sleep 30; done'; tail -n 1 ~/n51_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n51_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks real --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n51_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n51_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n51-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "real"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save51.sh
+done
+tail -n 2 ~/n51_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。````
+
+**波 51 の結果（2026-10-24）**: 32 シャード全部完走・15,360 局・**2,470,208 行**・dropped 23（波 50 は 2／7,680＝多い・WP `reaudit-wr` が見つけた「アタック時の効果で場の上限を超えると攻撃が消え、窓の経路が打てない手を返す」欠陥の疑い・0.15% なので教材はそのまま使う）・1 局平均 26.0 秒（波 50 は 13.6 秒＝窓の世界 16 本・短い木のぶん）。
+
+**訓練 r22／r22o の指示書**（作業セッション用・1 セッション・`claude/train-r22`）。違いは教材を打ったエンジンだけ（どちらも warm-start r13d・生成役 r13d・実デッキ）。
+- r22＝π 波 51・価値 波 51（直したエンジン・247 万行）。
+- r22o＝π 波 50・価値 波 50＋49（直す前のエンジン・約 230 万行）。
+評価帯＝波 51 holdout（r22 に有利・補助指標）で r13d／r22o／r22（＋各 ep0／ep1）。
+
+```
+作業: r22 と r22o の訓練 → 評価帯（docs/n_loop_ops.md §7.41）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+r22 と r22o は同時に回さず順に（メモリ 14GB）。1 本ごとに npz とログを push する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for k in $(seq -w 1 32); do git fetch -q origin claude/n51-w$k:tmpw && mkdir -p ~/n51 && git archive tmpw n_records | tar -x -C ~/n51 && git branch -qD tmpw; done
+for N in 50 49; do for k in $(seq -w 1 16); do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n51/n_records/n51_w*_p[0-3] | wc -l      # 128
+ls -d ~/n50/n_records/n50_w*_p[0-3] | wc -l      # 64
+ls -d ~/n49/n_records/n49_w*_p[0-3] | wc -l      # 64
+
+P51="$HOME/n51/n_records/n51_w*_p[0-3]"
+P50="$HOME/n50/n_records/n50_w*_p[0-3]"
+Z49="$HOME/n49/n_records/n49_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r13d.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P51" $COMMON --out ~/nrel_r22.npz 2>&1 | tee ~/train_r22.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P50" --z-in "$Z49" $COMMON --out ~/nrel_r22o.npz 2>&1 | tee ~/train_r22o.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P51" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r22o.npz ~/nrel_r22.npz ~/nrel_r22o.ep0.npz ~/nrel_r22o.ep1.npz ~/nrel_r22.ep0.npz ~/nrel_r22.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r22.json 2>&1 | tee ~/band_r22.log
+
+git checkout -B claude/train-r22
+mkdir -p n1_results && cp ~/nrel_r22*.npz n1_results/ && cp ~/train_r22.log ~/train_r22o.log ~/band_r22.json ~/band_r22.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r13d・各ネットの π dir 数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝各ネットの best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r22*.npz train_r22.log train_r22o.log band_r22.json band_r22.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r22 と r22o のセット（訓練・評価帯）"
+git push -u origin claude/train-r22
+```
+
+**r22／r22o の訓練（2026-10-24・`claude/train-r22`）**: どちらも best は 2 周目。検証（各自の教材の holdout）: r22 価値の誤差 0.579・符号 0.789・方策 top1 0.530／r22o 0.527・0.816・0.516（検証の帯が違うので直接は比べない・評価帯は波 51 holdout で集計中）。
+
+**判定のアリーナ**: 公平同士・両席 160 回・今の本線（応手と対話の修正の後）・基準 r13d・ネットごとに 16 シャード × 175 ペア × 3 条件。**主＝random × real 3361000〜3376000**・副＝固定ミラー 3381000〜3396000・参考＝random × synth_roles2 3401000〜3416000。**r22 と r22o は同じ seed**（組にして比べる）。採用の規約は §7.32 と同じ（主の下限 > 0.50・副の下限 ≥ 0.45 で候補 → 本番の深さで確かめる）。
+
+作業セッション用の本文（`{C}`＝r22／r22o・`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（{C} vs r13d・公平同士・3 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.41）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-{C}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-{C}-w$KK origin/claude/cpu-spec-improvements-yw91jd   # 今の本線（応手と対話の修正の取り込み後）
+git fetch -q origin claude/arena-{C}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_{C} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r22:r22net && git show r22net:n1_results/nrel_{C}.npz > ~/nrel_{C}.npz
+mkdir -p arena_{C}
+
+次の内容を ~/run_{C}.sh に保存し、`nohup bash ~/run_{C}.sh > ~/run_{C}.out 2>&1 &` で回す。run_{C}.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_{C}/*.jsonl"))
+print(json.dumps({"job": "arena-{C}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_{C} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena {C} shard $KK"; git push -q -u origin claude/arena-{C}-w$KK || echo PUSH_FAILED; }
+for C in {C}; do
+  BM=3361000; BR=3381000; BS=3401000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_{C}.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_{C}/{C}_real_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_{C}.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_{C}/{C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_{C}.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BS + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_{C}/{C}_synth2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 25 分 × 3 本＝約 80 分（応手の修正で 1 局が約 2 倍）（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。````
+
+### 7.42 WP `worker-jobs`——定型の作業（アリーナ・生成・訓練）を 1 本のスクリプトと短い skill にする（作業セッション用・opus・2026-10-24）
+
+ユーザ決定（2026-10-24「それで進めてください」）。台帳 2+381。
+**問い**: 毎回 3,000 字前後の指示書を手で番号を埋めて 16〜32 本に配っている。2026-10-24 に 2 回、事故になりかけた（波 51 で番号の当てはめが bash の展開を壊しかけた・r22 のアリーナで補助エージェントが 32 本の指示文を手で打ち直した）。定型の作業を Sonnet に任せる決まり（CLAUDE.md）に合わせ、**作業セッションへの指示を数行にし、決まった処理はコードに置く**。
+**作るもの**:
+1. **`opcg_sim/loop/worker_job.py`**（ジョブの実行役）: `python -m opcg_sim.loop.worker_job --spec <ジョブ定義の JSON> --k <番号>` の 1 行で、次を全部やる——結果ブランチの用意（本線または定義に書いたコミットから）・wheel のビルド（済みなら飛ばす）・効果 JSON の用意・結果ブランチに既にある途中結果の取り戻し（冪等・やり直しで終えた分を飛ばす）・本体の実行（区切りごとに push）・`RESULT.json` の書き出し（今の各指示書と同じ形）・最後に `ALL_DONE`。押し出しに失敗したら `PUSH_FAILED` を出して指数的に待って 4 回までやり直す。
+   - **3 種類**: `arena`（候補・基準のネット〔同梱のパス・または「ブランチ:パス」で取ってくる〕・両席の探索の設定と測定用の旗・条件の並び〔条件ごとに seed の基点・デッキ・リーダー・ペア数・区切りのペア数〕・シャード k の seed の式）／`gen`（生成役・seed の基点の式・局数・何回に分けるか・`record_gen` の引数）／`train`（π と価値の波〔ブランチの並びと dir の glob〕・warm-start・訓練の引数・作るネットの並び〔順に回す〕・評価帯の引数）。
+   - ジョブ定義の JSON は **`opcg_sim/loop/jobs/<名前>.json`** に置き、コーディネータが本線にコミットしてから配る。番号 k から決まる値（seed・ブランチ名・ファイル名）は**実行役が式で作る**（指示文に番号以外を埋めない）。
+   - `--dry-run`: 実行するコマンドの列を表示するだけ（git・ビルド・実行をしない）。
+2. **`.claude/skills/worker-job/SKILL.md`**（作業セッション向けの短い skill）: 実行役を nohup で回す・9 分以内の待ちを繰り返して `ALL_DONE` まで見張る・コンテナが再起動したら同じ 1 行をもう一度回す・`PUSH_FAILED` やエラーのときに何を `RESULT.json` の notes に書いて止めるか・コードは変えない・PR を作らない・コミットにモデル名を入れない。
+3. **`opcg_sim/loop/worker_prompts.py`**（コーディネータ側）: ジョブ定義と番号の範囲から、作業セッションに渡す**数行の指示文**と、セッションの題名・結果ブランチの一覧を出す（`create_session` にそのまま貼れる形）。
+4. **今の 3 つを写したジョブ定義**: r22／r22o の判定アリーナ（§7.41）・波 51 の生成（§7.41）・r22／r22o の訓練（§7.41）。
+**確かめ**:
+- **写しの一致**: 3 つのジョブ定義の `--dry-run` が出すコマンドの列が、§7.41 の手書きの指示書のコマンド（`arena_shard`／`record_gen`／`n_rel_train`・`n_rel_band` の引数）と一致することを、pytest 1 本で見張る（CLAUDE.md の「値を変えない移植の一致の見張り」に当たる・`docs/TEST_SPEC.md` に 1 行）。
+- **実際に 1 回回す**: 小さいジョブ（アリーナ 2 ペア・生成 2 局・訓練は 1 周を少ない行で）を使い捨てのブランチ `claude/worker-job-trial-*` に向けて最後まで回し、途中で止めて同じ 1 行で再開すると終えた分を飛ばすことを確かめる（使い捨てのブランチは消さずに残してよい）。
+- `make test` green。エンジン・既定の挙動は変えない。
+**文書**: この節に使い方（ジョブ定義の書き方・指示文の例）を足し、今後の指示書はジョブ定義＋数行の指示文で書くことを明記する。
+**完了条件**: ブランチ `claude/worker-jobs` に push・`RESULT.json`（job "worker-jobs"・最後に status "done"）。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+
+**使い方（2026-10-24・WP `worker-jobs` の実装）**。**今後の指示書は「ジョブ定義＋数行の指示文」で書く**（手書きの 3,000 字の指示書は書かない）。
+
+1. **ジョブ定義を書く**（`opcg_sim/loop/jobs/<名前>.json`・**本線にコミットしてから配る**＝作業セッションは本線から読む）。いちばん近い既存の定義を写して直すのが早い（§7.41 の写し: `gen_n51.json`・`arena_r22.json`／`arena_r22o.json`・`train_r22.json`。試し: `trial_*.json`）。
+   - 共通の欄: `kind`（`arena`／`gen`／`train`）・`job`（RESULT.json の job）・`branch`（結果ブランチ）・`shards`（k の上限）・`section`／`about`／`hours`（指示文に出る）・`ledger_grep`（出どころの照合＝本線の `docs/n_loop_ops.md` にこの文字列が在ること・CLAUDE.md の「N系ループの分散運用」も見る）・`base`（`{"branch": …}`＝その最新・`{"commit": …}`＝固定）・`require`（`[{"file", "grep"}]`＝旗が在ることの確かめ・無ければ止まる）・`nets`（`"ブランチ:パス"` は取ってきて `~/<ファイル名>` に置く・パスだけなら同梱）・`inputs`（RESULT.json の inputs にそのまま載る）・`commit_message`。
+   - **番号から決まる値**: 文字列の `{k}`・`{KK}`／`{K}`（2 桁）と、`vars` に書いた式（`"B": "k - 1"`・`"BASE": "2550000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"`。使えるのは四則・`//`・`%`・比較・if 式・`ceil`／`floor`／`max`／`min`／`int`／`abs`）。`seed_base` の欄は式。`~/` は作業の home。
+   - `arena`: `pairs`・`chunk_pairs`（1 回の `--max-pairs`・回の数は `ceil(pairs/chunk_pairs)`・回ごとに push）・`bands`・`workers`・`args`（両席の設定と測定用の旗＝`--sims 1280 --worlds 2 --budget 0 --cand-sims …` など・`--candidate --baseline` の直後に入る）・`arms`（任意・`[{"name", "args"}]`＝同じ seed で腕を替える §7.31 の形・`out` に `{ARM}`）・`tail_args`（`--pair-timeout 3600` など・`--out` の直前）・`conditions`（`[{"name", "seed_base", "args", "out"}]`・`args` は `--leaders --decks`）・`out_dir`。並びは「回 → 条件 → 腕」で、条件ごとに push。台帳がもう `pairs` に届いていれば飛ばす（arena_shard 自身も終えたペアを飛ばす）。
+   - `gen`: `net`・`seed_base`（式）・`games`（1 区切りの局数・区切り J の seed は `seed_base + games×J`）・`parts`・`workers`・`args`（`record_gen` の残りの引数）・`out_dir`／`part_dir`（`{J}` を使う）・`log`・`copy_logs`（リポジトリに写して一緒に push）。区切りは `meta_n_record.json` が在れば飛ばす。
+   - `train`: `waves`（`[{"branch"（`{ww}`＝取ってくる番号 2 桁）, "shards", "dest", "glob", "expect"}]`＝取ってきて個数を確かめる・足りていれば取らない）・`common_args`・`runs`（`[{"name", "in", "z_in", "args", "out", "log"}]`・順に回す＝同時に回さない）・`bands`（`[{"in", "nrel", "args", "out", "log"}]`）・`results_dir`（npz と各周の npz を置く・在れば飛ばす）・`torch_env`。
+   - `audit`（§7.45）: `tool`（`tests/scripts/defense_audit.py`／`tests/scripts/blunder_audit.py`）・`seed_base`（式・名前 `SEED`）・`games`（式・`GAMES`）・`out_dir`（`OUT`・シャードごとに別の置き場）・`args`（道具の引数の共通部分＝測定用の旗など・`with_args: true` の段の後ろに付く）・`steps`（`[{"name", "args", "with_args"}]`＝サブコマンドの並び・`args` は道具にそのまま渡す〔`{SEED}`・`{GAMES}`・`{OUT}` を埋めるだけ〕）・`fetch`（任意・`{"リポジトリの中のパス": "ブランチ:パス"}`＝道具がリポジトリの中のパスで読むもの・例 `vm_nets/nrel_r20.npz`・結果ブランチには入れない）・`push_every_min`（段の途中も保存する間隔・既定 20）・`games_file`（`{"file", "seed_key", "void_key"}`＝局の記録・RESULT.json の局の数と決着せず）・`points_file`（`{"file", "skip_key"}`＝点の数）・`merge`（つなぎ方・下）。済んだ段は `{OUT}/worker_steps.json`（段の名前 → 所要の秒）に書き、在れば飛ばす。段の途中で止まったら同じ段をもう一度回す（`run`／`play` は道具自身が終えた局を飛ばす・`verify` などは頭から）。始める前に `{OUT}/*.jsonl` の最後の途中で切れた行を落とす。
+     - **つなぎと集計**（コーディネータ側）: `python -m opcg_sim.loop.worker_audit_merge --job <名前>`。定義の `merge`（`games_file`・`concat`〔シャードのファイル名 → つないだファイル名〕・`summary`〔道具の集計の引数・`{OUT}`＝つないだ置き場〕）に従い、各結果ブランチから取って番号の順につなぎ、道具の集計をかける（既定の置き場 `n1_results/<名前>_merged/`・`merge.json` に各シャードのコミット）。**seed の重なり**（範囲どうし・局の記録が 2 本に在る・範囲の外）と**欠けたシャード**（ブランチが無い・RESULT.json が done でない・局が足りない）は止まる（欠けだけは `--allow-partial` で通す）。手元で回した置き場をつなぐなら `--local`。
+     - 例: `audit_defense.json`（§7.24 の設定・seed 3013000〜3013299 の 300 局を 4 × 75）・`audit_blunder.json`（§7.41 の手順・seed 3301000〜3301099 の 100 局を 4 × 25・審判 r20 を `fetch`）。試し: `trial_audit.json`・`trial_audit_blunder.json`。**seed は台帳の払い出しに合わせて写して直す**（例の seed は過去の監査の帯の写し）。
+2. **確かめる**: `python -m opcg_sim.loop.worker_job --job <名前> --k 1 --dry-run`（手書きの指示書と同じ形のコマンドの列が出る）。
+3. **指示文を出す**: `python -m opcg_sim.loop.worker_prompts --job <名前> --k 1-16 --json`（`create_session` にそのまま渡せる title・prompt・branch・model〔Sonnet〕の並び）。回収するブランチの一覧は `--branches`。例（`--job arena_r22 --k 3`）:
+
+````
+定型の作業を 1 本回してください: ジョブ `arena_r22` の番号 k=3（§7.41・r22 vs r13d の判定アリーナ（…））。結果は `claude/arena-r22-w03` に push されます。
+手順は skill `worker-job`（本線の .claude/skills/worker-job/SKILL.md・…）。仕様の正本は docs/n_loop_ops.md §7.42。
+コードは変更しない・PR は作らない・コミットにモデル名を入れない。質問で止まらず、迷った点は報告と RESULT.json の notes に書いて完走してください。**`~/worker_job.out` に ALL_DONE が出るまでターンを終えないでください**（目安 1.5 時間・9 分以内の待ちを繰り返す）。
+
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q --filter=blob:none --single-branch --branch claude/cpu-spec-improvements-yw91jd https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend && git fetch -q origin claude/cpu-spec-improvements-yw91jd && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
+nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
+````
+
+**実行役がすること**（`worker_job.py`・標準ライブラリだけ＝本線から取り出した 1 ファイルで動く）: 出どころの照合 → 結果ブランチ（**origin に在ればその先端から再開**・無ければ `base` から。手元にだけ在る途中結果は退避して戻す）→ `require` → numpy／maturin → wheel（`rust/` の木が前回と同じなら飛ばす）→ 効果 JSON → ネット・教材の取得 → 本体（区切りごとに `RESULT.json`〔今までの指示書と同じ形＋`worker` 欄＝ジョブ定義・k・コミット〕を書いて commit・push）→ `status: "done"` で最後の push → `ALL_DONE`。push の失敗は `PUSH_FAILED（n 回目）` を出して 2・4・8・16 秒待って 4 回までやり直し、最後まで通らなければ `PUSH_FAILED（最後の …）` で終わる（ALL_DONE を出さない・次の保存でまとめて押す）。エラーは `WORKER_JOB_ERROR` を出し、`status: "error"`・notes にエラーを書いて push を試みる。
+**範囲の外**: 再分析（§7.35 の `reanalyze.py`）・照合や調査のような読んで考える作業は、今までどおり手書きの指示書（必要になったら `kind` を足す）。監査（守りの見逃し・大きな損）は 2026-10-24 に `kind: "audit"` を足した（§7.45）＝**回すところまでは実行役**、点を 1 件ずつ読んで型に分けるのは今までどおり読んで考える作業。
+
+**試し（2026-10-24・`claude/worker-jobs` のコードで・使い捨てのブランチは残してある）**: 作業セッションと同じ 1 行（`git show … worker_job.py > ~/worker_job.py && python ~/worker_job.py --job <名前> --k 1 --source claude/worker-jobs`）で 4 本を最後まで回した。
+- `trial_gen` → `claude/worker-job-trial-gen-w01`: 2 局（1 局 × 2 区切り）・339 行・区切りごとに push・ALL_DONE。**同じ 1 行をもう一度回すと全部飛ばし、コミットを 1 つも足さない**（初めは RESULT.json の `commit` が保存のたびに変わり、済んだ区切りの保存が done → partial → done と揺れていた＝`code_commit`〔始めたときのコード〕に替え、全部飛ばした区切りは保存しないように直した）。
+- `trial_train` → `claude/worker-job-trial-train`: 上の 2 局を取ってきて 1 周の訓練 → 評価帯・npz（＋ep0）・ログ・`band_trial.json`・RESULT.json（各周の val・meta の行数・rss）。
+- `trial_arena` → `claude/worker-job-trial-arena-w01`: 候補＝上の訓練のブランチから取ったネット・2 ペア（1 ペアずつ 2 回）。2 回目の保存の途中で止め、同じ 1 行で再開すると 2 回とも飛ばして done で終えた。
+- `trial_gen_resume` → `claude/worker-job-trial-gen-resume`: 2 局 × 3 区切り。**区切り 1 の途中で実行役を止め**（origin には区切り 0 だけ）、手元の途中結果も消して（コンテナが替わったのと同じ）同じ 1 行で再開すると、区切り 0 を origin から取り戻して飛ばし、区切り 1・2 だけを回して 6 局・866 行で done。
+
+**r22／r22o の判定の結果（2026-10-24・報告 `docs/reports/2026-10-24_r22_judgment.md`）**: 主 random × real **r22 +32.9 [+25.6, +40.3]**／r22o +6.6・副ミラー r22 +24.7／r22o −39.6・参考 synth_roles2 r22 +2.1／r22o −36.7。同じ seed の組の差 r22 − r22o は主 +3.8 ポイント（z 5.2）・副 +9.2・参考 +5.5＝**教材を打ったエンジンの欠陥はネットの頭打ちの一因だった**。r22 は規約を満たす＝採用の候補 → §7.43。
+
+### 7.43 r22 の本番の設定での確認（2026-10-24）
+
+§7.41 の計画（候補なら本番の深さでも）。台帳 2+382。両席とも出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）・random × real・32 シャード × 84 ペア・seed **3421000 + (k−1)×1000**。下限 > 0.50 なら出荷を r13d → r22 に切り替えるかをユーザに諮る。**最初のジョブ定義による配布**（`opcg_sim/loop/jobs/arena_r22p.json`・§7.42・作業セッションは Sonnet）。
+**予告（数を見る前）**: +15〜+30（r13d の採用時は 160 回 +21.5 → 本番 +24.6 で縮まず、r19 は +12.4 → +3.6 で消えた。r22 の伸びは教材の質で、浅い読みだけで効く価値の改善ではないと読む）。
+
+**r22 の本番の設定の結果（2026-10-24・報告 `docs/reports/2026-10-24_r22_prod_arena.md`）**: 2,684 ペア **0.5626 [0.5517, 0.5734]・+43.7 [+36.1, +51.4]**・void 4＝出荷の基準（下限 > 0.50）を満たす。ジョブ定義＋実行役＋Sonnet の最初の配布は 32 本ともエラーなく完走。
+
+### 7.45 WP `worker-audit`——監査（守りの見逃し・大きな損）を実行役で分けて回す（作業セッション用・opus・2026-10-24）
+
+ユーザ決定（2026-10-24「1 でお願いします」＝監査を作業セッション数本に分けて同時に回す）。台帳 2+388。
+**問い**: 守りの監査 300 局は 1 局約 2 分（応手と対話の修正で、160 回の読みでは窓の費用が相対的に大きい）× 2 並列で 4〜5 時間かかる。監査の道具は seed の範囲で回せるので、アリーナ・生成と同じく番号 k ごとに範囲を割って Sonnet の作業セッションで並べ、結果をつないで集計する。
+**作るもの**（§7.42 の実行役に足す・既存の 3 種類の動きは変えない）:
+1. **`kind: "audit"`**（`opcg_sim/loop/worker_job.py`）: 道具（`tests/scripts/defense_audit.py`・`tests/scripts/blunder_audit.py`）とサブコマンドの並び（例 `run` → `verify`、`play` → `judge` → `recheck` → `verify`）を定義に書き、番号 k から決まる seed の範囲（`seed_base` の式・`games`）で回す。サブコマンドごとに出力が在れば飛ばす（冪等）・区切りごとに push・`RESULT.json`（点の数・決着せず・所要）・ALL_DONE。道具の引数（測定用の旗など）は定義の `args` にそのまま書く。
+2. **つなぎと集計**（`opcg_sim/loop/worker_audit_merge.py`・コーディネータ側）: ジョブ定義と番号の範囲から各結果ブランチの点のファイルを取ってつなぎ、道具の集計（`defense_audit.py summarize`・`blunder_audit.py summary`）をかけて 1 本の要約にする。seed の重なり・欠けたシャードを検出したら止める。
+3. **ジョブ定義の例**: 守りの監査（§7.24 の設定・300 局を 4 × 75）と大きな損の洗い出し（§7.41 の手順・100 局を 4 × 25）を `opcg_sim/loop/jobs/` に 1 つずつ（seed は使い捨ての範囲で可）。
+4. **skill**（`.claude/skills/worker-job/SKILL.md`）に audit の種類を足す（回し方は他と同じ）。§7.42 の使い方にも足す。
+**確かめ**:
+- **分けても同じ結果**: 守りの監査を 8 局（seed は §7.24 の帯の頭 8 局）で、1 本で回した要約と、2 本 × 4 局に分けて回してつないだ要約が一致する（点の並びと集計の数）。pytest は足さない（1 回きりの確かめ・報告に書く）。`--dry-run` の写しの見張り（§7.42 の pytest）に audit の定義を 1 つ足すのはよい。
+- 実際に 2 本 × 少ない局で、使い捨てのブランチ `claude/worker-job-trial-audit-*` に向けて最後まで回し、途中で止めて再開できること。
+- `make test` green。エンジン・道具の判定は変えない。
+**完了条件**: ブランチ `claude/worker-audit` に push・`RESULT.json`（job "worker-audit"・最後に status "done"）。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+### 7.44 波 52——r22 が打つ最初の波と r23（2026-10-24）
+
+ユーザ決定（2026-10-24「その順番で進めてください」）。台帳 2+387・2+389。
+- **教材（波 52）**: 生成役 **r22**（出荷既定）・設定は波 51 と同じ・**エンジンは WP `rs-overflow-trigger` のコード（1ee88db91）を取り込んだ本線**（場の上限超えで戦闘が止まる欠陥と、トリガーを断れない候補の抜けを直した後）。32 シャード × 480 局。seed **2571000〜2586500**（シャード k の base は 2570000 + ceil(k/2)×1000 + (k が偶数なら 500)）。ジョブ定義 `opcg_sim/loop/jobs/gen_n52.json`・作業セッションは Sonnet。
+- **訓練 r23（波 52 が揃った後・Sonnet）**: warm-start r22・π＝波 52・価値＝波 52＋51（今の生成役 r22 と 1 つ前の生成役 r13d・どちらも直したエンジン〔波 51 は場の上限・トリガーの修正の前〕・約 490 万行）。
+- **判定**: 公平同士・両席 160 回・基準 r22・主 random × real・副 固定ミラー・参考 random × synth_roles2 → 候補なら本番の設定。seed は訓練の後に払い出す。
+- **予告（数を見る前）**: r23 vs r22 主 +5〜+20（同じ打ち筋の 1 周目・教材がさらにきれいになったぶん）。
+**実装と確かめ（2026-10-24・ブランチ `claude/worker-audit`・使い方は §7.42 の `audit` の項）**。
+- **作ったもの**: `worker_job.py` の `kind: "audit"`（道具のサブコマンドの並びを定義のとおり回す・道具の引数は定義の `args` をそのまま渡す＝測定用の旗は定義に書くだけ・済んだ段は `{OUT}/worker_steps.json`・長い段の途中も 20 分ごとに保存・再開の前に切れた最後の行を落とす）・`worker_audit_merge.py`（つなぎと道具の集計・seed の重なりと欠けで止まる）・`jobs/audit_defense.json`（4 × 75）・`jobs/audit_blunder.json`（4 × 25・審判 r20 を `claude/train-r20` から `vm_nets/` へ）・試し 3 つ。arena／gen／train の動きは変えていない（§7.42 の写しの見張りはそのまま通る・audit_defense の見張りを 1 つ足した）。
+- **分けても同じ結果**（守りの監査・§7.24 の設定・seed 3013000〜3013007 の 8 局）: 1 本で 8 局と、2 本 × 4 局（`trial_audit`・`claude/worker-job-trial-audit-w01`／`w02`）をつないだ要約は、**局 8・対象の応手の点 320・点の行 372・脅威の点（甲 7／乙 2）・見逃し 0・終わり方の手番 52 が一致**。違いは**判定器が時間の上限（5 秒／10 秒）に掛かるかどうかで結果が揺れる 2 点だけ**（応手の点の 1 行が「不明 → 詰み」・終わり方の 1 手番が「不明 → 詰み」＝要約の終わり方の脅威 7 → 8・不明 30 → 29）。`nodes` の違い 196 のうち 189 は両方とも時間切れの判定（どこまで読んだかの数）、残りは同じ手番の置換表を共有する後の点。**同じ 1 局（3013002）を同じ設定で 2 回回しても同じ型の揺れが出る**（`nodes` 13 か所・乙の配り方 1 つが「無い → 不明」）＝分けたことによる差ではなく、判定器の時間の上限による揺れ。
+  - **時間を外した完全一致**: 同じ 8 局を判定の打ち切りを節点 2,000 だけ（時間の上限 600 秒＝掛からない・`PYTHONHASHSEED=0`）にして（`trial_audit_det`・`claude/worker-job-trial-audit-det-w01`／`w02`）、1 本と 2 本 × 4 局をつないだものは**点・`nodes`・verify・要約の全部が 1 か所も違わない**（時間の数を除く）。
+  - この 8 局には見逃しが無く（verify の対象 0）、verify の行のつなぎは空のファイルでしか確かめていない（空でも在ることが要約の節を決めるので、つなぎは空のファイルも運ぶ＝試しで見つけて直した）。
+- **途中で止めて再開**: シャード 1 の `run` の途中（2 局が origin に保存された後）で実行役と道具を止め、手元の結果も消して同じ 1 行で再開すると、origin の先端から取り戻して道具が「todo 2（done 2）」で残りだけを回し、done で終えた。つないだ結果は上のとおり 1 本と一致（時間の揺れの 2 点を除く）。大きな損の試し（`trial_audit_blunder`・1 局・判定 2 点・K＝4）は 5 段（play → judge → recheck → verify → summary）を最後まで回し、同じ 1 行をもう一度回すと全部の段を飛ばしてコミットを足さない。
+- **所要の目安**: 守りの監査 1 局 145〜300 秒（2 並走・1,280 回）。300 局を 4 本 × 4 並走なら 1 本 75 局で約 1 時間（verify は見逃しの点の数による）。
+
+**波 52 の結果（2026-10-24）**: 32 シャード全部完走・15,360 局・**2,529,298 行**・dropped 26（波 51 は 23＝率は同じ・場の上限の型は直っているので、残りは rs-overflow-trigger の 400 局で見た手数の上限・払えない起動の往復の型と見られる・未確認）・1 局平均 26.9 秒。**2 本（w08・w11）は実行役の不具合で結果が結果ブランチに載らず**（クローンが途中で止まった空のリポジトリから走り、結果を手元の main に積んで、動いていない結果ブランチを push して「push 済み」と出した）、作業セッションに結果のファイルだけを結果ブランチへ載せ直してもらった（強制 push なし・中身はエンジンの木と一致を確認）。r23 の訓練（ジョブ `train_r23`・Sonnet）を起こした。
+
+### 7.46 WP `worker-job-push-check`——実行役の push を確かめる（作業セッション用・opus・2026-10-24）
+
+台帳 2+391。§7.44 の波 52 で 32 本中 2 本、結果が届かないのに「push 済み」と出た（上）。直すもの（`opcg_sim/loop/worker_job.py`）:
+1. **最初に作業の木を確かめる**: `~/opcg-sim-backend` が在っても、origin が本リポジトリで、`base` のコミットを持っている（壊れたクローン・空のリポジトリでない）ことを確かめる。満たさなければ退避して取り直す。
+2. **結果ブランチに居ることを確かめる**: 本体を回す前と保存のたびに、今のブランチが結果ブランチであること（`git rev-parse --abbrev-ref HEAD`）。違えばエラーで止める（`WORKER_JOB_ERROR`）。
+3. **push の後に先端を確かめる**: `git ls-remote origin refs/heads/<結果ブランチ>` が手元のコミットと同じであること。違えば「届いていない」として `PUSH_FAILED` と同じやり直しに入り、最後まで違えば ALL_DONE を出さない。
+- 試し: 壊れたクローン（`.git` だけ在る空のリポジトリ）から始めても正しい結果ブランチに載ること・手元の main に居る状態で始めても止まるか正しく切り替わること・push を拒否させる（先端を別のコミットにしておく）と ALL_DONE を出さないこと。§7.42 の写しの見張りの pytest は通ったまま。`make test` green。
+**完了条件**: ブランチ `claude/worker-job-push-check` に push・`RESULT.json`（job "worker-job-push-check"・最後に status "done"）。PR は作らない。
+
+**実装と確かめ（2026-10-24・ブランチ `claude/worker-job-push-check`）**。直したのは `opcg_sim/loop/worker_job.py` だけ（ジョブ定義の `--dry-run` のコマンドの列は変えていない＝§7.42 の写しの見張りはそのまま通る）。
+- **1. 作業の木**: 始める前（`--job` の定義を読む前と、定義を読んだ後に `base` についてもう一度）、`~/opcg-sim-backend` が「作業の木であり・origin の URL が本リポジトリ（末尾 `gx5gyqe2-art/opcg-sim-backend`・プロキシ経由でも同じ）で・本線と `base` のブランチを origin から取れて・固定の `base.commit` を持つ」ことを確かめる。取ったものに `origin/<ブランチ>` を揃える（出どころの照合とコードの基が古いものを読まない）。満たさなければ `作業の木を取り直す: …（理由）` を出し、**横に新しくクローンして確かめが通ってから**古い木を `~/.worker_job/broken/` へ退避して入れ替える（取り直しが通らなければ古い木は動かさずに `WORKER_JOB_ERROR`）。退避した木にだけ在った途中結果も、結果ブランチに戻す。
+- **2. 今のブランチ**: 結果ブランチへの切り替えの直後・本体の各コマンドの前・保存（commit・push）の前に `git rev-parse --abbrev-ref HEAD` が結果ブランチであることを確かめ、違えば `WORKER_JOB_ERROR 今のブランチが …（結果ブランチ … のはず・…）` で止まる（エラーの保存もしない＝別のブランチに積まない）。
+- **3. push の後の先端**: push が成功で返っても `git ls-remote origin refs/heads/<結果ブランチ>` が手元の HEAD でなければ `PUSH_FAILED（n 回目）: 届いていない（origin の … は …・手元は …）` として同じやり直し（2・4・8・16 秒）に入る。最後まで届かなければ `保存 …: PUSH_FAILED` → `PUSH_FAILED（最後の …）` で終わり、ALL_DONE を出さない。「push 済み」は先端を確かめた後にだけ出る。
+- **試し**（使い捨てのジョブ定義 `jobs/trial_push.json`・1 局 × 1 区切り・32 回・作業の home は使い捨ての置き場・ブランチ `claude/worker-job-trial-push-w01`〜`w05` は残してある）:
+  - k=1 **壊れたクローン**（`git init` しただけの `.git` だけ在る空のリポジトリ）から: 「origin が本リポジトリでない（無い）」で取り直し → `w01` に partial・done を push・ALL_DONE。origin の先端＝手元の HEAD（943fc38d4）。
+  - k=2 **手元の main に居る状態**（古いコミットの `main` を checkout したクローン）から: 結果ブランチ `w02` に切り替わって ALL_DONE（cddb9191d）・手元の `main` は動かない。同じ木で `main` に戻して `check_branch`／`do_save` を直に呼ぶと「今のブランチが main（…のはず）」で止まり、何もコミットしない。
+  - k=4 **push を拒否させる**（本体の最中に、結果ブランチの祖先でないコミットを origin の `w04` に置く）: 保存のたびに `PUSH_FAILED` を 5 回 → `PUSH_FAILED（最後の …）`・ALL_DONE なし・origin の `w04` は置いたコミットのまま。（k=3 は置いたコミットが結果ブランチの祖先で早送りになり、拒否が起きなかった＝試しの組み立ての誤り。`w03` は普通に done。）
+  - k=5 **push は成功で返るが届かない**（push 先だけを手元の bare に向ける `remote.origin.pushurl`）: 旧いコードなら「push 済み」と出た型。`届いていない（origin の … は 無い・手元は …）` を 5 回 × 2 保存 → `PUSH_FAILED（最後の …）`・ALL_DONE なし。push 先を戻して同じ 1 行で再開すると、手元の途中結果を戻して本体を飛ばし、done を push して ALL_DONE（origin の先端＝手元 d38416f0a）。
+- **既にあった型で、直していないもの**: 手元の途中結果の退避（`do_checkout`）は `save_paths` の置き場（例 `n_records`）を丸ごと運ぶ。**同じ木で別のジョブ・別の番号を回すと、前のジョブの結果も新しい結果ブランチに載る**（試しの k=3〜5 で `trial_push_w01_p0` などが載った）。作業セッションは 1 本のジョブしか回さないので実害は無いはずだが、コンテナを使い回すなら直す（退避をこのジョブの区切りの置き場だけに絞る）。
+
+### 7.47 トリガーを断る修正の本番アリーナ（WP `rs-overflow-trigger` の (B)・2026-10-24）
+
+`docs/search_efficiency_plan.md` §7.44。台帳 2+392。候補席＝修正後（トリガーの発動確認に「発動しない」がある）・基準席＝`--confirm-trigger-legacy`（必ず発動する）。両席 r22・出荷の設定・random × real・32 シャード × 84 ペア・seed **3471000 + (k−1)×1000**（払い出し済み）。場の上限の修正 (A) は両席に効くのでこのアリーナでは測れない。
+ジョブ定義 `opcg_sim/loop/jobs/arena_ovt.json`・作業セッションは Sonnet。採用の規約は §7.33（下限 ≥ 0.49 で既定のまま）。**予告**: +3〜+10。
+
+**r23 の訓練（2026-10-24・`claude/train-r23`・Sonnet）**: best は 1 周目（ep0）・検証 価値の誤差 0.529・符号 0.805・方策 top1 0.506（ep1 0.535・0.801・0.512）・メモリ 12.9 GB（上限 14 GB に近い＝価値の行 約 490 万で次の波を足すと届く）。判定のアリーナはジョブ `arena_r23`（seed は上の台帳）。
+
+**トリガーを断る修正の本番アリーナの結果（2026-10-24）**: 2,687 ペア **0.5073 [0.5019, 0.5126]・+5.0 [+1.3, +8.8]**＝採用（既定のまま）。報告 `docs/reports/2026-10-24_trigger_decline_arena.md`。
+
+**r23 の判定（2026-10-24・両席 160 回・基準 r22）**: 主 random × real **2,797 ペア 0.5363 [0.5264, 0.5462]**・副 固定ミラー 2,800 ペア 0.4995 [0.4878, 0.5111]（下限 ≥ 0.45＝退行なし）・参考 synth_roles2 2,450 ペア（途中）0.5265 [0.5158, 0.5373]。規約（主の下限 > 0.50・副の下限 ≥ 0.45）を満たす＝**採用の候補** → §7.48。評価帯（波 52 holdout）: 価値の誤差 r13d 0.584／r22 0.511／r23 0.501。
+
+### 7.48 r23 の本番の設定での確認（2026-10-24）
+
+両席とも出荷の設定・random × real・32 シャード × 84 ペア・seed **3611000 + (k−1)×1000**。ジョブ定義 `arena_r23p`・Sonnet。下限 > 0.50 なら出荷を r22 → r23 に切り替えるかをユーザに諮る。台帳 2+394。**予告**: +15〜+35（160 回 +25 前後・r22 は 160 回 +32.9 → 本番 +43.7 で伸びた）。
+
+### 7.49 カウンターの窓の短い木をやめる修正の本番アリーナ（WP `rs-window-tree-blocker`・2026-10-24）
+
+ユーザ決定（2026-10-24「今のアリーナが終わったあとに c をやりましょうか」）。台帳 2+396。`docs/search_efficiency_plan.md` §7.45・報告 `docs/reports/2026-10-24_window_tree_blocker.md`（守りの再監査では見逃しが 11 → 20 に悪化）。
+候補席＝修正後（ライフ ≤ 1 の短い木はブロッカーの窓だけ）・基準席＝`--window-tree-counter-legacy`（今の既定＝カウンターの窓にも木）。両席 r22・出荷の設定・random × real・32 シャード × 84 ペア・seed **3511000 + (k−1)×1000**。**コードは作業ブランチ `claude/rs-window-tree-blocker`**（本線には入れていない）。ジョブ定義 `arena_wtb`・Sonnet。r23 の本番の確認（§7.48）が終わってから起こす（セッション数）。
+**予告**（作業セッション）: −8〜+2。採るのは下限 ≥ 0.49 かつ正のとき（費用の得は無いので、退行なしだけでは採らない）。
+
+**r23 の本番の設定の結果（2026-10-24・報告 `docs/reports/2026-10-24_r23_prod_arena.md`）**: 2,685 ペア **0.5490 [0.5386, 0.5593]・+34.1 [+26.9, +41.4]**・void 3＝出荷の基準を満たす。
+
+### 7.50 波 53——r23 が打つ最初の波と r24（2026-10-25）
+
+ユーザ決定（2026-10-25「a」）。台帳 2+406。
+- **教材（波 53）**: 生成役 **r23**（出荷既定）・設定は波 52 と同じ（ジョブ定義 `opcg_sim/loop/jobs/gen_n53.json`・Sonnet・32 シャード × 480 局）。**エンジンは払えない起動の修正（`rs-unpayable-activate`）の後・手数の上限 1,000 手の後の本線**。
+  seed **2591000〜2606500**（シャード k の base は 2590000 + ceil(k/2)×1000 + (k 偶数なら 500)）。
+- **訓練 r24（波 53 が揃った後・Sonnet）**: warm-start r23・π＝波 53・価値＝波 53＋52（今の生成役 r23 と 1 つ前の生成役 r22・約 500 万行・メモリの見積もり 4.9＋1.6×5 ≈ 13 GB）。評価帯は波 53 の holdout。
+- **判定**: 公平同士・両席 160 回・基準 r23・主 random × real・副 固定ミラー・参考 random × synth_roles2 → 候補なら本番の設定。seed は訓練の後に払い出す。
+- **予告（数を見る前）**: r24 vs r23 主 +5〜+20（r22 → r23 の +25.3 より小さい見込み・同じ打ち筋の 2 周目）。dropped は波 52 の 26 局（0.17%）から 0〜数局（手数の上限と払えない起動の型が消えるため）。
+
+**波 53 の結果（2026-10-25）**: 32 シャード全部完走・15,360 局・**2,594,900 行**・**dropped 0**（波 52 は 26・払えない起動の修正と手数の上限 1,000 で消えた＝予告どおり）。
+r24 の訓練はジョブ定義 `train_r24`（Sonnet・warm-start r23・π＝波 53・価値＝波 53＋52・約 512 万行・評価帯は波 53 の holdout で r22／r23／r24 を比べる）。メモリは r23（499 万行で 12.92 GB）から見て約 13.2 GB の見込み。
+
+**r24 の訓練の結果（2026-10-25・`claude/train-r24`）**: 価値の行 512 万・方策の点 104 万・2 周（良いのは 2 周目）。評価帯（波 53 の holdout・37 万行・価値の二乗誤差／勝敗の符号の一致）: r22 0.5041／0.8175・r23 0.4918／0.8234・**r24 0.4882／0.8249**。
+**r24 の判定**: ジョブ定義 `arena_r24`（Sonnet・16 シャード × 175 ペア × 3 条件・公平同士・両席 160 回・基準 r23）。seed は主 random × real **3761000 + (k−1)×1000**・副 固定ミラー **3781000 + …**・参考 random × synth_roles2 **3801000 + …**。主が基準達成・副の下限 ≥ 0.45 なら本番の設定で確かめる。
+
+### 7.51 根の詰みの証明の節点の上限の本番アリーナ（WP `rs-lethal-nodes`・2026-10-25）
+
+`docs/search_efficiency_plan.md` §7.49・報告 `docs/reports/2026-10-25_lethal_nodes.md`。台帳 2+407。候補席＝根の証明の節点の上限 80,000（`--cand-lethal-root-nodes 80000`）・基準席＝今の 20,000。
+両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・seed **3681000 + (k−1)×1000**。ジョブ定義 `arena_lnodes`・Sonnet。
+作業セッションの測り: 証明 853 → 966（+113・増えた分は全部、本当の配り方でも勝てる点・偽の証明は 1 点のまま・失った証明 0）・1 手の平均 +19.6%・99% 点 +10.3%。
+**予告**: +1〜+3。採るのは下限 ≥ 0.49 かつ正のとき（1 手 +20% の費用があるので、退行なしだけでは採らない）。
+
+**結果（2026-10-25・報告 `docs/reports/2026-10-25_lethal_nodes_arena.md`）**: 2,688 ペア **+0.6 [−0.3, +1.6]**・void 0・結果が分かれたのは 15 ペア（候補 10・基準 5）。**不採用**（ユーザ決定 2026-10-25「上げないかな」・台帳 2+411）。
+
+### 7.52 守りの窓の相手から見た詰みの証明の本番アリーナ（WP `rs-defense-proof`・2026-10-25）
+
+`docs/search_efficiency_plan.md` §7.51・報告 `docs/reports/2026-10-25_defense_proof.md`。台帳 2+407。候補席＝守りの証明を入れた形（`--cand-defense-proof`）・基準席＝今の形。
+両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・seed **3721000 + (k−1)×1000**。ジョブ定義 `arena_dfp`・Sonnet。**§7.51 のアリーナの後に起こす**（同時に動くセッションを約 50 に収めるため）。
+作業セッションの測り: 守りの再監査（seed 3351000〜3351299・手が変わった 33 局を最初に変わった手から）で確かめ後の見逃し 甲 4・乙 2 → 0・0、新しい見逃し 0。1 手の費用は測れる差なし（+1% 前後の見込み）。
+ただし WP `audit-verify-opp` の打ち比べでは、乙の 2 点は両席が強く打つとどちらの応手でも負け＝上限 +2 は 0 に近いかもしれない。
+**予告**: 0〜+2。採るのは下限 ≥ 0.49 かつ正のとき。
+
+**結果（2026-10-25・報告 `docs/reports/2026-10-25_defense_proof_arena.md`）**: 2,688 ペア **+0.9 [−0.3, +2.1]**・void 0・結果が分かれたのは 23 ペア（候補 15・基準 8）。**不採用**（ユーザ決定 2026-10-25「入れないでおきましょう」・台帳 2+416）。
+
+### 7.53 WP `worker-shallow`——作業セッションの取得を浅くする（作業セッション用・opus・2026-10-25）
+
+ユーザ決定（2026-10-25「浅く取得する方式はやりましょう」）。台帳 2+408。
+**根拠**: §7.51 のアリーナ 32 本で、作業セッションの取得（`git clone -q`・履歴をすべて取る）が 1 本あたり約 10 分・8.2 GB（本線の `.git` は 8.0 GB＝過去の教材・アリーナの記録・ネットの履歴）。32 本が同時に取ると 1 本は失敗（exit 128）してやり直した。
+さらに、作業セッションには環境が最初から本線を `/home/user/opcg-sim-backend` に取っているのに（`create_session` の既定は履歴 50 コミット）、実行役は別に `~/opcg-sim-backend`（`/root`）へもう 1 つ取っている。
+**直すもの**（`opcg_sim/loop/worker_job.py`・`opcg_sim/loop/worker_prompts.py`・`.claude/skills/worker-job/SKILL.md`・必要なら `docs/n_loop_ops.md` §7.42 の手順）:
+1. 指示文の起動の 2 行と、実行役の取り直し（`worker_job.py` の `git clone`）を浅い取得にする。候補は履歴 1 コミット（`--depth 1`・本線だけ）か、履歴は取って中身を必要なときだけ取る形（`--filter=blob:none`）。**どちらが良いかを測って決める**（取得の秒・容量・その後の fetch／push／再開が動くか）。
+2. 実行役が浅い木で困らないことを確かめる:
+   - 作業の木の確かめ（§7.46 の 1: `base` のコミットを持っているか）。
+   - 結果ブランチを origin から取り戻して続きから再開する（`do_checkout`）。
+   - push と、その後の先端の確かめ（ls-remote）。
+   - 訓練が読む古い波のブランチ（`n_records`）の取得。
+   - 監査・アリーナが読む別ブランチのファイル（`git show origin/...:path`）。
+   いずれも、浅い木では必要なブランチを個別に `git fetch --depth 1 origin <branch>` する形などで通るようにする。
+3. **今動いている作業セッションを壊さない**: 既に深く取った木（`~/opcg-sim-backend` が在る）はそのまま使えること（指示文は `[ -d … ] ||` で取得を飛ばす）。実行役の変更は、次に起動・再開したセッションから効く。
+4. 可能なら、環境が取ってある `/home/user/opcg-sim-backend` を使い回す案も比べる（2 つ目の取得が要らなくなる・ただし本線から作業の枝へ切り替える実行役の動きと、セッションの作業ブランチの扱いがぶつからないか）。採らないならその理由を報告に書く。
+**確かめ**: 使い捨てのジョブ定義（既存の `trial_*.json` と同じ形・1 局 × 1 区切り）で、浅い取得から gen・arena・train（小さく）・audit が ALL_DONE まで通ること、途中で止めて再開できること、壊れたクローンからの取り直しが通ること。§7.46 の試し（k=1〜5）と同じ型を浅い木でも 1 回ずつ。取得の秒と容量の前後を表にする。
+テストは足さない（器の直し）。`make test` green。エンジンを触らないので `audit-cross` は要らない。
+**報告** `docs/reports/2026-10-25_worker_shallow.md`・`RESULT.json`（job "worker-shallow"・status done）・ブランチ `claude/worker-shallow`。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+**注意**: 試しの間にも本番の作業セッション（§7.51 のアリーナ 32 本・r24 の訓練）が本線の `worker_job.py` を読む。本線へはコーディネータが取り込む（作業セッションは自分のブランチにだけ push する）。
+
+**実装と確かめ（2026-10-25・ブランチ `claude/worker-shallow`・報告 `docs/reports/2026-10-25_worker_shallow.md`）**。
+- **方式は `--filter=blob:none --single-branch --branch 本線`**（履歴は取って中身は要るときだけ）。取得は **249 秒・7.6 GB → 約 13 秒・81 MB**（作業の木込み 0.72 GB）。`--depth 1` も同じ 13 秒・77 MB だが、深さを付けずに別のブランチを取るとその履歴を根まで取る（波 1 本で 9 秒・+73 MB）＝どの fetch にも深さが要る。blob を後で取る木は履歴を全部持つので、今の fetch・checkout・push がそのまま動く。
+- 指示文の起動の行（`worker_prompts.py`＝`worker_job.CLONE_ARGS`・skill・§7.42 の例）と実行役の取り直しを同じ形にした。実行役は履歴を切った木（`--depth`・環境が取る履歴 50 の木）でだけ fetch に `--depth 1` を付ける（shell の段は `$WORKER_JOB_DEPTH`）。**全部持つ木には付けない＝既に深く取った木は今までと同じ操作**。固定の `base.commit` が手元に無ければ名指しで取る。
+- 試し（結果ブランチ `claude/worker-shallow-trial-*` は残してある）: 浅い取得から gen（区切りの途中で止め、作業の home を消して再開）・train・arena（止めて再開）・audit（審判を別のブランチから取る）が ALL_DONE。§7.46 の型: 壊れたクローン → 浅く取り直し・手元の main・push の拒否（ALL_DONE なし）・届かない push（ALL_DONE なし → 戻して再開で ALL_DONE）。加えて全部取った 7.6 GB の木（浅くならない）と履歴 50 の木（再開も）で ALL_DONE。
+- 環境の木（`/home/user/opcg-sim-backend`）の使い回しは採らない: 2 つ目の取得はもう 13 秒・0.1 GB で、セッションの作業ブランチと結果ブランチの取り合い（§7.46 の 2 で止まる）・環境によっては push の中継がセッションのブランチしか通さないかもしれない点の方が重い。
+
+### 7.54 r24 の本番の設定での確認（2026-10-25）
+
+両席とも出荷の設定・random × real・32 シャード × 84 ペア・seed **3821000 + (k−1)×1000**。ジョブ定義 `arena_r24p`・Sonnet。台帳 2+413。下限 > 0.50 なら出荷を r23 → r24 に切り替えるかをユーザに諮る。
+**r24 の判定（160 回・報告 `docs/reports/2026-10-25_r24_judgment.md`）**: 主 random × real 2,800 ペア **0.5104 [0.5004, 0.5203]・+7.2 [+0.3, +14.1]**・副 固定ミラー 0.4988 [0.4867, 0.5108]（下限 ≥ 0.45＝退行なし）・参考 synth_roles2 0.4945 [0.4843, 0.5046]・void 0。
+
+**r24 の本番の設定の結果（2026-10-25・報告 `docs/reports/2026-10-25_r24_prod_arena.md`）**: 2,688 ペア **0.5093 [0.4991, 0.5195]・+6.5 [−0.6, +13.5]**・void 0＝下限が 0.50 に届かない。
+
+### 7.55 止まった作業セッションの見張り（`opcg_sim/loop/worker_watch.py`・2026-10-25）
+
+ユーザ決定（2026-10-25「その順番で進めてください」の 4 番目）。台帳 2+414。32 本のうち 2〜3 本は、待機（idle）でコンテナが止まって実行役が消えるか、立ち上がり（取得・ビルド）で止まる。
+定期確認では `python -m opcg_sim.loop.worker_watch --job <名前> --started HH:MM` を回す。結果ブランチの状態と最後の push の時刻を並べ、次の番号を `SUSPECT` として出す:
+- 起動から 40 分（`--boot`・本番の設定のアリーナは最初の区切りの push まで 30 分前後）たってもブランチが無い
+- done でないのに、最後の push からジョブの時間の 1/3（最低 30 分・`--stale`）たっている
+- status が error
+出た番号のセッションを `get_session` で見て、待機・止まりなら声をかける（手順 1 の 2 行をもう一度回す）。初回（2026-10-25 08:50）は `arena_r24p` の k=8（`make rust-develop` の失敗）を見つけた。
+
+### 7.56 波 54——r24 が打つ最初の波（2026-10-25）
+
+ユーザ決定（2026-10-25「a でお願いします」・方策の頭の机上検証と並行）。台帳 2+419。
+- **教材（波 54）**: 生成役 **r24**（出荷既定）・設定は波 53 と同じ（ジョブ定義 `opcg_sim/loop/jobs/gen_n54.json`・Sonnet・32 シャード × 480 局）。
+  seed **2611000〜2626500**（シャード k の base は 2610000 + ceil(k/2)×1000 + (k 偶数なら 500)）。
+- **使い道**: (1) 普通の r25（warm r24・π 波 54・価値 波 54＋53）＝頭打ちが本物かの確認。(2) 方策の頭の机上検証（`docs/search_efficiency_plan.md` §7.52）が当たれば、その本実装の訓練の材料。
+- **予告**: r25 vs r24 主 0〜+10。dropped は 0〜数局。
+
+**波 54 の結果（2026-10-25）**: 32 シャード全部完走・15,360 局・**2,662,753 行**・**dropped 0**（浅い取得で立ち上がりが速く、約 1.7 時間で揃った）。r25 の訓練はジョブ定義 `train_r25`（Sonnet・warm-start r24・π＝波 54・価値＝波 54＋53・約 526 万行・評価帯は波 54 の holdout で r23／r24／r25）。メモリは r24（512 万行）から見て約 13.3 GB の見込み。
+
+**r25 の訓練の結果（2026-10-25・`claude/train-r25`）**: 2 周（良いのは 2 周目）。評価帯（波 54 の holdout・価値の二乗誤差／勝敗の符号の一致）: r23 0.5053／0.8156・r24 0.5006／0.8170・**r25 0.4954／0.8182**（1 周目 0.4916）。
+**r25 の判定**: ジョブ定義 `arena_r25`（Sonnet・16 シャード × 175 ペア × 3 条件・公平同士・両席 160 回・基準 r24）。seed は主 random × real **3861000 + (k−1)×1000**・副 固定ミラー **3881000 + …**・参考 random × synth_roles2 **3901000 + …**。
+
+**r25 の判定の結果（2026-10-25・報告 `docs/reports/2026-10-25_r25_judgment.md`）**: 主 −0.9 [−7.6, +5.9]・副 +7.9・参考 −12.4 [−19.3, −5.6]・void 0＝**非昇格**。出荷は r24 のまま。
+
+**波 55 は回さない**（ユーザ決定 2026-10-25「次の波は止めましょう」・台帳 2+425）。今の輪は r25 で頭打ち。
+
+### 7.57 世界 4 本の本番アリーナ（2026-10-25）
+
+ユーザ決定（2026-10-25「入れる」・本番の設定で測り直してから出荷に入れる）。台帳 2+429。
+候補席＝世界 4 本・基準席＝世界 2 本（今の出荷）。両席 r24・ほかは出荷の設定（1,280 回・枝予算なし・根の詰みの証明・公平）・random × real・32 シャード × 84 ペア・seed **3921000 + (k−1)×1000**。ジョブ定義 `arena_w4p`・Sonnet。
+**比べる量に注意**: 2026-10-21 の +30.2 は世界 1 本との差（`2026-10-21_worlds2_sims2560_arena.md`: 1 本 0／2 本 +18.1／4 本 +30.2・両席 r13d・窓の決め方を直す前）。今の出荷はすでに世界 2 本なので、**4 本 − 2 本の見込みは +8〜+15**。
+採るのは下限 ≥ 0.50（1 手の時間が 2 倍になる費用があるので、退行なしだけでは採らない）。
+
+**結果（2026-10-25・報告 `docs/reports/2026-10-25_worlds4_prod_arena.md`）**: 2,688 ペア **+13.2 [+6.6, +19.8]**・void 0＝採る条件を満たす。出荷に入れるかはユーザ判断。
+
+### 7.58 相手の集団で教材を作る——ジョブ定義の書き方（WP `league-gen`・`search_efficiency_plan.md` §7.56・2026-10-25）
+
+ユーザ決定（2026-10-25「相手の集団で教材」）。報告 `docs/reports/2026-10-25_league_gen.md`。
+`record_gen` に **`--opp-pool 名前:重み,…`** を足した。局ごとに片方の席が学ぶ側（`--net`＝今の生成役）、もう片方が集団から重みどおりに引いたネット。
+- **引きは局の seed だけで決まる**（`record_gen.opp_draw`）。学ぶ側の席は seed の偶奇で交互（偶数＝p1・奇数＝p2）＝先手・後手の偏りなし。
+- 名前だけ（`r23`）なら `opcg_sim/data/learned/nrel_r23.npz`（同梱のネットはそのまま使える＝ジョブ定義の `nets` の取得は要らない）。同梱していないネットはパスで書く（`/root/nrel_x.npz:0.1`・名前はファイル名）。
+- 集団に学ぶ側と同じネット（例 `r24`）を入れると、その割合の局は今までの自己対戦と同じ（両席とも学ぶ側の印）。
+- 相手の席の探索の設定（回数・世界・雑音・温度・ε・選び方）は学ぶ側と同じ（`args` に書いたものが両席に効く）。
+- 記録には列 `seat_net`（席を打ったネットの名前）・`learner`（1＝学ぶ側のネットの席）が増え、`meta_games.json` の局ごとに `nets`・`learner_seat`、`meta_n_record.json` に `opp_pool`・`opp_games`（相手ごとの局数）が入る。**集団なしの既定は今の記録と 1 bit も同じ**。
+- `--reanalyze-mult` とは併用できない（断る）。
+
+**ジョブ定義**: 生成のジョブ（`kind: "gen"`）の `args` に 2 語足すだけ（実行役は変えていない）。例（波 54 の定義 `gen_n54.json` を写す場合）:
+
+```json
+ "net": "opcg_sim/data/learned/nrel_r24.npz",
+ "args": ["--sims", "1280", "--worlds", "1", "--budget", "0", "--select-rule", "q_min_n", "--q-min-frac", "0.125",
+          "--root-prior-temp", "2.0", "--eps-play", "0.03", "--eps-hold", "0.03", "--decks", "real", "--shard-games", "10",
+          "--opp-pool", "r24:0.5,r23:0.2,r22:0.15,r13d:0.15"],
+ "require": [{"file": "opcg_sim/loop/record_gen.py", "grep": "\"--opp-pool\""}],
+```
+
+`require` に `--opp-pool` を入れておくと、取り込み前の本線で回して旗が無いまま落ちる事故を立ち上がりで止められる。
+
+**訓練**: `n_rel_train train … --pi-rows learner` で方策の教師を学ぶ側の行だけにする（価値の教師は両席の行のまま・`learner` 列の無い自己対戦の波は全部の行）。既定 `--pi-rows all` は今まで通り。訓練のジョブ定義では `common_args` か `runs[].args` に `"--pi-rows", "learner"` を足す。
+
+**費用**: 1 ワーカーが集団のネットを全部読む（同梱の npz は 1 本約 0.57 MB＝4 本でも無視できる）。相手が古いネットでも探索の回数は同じなので、1 局の時間はほぼ変わらない見込み（20 局の試しでは測っていない＝波で確かめる）。方策点は自己対戦の局の両席＋相手の局の学ぶ側の席＝集団 `r24:0.5` なら全体の約 3/4（試し 20 局で 1,077／1,463）。
+
+### 7.59 波 55L——相手の集団で打つ最初の波と r26（2026-10-25）
+
+ユーザ決定（2026-10-25「相手の集団で教材」）。台帳 2+432。WP `league-gen`（§7.58）の後。
+- **教材（波 55L）**: 学ぶ側 **r24**・相手の集団 **r24 0.5／r23 0.2／r22 0.15／r13d 0.15**（局の seed で引く・学ぶ側の席は交互）・設定は波 54 と同じ・**規則の直し 2 つ（リーダーの【ブロッカー】・【凍結】・WP `defect-hunt-2`）の後のエンジン**。ジョブ定義 `gen_n55l.json`・Sonnet・32 シャード × 480 局。
+  seed **2631000〜2646500**（シャード k の base は 2630000 + ceil(k/2)×1000 + (k 偶数なら 500)）。
+- **訓練 r26**: warm-start r24・π＝波 55L の**学ぶ側の行だけ**（`--pi-rows learner`）・価値＝波 55L の全部＋波 54。
+- **判定**: 公平同士・両席 160 回・基準 r24・主 random × real・副 固定ミラー・参考（警告灯）random × synth_roles2。
+- **予告**: r26 vs r24 主 0〜+10。合成デッキの下がり（r24 −3.8・r25 −12.4）が止まるか。
+- **起こす時期**: 世界 4 本の本番アリーナ（§7.57・32 本）が終わってから（同時に動くセッションを約 50 に収める）。
+- **結果（波 55L）**: 32 シャード全部 done・**15,360 局・2,634,479 行・落とした局 0**。訓練はジョブ定義 `train_r26.json`（Sonnet・台帳 2+435）。
+- **r26 の訓練の結果**（`claude/train-r26`・訓練 23 分・最良は 1 周目）: 評価帯（波 55L の取り置き 377,889 行）の勝敗の誤差 **r26 0.4882**・r24 0.4961・r23 0.5043（r24 より −0.0079・r25 のときの −0.0052 より大きい）。打ち方の当たり（学ぶ側の行・検証）0.4845。
+- **r26 の判定**: ジョブ定義 `arena_r26`（Sonnet・16 シャード × 175 ペア × 3 条件・公平同士・両席 160 回・基準 r24）。seed は主 random × real **3971000 + (k−1)×1000**・副 固定ミラー **3991000 + …**・参考 random × synth_roles2 **4011000 + …**。
+- **r26 の判定の結果（2026-10-26・報告 `docs/reports/2026-10-26_r26_judgment.md`）**: 主 random × real 2,800 ペア **0.5216 [0.5117, 0.5316]・+15.0 [+8.1, +22.0]**・副 固定ミラー +24.7 [+16.5, +33.0]・参考 synth_roles2 +8.2 [+1.3, +15.1]・void 0。**r26 は候補**（合成デッキの下がりも止まった）。
+
+### 7.60 r26 の本番の設定での確認（2026-10-26）
+
+両席とも出荷の設定（1,280 回・世界 2 本・枝予算なし・根の詰みの証明・公平）・r26 vs r24・random × real・32 シャード × 84 ペア・seed **4031000 + (k−1)×1000**。ジョブ定義 `arena_r26p`・Sonnet。台帳 2+438。下限 > 0.50 なら出荷を r24 → r26 に切り替えるかをユーザに諮る（届かなくても §7.54 の r24 と同じく主条件と副条件で決めてよい）。
+
+**r26 の本番の設定の結果（2026-10-26・報告 `docs/reports/2026-10-26_r26_prod_arena.md`）**: 2,688 ペア **0.5272 [0.5169, 0.5374]・+18.9 [+11.8, +26.0]**・void 0＝下限が 0.50 を越えた。出荷の切り替え（r24 → r26）をユーザに諮る。

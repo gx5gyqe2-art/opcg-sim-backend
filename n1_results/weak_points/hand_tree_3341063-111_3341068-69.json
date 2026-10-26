@@ -1,0 +1,104 @@
+{
+ "3341063:111": [
+  {
+   "discard": [
+    "EB03-006"
+   ],
+   "window_q": 0.3114,
+   "static": {
+    "r13d": 0.314,
+    "r22": -0.3
+   },
+   "tree_x1": {
+    "v": -0.018,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP13-012\"], \"selected_slots\": [2",
+    "kind": "window"
+   },
+   "tree_x4": {
+    "v": -0.018,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP13-012\"], \"selected_slots\": [2",
+    "kind": "window"
+   }
+  },
+  {
+   "discard": [],
+   "window_q": 0.3714,
+   "static": {
+    "r13d": 0.371,
+    "r22": -0.314
+   },
+   "tree_x1": {
+    "v": 0.5985,
+    "best": "{\"action_type\": \"ATTACK\", \"card\": \"OP09-009\", \"targets\": [\"EB02-035\"]}",
+    "kind": "main"
+   },
+   "tree_x4": {
+    "v": 0.6396,
+    "best": "{\"action_type\": \"ATTACK\", \"card\": \"OP09-009\", \"targets\": [\"EB02-035\"]}",
+    "kind": "main"
+   }
+  }
+ ],
+ "3341068:69": [
+  {
+   "discard": [
+    "OP16-109"
+   ],
+   "window_q": -0.4071,
+   "static": {
+    "r13d": -0.655,
+    "r22": -0.281
+   },
+   "tree_x1": {
+    "v": -0.4382,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   },
+   "tree_x4": {
+    "v": -0.4382,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   }
+  },
+  {
+   "discard": [
+    "OP09-093"
+   ],
+   "window_q": -0.2661,
+   "static": {
+    "r13d": -0.567,
+    "r22": -0.224
+   },
+   "tree_x1": {
+    "v": -0.309,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   },
+   "tree_x4": {
+    "v": -0.309,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   }
+  },
+  {
+   "discard": [
+    "OP16-116"
+   ],
+   "window_q": -0.1168,
+   "static": {
+    "r13d": -0.493,
+    "r22": -0.136
+   },
+   "tree_x1": {
+    "v": -0.1705,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   },
+   "tree_x4": {
+    "v": -0.1705,
+    "best": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-104\"], \"selected_slots\": [3",
+    "kind": "window"
+   }
+  }
+ ]
+}

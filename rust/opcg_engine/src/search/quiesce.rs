@@ -26,9 +26,8 @@ use crate::net::{nrel, Candidate, LoadedNet};
 use crate::state::EngineError;
 use serde_json::{json, Value};
 use std::cell::RefCell;
-use std::collections::HashMap;
 
-use super::{adapter, apply, LeafRollout, Move, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, PayloadRef, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
@@ -133,6 +132,9 @@ pub struct SearchState {
 
 // --- 評価器（value／priors）の文脈 ----------------------------------------------
 
+/// 展開で作った幹とその席（同じ盤面の価値に使い回す）。
+pub type SeatTrunk = (Seat, std::rc::Rc<crate::net::Trunk>);
+
 /// 探索が触る「盤面以外」＝カード表・ネット・候補生成の設定。
 pub struct Ctx<'a> {
     pub masters: &'a MasterTable,
@@ -156,6 +158,7 @@ impl<'a> Ctx<'a> {
             // 別途組むが、a1 は `ablate={"rel"}` なので 0 のままでよい。
             skip_relations: true,
             skip_onplay: self.net.weights.ablated("onplay"),
+            deck_v14: self.net.weights.deck_v14,
         }
     }
 
@@ -192,11 +195,12 @@ impl<'a> Ctx<'a> {
         };
         let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
         if !boxes.is_empty() && !self.opts.setup_box_keep_bare {
-            let boxed: Vec<&Value> = boxes
+            let boxed: Vec<Move> = boxes
                 .iter()
-                .filter_map(|b| b.get("payload").and_then(|p| p.get("base")))
+                .filter_map(|b| b.payload().and_then(|p| p.get("base")))
+                .map(|v| Move::from_json(v.into_owned()))
                 .collect();
-            moves.retain(|m| !boxed.contains(&m));
+            moves.retain(|m| !boxed.contains(m));
         }
         moves.extend(boxes);
         Ok(moves)
@@ -229,7 +233,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         to_move: Seat,
-        trunk: Option<&(Seat, crate::net::Trunk)>,
+        trunk: Option<&SeatTrunk>,
     ) -> Result<f64, EngineError> {
         if let Some(w) = s.state().winner {
             return Ok(if w == to_move { 1.0 } else { -1.0 });
@@ -261,11 +265,15 @@ impl<'a> Ctx<'a> {
             to_move,
             &self.enc_opts(),
         )?;
-        if enc.rel_om.is_empty() {
-            enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
-        }
-        if enc.rel_oo.is_empty() {
-            enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
+        // 関係 R を遮断したネット（`ablate={"rel"}`＝a1 以降の NRel）は R を 1 度も読まない
+        // （`net::nrel` の読み・長さの検査はどちらも遮断時に飛ばす）＝0 埋めを作らない。
+        if !self.net.weights.ablated("rel") {
+            if enc.rel_om.is_empty() {
+                enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
+            }
+            if enc.rel_oo.is_empty() {
+                enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
+            }
         }
         // ネットが読むのは先頭 22 枠（Python `ci = base["card_idx"][:N_TOK]`）。
         enc.card_idx.truncate(N_TOK);
@@ -293,7 +301,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         legal: &[Move],
-    ) -> Result<(Option<Vec<f32>>, Option<(Seat, crate::net::Trunk)>), EngineError> {
+    ) -> Result<(Option<Vec<f32>>, Option<SeatTrunk>), EngineError> {
         if legal.is_empty() {
             return Ok((None, None));
         }
@@ -311,35 +319,29 @@ impl<'a> Ctx<'a> {
         let prof_cand = crate::prof::enter(crate::prof::Cat::CandRows);
         let rows = setup_row_map(legal);
         let cand_target = self.net.weights.cand_target();
-        let refs: Vec<CandOwned> = {
+        let cands = {
             let state = s.state();
             // 効果の発生源（対象選択の候補行の主体・§20.9 の A）。中断していなければ None。
-            let src: Option<String> = if cand_target {
+            let src: Option<&str> = if cand_target {
                 state
                     .active_interaction()
                     .and_then(|it| it.source_card)
-                    .map(|c| state.card(c).uuid.clone())
+                    .map(|c| state.card(c).uuid.as_str())
             } else {
                 None
             };
-            let slots = slot_index(state, me);
+            // 引くだけの表＝枠の数ぶんを先に取っておく（中身は [`slot_index`] と同じ）。
+            let mut slots: UuidMap<'_, i32> = UuidMap::with_capacity_and_hasher(N_TOK, Default::default());
+            fill_slot_index(state, me, &mut slots);
             let uidx = uuid_index(state);
-            rows.heads
+            let refs: Vec<nrel::CandRef<'_>> = rows
+                .heads
                 .iter()
-                .map(|i| {
-                    cand_owned(
-                        state,
-                        self.masters,
-                        &uidx,
-                        &slots,
-                        &legal[*i],
-                        src.as_deref(),
-                        cand_target,
-                    )
-                })
-                .collect()
+                .map(|i| cand_owned(state, self.masters, &uidx, &slots, &legal[*i], src, cand_target))
+                .collect();
+            self.cand_rows(&enc, &refs)
         };
-        let cands = match self.cand_rows(&enc, &refs) {
+        let cands = match cands {
             Ok(c) => c,
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok((None, None)),
@@ -387,12 +389,12 @@ impl<'a> Ctx<'a> {
         legal: &[Move],
     ) -> Result<Vec<f32>, EngineError> {
         let mut w = vec![1.0f32; legal.len()];
-        let mut bases: Vec<(&Value, Vec<usize>)> = Vec::new();
+        let mut bases: Vec<(std::borrow::Cow<'_, Value>, Vec<usize>)> = Vec::new();
         for (i, mv) in legal.iter().enumerate() {
-            if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
+            if mv.action_type() != Some("SETUP_BOX") {
                 continue;
             }
-            let Some(base) = mv.get("payload").and_then(|p| p.get("base")) else {
+            let Some(base) = mv.payload().and_then(|p| p.get("base")) else {
                 continue;
             };
             match bases.iter_mut().find(|(b, _)| *b == base) {
@@ -409,7 +411,8 @@ impl<'a> Ctx<'a> {
                 .iter()
                 .map(|i| super::r#macro::setup_box_first_select(&legal[*i]))
                 .collect();
-            let ws = super::r#macro::setup_branch_weights(self, &state, me, base, &firsts)?;
+            let base = Move::from_json(base.clone().into_owned());
+            let ws = super::r#macro::setup_branch_weights(self, &state, me, &base, &firsts)?;
             for (k, i) in idxs.iter().enumerate() {
                 w[*i] = ws[k];
             }
@@ -420,27 +423,9 @@ impl<'a> Ctx<'a> {
     fn cand_rows(
         &self,
         enc: &crate::encode::Encoding,
-        refs: &[CandOwned],
+        refs: &[nrel::CandRef<'_>],
     ) -> Result<Vec<Candidate>, EngineError> {
-        let borrowed: Vec<nrel::CandRef<'_>> = refs
-            .iter()
-            .map(|r| nrel::CandRef {
-                action_type: r.action_type.as_str(),
-                don_k: r.don_k,
-                has_target: r.has_target,
-                card_id: r.card_id.as_deref(),
-                target_card_id: r.target_card_id.as_deref(),
-                si: r.si,
-                ti: r.ti,
-            })
-            .collect();
-        nrel::cand_rows(
-            &self.net.tab,
-            &self.net.statics,
-            self.vocab(),
-            enc,
-            &borrowed,
-        )
+        nrel::cand_rows(&self.net.tab, &self.net.statics, self.vocab(), enc, refs)
     }
 }
 
@@ -458,10 +443,10 @@ struct RowMap {
 fn setup_row_map(legal: &[Move]) -> RowMap {
     let mut heads: Vec<usize> = Vec::with_capacity(legal.len());
     let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
-    let mut seen: Vec<(&Value, usize)> = Vec::new();
+    let mut seen: Vec<(std::borrow::Cow<'_, Value>, usize)> = Vec::new();
     for (i, mv) in legal.iter().enumerate() {
-        let base = if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-            mv.get("payload").and_then(|p| p.get("base"))
+        let base = if mv.action_type() == Some("SETUP_BOX") {
+            mv.payload().and_then(|p| p.get("base"))
         } else {
             None
         };
@@ -478,24 +463,26 @@ fn setup_row_map(legal: &[Move]) -> RowMap {
     RowMap { heads, row_of }
 }
 
-/// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
-pub struct CandOwned {
-    pub action_type: String,
-    pub don_k: Option<f64>,
-    pub has_target: bool,
-    pub card_id: Option<String>,
-    pub target_card_id: Option<String>,
-    pub si: i32,
-    pub ti: i32,
-}
+/// uuid → 値の表（[`crate::fxhash::FxHasher`]＝引くだけの表・SipHash より軽い。引いた値は同じ。
+/// 並びを外へ出す [`slot_index`] の呼び出し元は、もともと実行ごとに並びが乱れる
+/// `RandomState` だった＝並びに意味は無い）。
+pub type UuidMap<'a, V> = crate::fxhash::FxHashMap<&'a str, V>;
 
 /// Python `n_eff._uuid_index`（uuid → カード。**ゾーンの範囲と優先順を Python に揃える**:
 /// リーダー → 場 → 手札 → トラッシュ → ライフ → ステージ、p1 が先・先勝ち）。
 ///
 /// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
 /// 含めない）＝方策の `card_id` 解決はこちらを使う。
-pub fn uuid_index(state: &GameState) -> HashMap<&str, CardIdx> {
-    let mut idx: HashMap<&str, CardIdx> = HashMap::new();
+pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
+    // 引くだけの表＝先に件数ぶんを取っておく（中身は同じ・伸ばし直しの再ハッシュをしない）。
+    let n: usize = [Seat::P1, Seat::P2]
+        .iter()
+        .map(|seat| {
+            let p = state.player(*seat);
+            2 + p.field.len() + p.hand.len() + p.trash.len() + p.life.len()
+        })
+        .sum();
+    let mut idx: UuidMap<'_, CardIdx> = UuidMap::with_capacity_and_hasher(n, Default::default());
     for seat in [Seat::P1, Seat::P2] {
         let p = state.player(seat);
         let zones = p
@@ -515,7 +502,15 @@ pub fn uuid_index(state: &GameState) -> HashMap<&str, CardIdx> {
 }
 
 /// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
-pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
+pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
+    let mut out: UuidMap<'_, i32> = UuidMap::default();
+    fill_slot_index(state, me, &mut out);
+    out
+}
+
+/// [`slot_index`] の中身を `out` へ入れる（`out` の容量は呼び出し側が決める＝引くだけの使い方
+/// なら先に取っておける。並びを外へ出す [`slot_index`] は今までどおり既定の容量から伸ばす）。
+fn fill_slot_index<'s>(state: &'s GameState, me: Seat, out: &mut UuidMap<'s, i32>) {
     let opp = me.other();
     let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
     slots.push(state.player(me).leader);
@@ -529,20 +524,18 @@ pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
     for k in 0..crate::encode::MAX_HAND {
         slots.push(state.player(me).hand.get(k).copied());
     }
-    let mut out: HashMap<&str, i32> = HashMap::new();
     for (i, c) in slots.iter().enumerate() {
         if let Some(c) = c {
             // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
             out.insert(state.card(*c).uuid.as_str(), i as i32);
         }
     }
-    out
 }
 
 /// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
 pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
 
-/// 手 → `CandOwned`（Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
+/// 手 → 候補行の識別 `nrel::CandRef`（手・盤面・マスターを借りる。Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
 ///
 /// 主体は `card_uuid` → `payload.uuid` の順（Python の `mv.get("card_uuid") or p.get("uuid")`）、
 /// 対象は `payload.target_ids[0]`。引けない uuid は `card_id=None`（＝vocab の PAD 0）。
@@ -552,54 +545,81 @@ pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
 /// （`src_uuid`＝中断している対話の `source_card_uuid`）にする。これが無いと「A を KO」と
 /// 「B を KO」が同じ候補行になり P が対象を区別できない。v13 のネットでは `false`＝
 /// 今までどおり（1 bit も変わらない）。
-pub fn cand_owned(
+pub fn cand_owned<'a>(
     state: &GameState,
-    masters: &MasterTable,
-    uidx: &HashMap<&str, CardIdx>,
-    slots: &HashMap<&str, i32>,
-    mv: &Move,
+    masters: &'a MasterTable,
+    uidx: &UuidMap<'_, CardIdx>,
+    slots: &UuidMap<'_, i32>,
+    mv: &'a Move,
     src_uuid: Option<&str>,
     cand_target: bool,
-) -> CandOwned {
-    let null = Value::Null;
+) -> nrel::CandRef<'a> {
+    cand_parts(
+        state,
+        masters,
+        uidx,
+        slots,
+        mv.action_type(),
+        mv.card_uuid(),
+        mv.payload(),
+        src_uuid,
+        cand_target,
+    )
+}
+
+/// [`cand_owned`] の本体（手の欄＝`action_type`・`card_uuid`・`payload` から）。準備箱の素の手
+/// （`payload.base`＝JSON）も同じ読みで辿る。
+#[allow(clippy::too_many_arguments)]
+fn cand_parts<'a>(
+    state: &GameState,
+    masters: &'a MasterTable,
+    uidx: &UuidMap<'_, CardIdx>,
+    slots: &UuidMap<'_, i32>,
+    at: Option<&'a str>,
+    card_uuid: Option<&'a str>,
+    p: Option<PayloadRef<'a>>,
+    src_uuid: Option<&str>,
+    cand_target: bool,
+) -> nrel::CandRef<'a> {
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
     // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
     // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
-    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-        if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
-            return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
+    if at == Some("SETUP_BOX") {
+        if let Some(base) = p.and_then(|p| p.as_json()).and_then(|v| v.get("base")) {
+            return cand_parts(
+                state,
+                masters,
+                uidx,
+                slots,
+                base.get("action_type").and_then(Value::as_str),
+                base.get("card_uuid").and_then(Value::as_str),
+                base.get("payload").map(PayloadRef::Json),
+                src_uuid,
+                cand_target,
+            );
         }
     }
-    let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
-    let p = mv.get("payload").unwrap_or(&null);
-    let mut su = mv
-        .get("card_uuid")
-        .and_then(Value::as_str)
-        .or_else(|| p.get("uuid").and_then(Value::as_str));
+    let at = at.unwrap_or("");
+    let mut su = card_uuid.or_else(|| p.and_then(|p| p.uuid()));
     let (has_target, tu) = if cand_target && at == SELECT_AT {
         if su.is_none() {
             su = src_uuid;
         }
-        let sel = p
-            .get("selected_uuids")
-            .and_then(Value::as_array)
-            .and_then(|a| a.first())
-            .and_then(Value::as_str);
+        let sel = p.and_then(|p| p.first_selected());
         (sel.is_some(), sel)
     } else {
-        let tids = p.get("target_ids").and_then(Value::as_array);
         (
-            tids.map(|a| !a.is_empty()).unwrap_or(false),
-            tids.and_then(|a| a.first()).and_then(Value::as_str),
+            p.is_some_and(|p| p.has_target_ids()),
+            p.and_then(|p| p.first_target_id()),
         )
     };
-    let card_id = |u: Option<&str>| -> Option<String> {
+    let card_id = |u: Option<&str>| -> Option<&'a str> {
         let c = *uidx.get(u?)?;
-        Some(masters.get(state.card(c).master).card_id.clone())
+        Some(masters.get(state.card(c).master).card_id.as_str())
     };
-    CandOwned {
-        action_type: at.to_owned(),
-        don_k: p.get("don_k").and_then(Value::as_f64),
+    nrel::CandRef {
+        action_type: at,
+        don_k: p.and_then(|p| p.don_k_f64()),
         has_target,
         card_id: card_id(su),
         // Python は `if tids:` のときだけ対象の card_id を引く
@@ -624,7 +644,7 @@ pub fn quiesce_choice(
         }
     }
     for (i, mv) in legal.iter().enumerate() {
-        if mv.get("action_type").and_then(Value::as_str) == Some("PASS") {
+        if mv.action_type() == Some("PASS") {
             return Ok(i);
         }
     }
@@ -670,6 +690,24 @@ pub fn best_branch(vals: &[Option<f64>]) -> Option<usize> {
     best
 }
 
+/// 箱コミット生成が読む適用手の 1 段（打った席・手・**打つ前の**判断点の対話の候補の札）。
+///
+/// 3 つ目は WP `rs-commit-hidden` の判定用（[`dialog_cards`]・対話でなければ空）。
+pub type TraceStep = (Seat, Move, Vec<CardIdx>);
+
+/// 判断点の対話の候補の札（`candidates` と `selectable` の両方・ドン!!は除く・対話でなければ空）。
+pub fn dialog_cards(state: &GameState) -> Vec<CardIdx> {
+    match state.active_interaction() {
+        Some(it) => it
+            .candidates
+            .iter()
+            .chain(it.selectable.iter().flatten())
+            .filter_map(|t| t.card())
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
 /// Python `mcts.resolve_battle_inplace`（窓が解決するまで**その場で**進める・巻き戻さない）。
 ///
 /// `box_value=true` が Python の「`box_depth>0` かつ `value_fn` あり」＝残りの窓も出口 value
@@ -683,7 +721,7 @@ pub fn resolve_battle_inplace(
     max_plies: usize,
     box_value: bool,
     box_depth: i32,
-    mut trace: Option<&mut Vec<(Seat, Move)>>,
+    mut trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<usize, EngineError> {
     let mut n = 0usize;
     // §20.7.2 の共通規則: 攻撃箱／防御箱の中でも「**自分が**選ぶ最初の対象選択」を 1 段だけ
@@ -740,13 +778,14 @@ pub fn resolve_battle_inplace(
             Some(i) => i,
             None => quiesce_choice(ctx, s, &legal, true)?,
         };
+        let cards = if trace.is_some() { dialog_cards(s.state()) } else { Vec::new() };
         match apply::apply_move_inplace(s, ctx.masters, name, &legal[pick], true) {
             Ok(()) => {}
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => break, // Python の `except Exception: break`
         }
         if let Some(tr) = trace.as_deref_mut() {
-            tr.push((name, legal[pick].clone()));
+            tr.push((name, legal[pick].clone(), cards));
         }
         n += 1;
     }
@@ -767,6 +806,27 @@ pub fn resolved_branch_values(
     box_depth: i32,
     window: Window,
 ) -> Result<Vec<Option<f64>>, EngineError> {
+    resolved_branch_values_with(ctx, s, st, name, legal, max_plies, box_depth, window, &mut |s, _st| {
+        ctx.value(s, name)
+    })
+}
+
+/// [`resolved_branch_values`] の、出口盤面の評価を外から渡す版（WP `rs-window-read`・§7.42 の 3）。
+///
+/// `leaf` は窓を解決した出口盤面（`s`・巻き戻す前）で呼ばれ、`name` から見た値を返す。
+/// `leaf = ctx.value(s, name)` なら [`resolved_branch_values`] と 1 bit も変わらない。
+#[allow(clippy::too_many_arguments)]
+pub fn resolved_branch_values_with(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+    name: Seat,
+    legal: &[Move],
+    max_plies: usize,
+    box_depth: i32,
+    window: Window,
+    leaf: &mut dyn FnMut(&mut Session, &mut SearchState) -> Result<f64, EngineError>,
+) -> Result<Vec<Option<f64>>, EngineError> {
     if !st.budget.take(legal.len()) {
         return Ok(vec![None; legal.len()]);
     }
@@ -777,15 +837,14 @@ pub fn resolved_branch_values(
     let mut vals = Vec::with_capacity(legal.len());
     for mv in legal {
         s.rng.restore(&base_rng);
-        let saved = s.swap_events(Vec::new());
         let mut unimplemented: Option<EngineError> = None;
-        let v = s.transaction(|s| {
+        let v = s.discard_events(|s| s.transaction(|s| {
             let out = (|| -> Result<f64, EngineError> {
                 apply::apply_move_inplace(s, ctx.masters, name, mv, true)?;
                 resolve_battle_inplace(
                     ctx, s, st, window, max_plies, true, box_depth, None,
                 )?;
-                ctx.value(s, name)
+                leaf(s, st)
             })();
             match out {
                 Ok(v) => Some(v),
@@ -795,8 +854,7 @@ pub fn resolved_branch_values(
                 }
                 Err(_) => None,
             }
-        });
-        s.swap_events(saved);
+        }));
         if let Some(e) = unimplemented {
             return Err(e);
         }
@@ -882,7 +940,7 @@ pub fn leaf_rollout_turn_end(
         }
         let pick = quiesce_choice(ctx, s, &legal, true)?;
         let mv = legal[pick].clone();
-        let is_turn_end = mv.get("action_type").and_then(Value::as_str) == Some("TURN_END");
+        let is_turn_end = mv.action_type() == Some("TURN_END");
         match apply::apply_move_inplace(s, ctx.masters, seat, &mv, true) {
             Ok(()) => {}
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
@@ -1063,8 +1121,8 @@ mod tests {
     // 1 bit も変わらないこと（同じ PAD 行のまま）を固定する。
 
     fn select_move(sel: &str) -> Move {
-        json!({"kind": "game", "action_type": SELECT_AT,
-               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}})
+        Move::from_json(json!({"kind": "game", "action_type": SELECT_AT,
+               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}}))
     }
 
     #[test]
@@ -1082,32 +1140,26 @@ mod tests {
         );
         let slots = slot_index(&state, Seat::P1);
         let uidx = uuid_index(&state);
-        let row = |sel: &str, v14: bool| {
-            cand_owned(
-                &state,
-                &masters,
-                &uidx,
-                &slots,
-                &select_move(sel),
-                Some(su.as_str()),
-                v14,
-            )
+        let (ma, mb) = (select_move(&ua), select_move(&ub));
+        let row = |mv: &Move, v14: bool| {
+            let r = cand_owned(&state, &masters, &uidx, &slots, mv, Some(su.as_str()), v14);
+            (r.has_target, r.si, r.ti, r.card_id.map(str::to_owned))
         };
         // v14: 対象＝selected_uuids[0]・主体＝効果の発生源（枠も引ける）
-        let ra = row(&ua, true);
-        let rb = row(&ub, true);
-        assert!(ra.has_target && rb.has_target);
-        assert_eq!(ra.si, slots[su.as_str()]);
-        assert_eq!(ra.ti, slots[ua.as_str()]);
-        assert_eq!(rb.ti, slots[ub.as_str()]);
-        assert_ne!(ra.ti, rb.ti, "A と B が同じ行になっている");
+        let ra = row(&ma, true);
+        let rb = row(&mb, true);
+        assert!(ra.0 && rb.0);
+        assert_eq!(ra.1, slots[su.as_str()]);
+        assert_eq!(ra.2, slots[ua.as_str()]);
+        assert_eq!(rb.2, slots[ub.as_str()]);
+        assert_ne!(ra.2, rb.2, "A と B が同じ行になっている");
         // v13（r3／a1）: 今までどおり対象なし・主体なし＝2 つは同じ行
-        let oa = row(&ua, false);
-        let ob = row(&ub, false);
-        assert!(!oa.has_target && !ob.has_target);
-        assert_eq!((oa.si, oa.ti), (-1, -1));
-        assert_eq!((oa.si, oa.ti), (ob.si, ob.ti));
-        assert_eq!(oa.card_id, ob.card_id);
+        let oa = row(&ma, false);
+        let ob = row(&mb, false);
+        assert!(!oa.0 && !ob.0);
+        assert_eq!((oa.1, oa.2), (-1, -1));
+        assert_eq!((oa.1, oa.2), (ob.1, ob.2));
+        assert_eq!(oa.3, ob.3);
     }
 
     /// `selected_uuids` が空（＝「選ばない」）なら v14 でも対象なしのまま。
@@ -1117,8 +1169,8 @@ mod tests {
         let (masters, state) = BoardBuilder::new().build();
         let slots = slot_index(&state, Seat::P1);
         let uidx = uuid_index(&state);
-        let mv = json!({"kind": "game", "action_type": SELECT_AT,
-                        "payload": {"selected_uuids": [], "accepted": true}});
+        let mv = Move::from_json(json!({"kind": "game", "action_type": SELECT_AT,
+                        "payload": {"selected_uuids": [], "accepted": true}}));
         let r = cand_owned(&state, &masters, &uidx, &slots, &mv, None, true);
         assert!(!r.has_target);
         assert_eq!(r.ti, -1);

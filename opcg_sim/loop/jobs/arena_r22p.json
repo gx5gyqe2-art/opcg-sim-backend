@@ -1,0 +1,67 @@
+{
+ "kind": "arena",
+ "section": "§7.43",
+ "ledger_grep": "7.43 r22 の本番の設定",
+ "about": "r22 vs r13d・両席とも出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）・random×real",
+ "job": "arena-r22p-w{KK}",
+ "branch": "claude/arena-r22p-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r22:n1_results/nrel_r22.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "out_dir": "arena_r22p",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "2",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3421000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r22p_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r22.npz (claude/train-r22)",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
+ "commit_message": "arena r22p shard {KK}"
+}

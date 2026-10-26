@@ -1,0 +1,15 @@
+[rust-develop] venv 無し: maturin build + pip install で代替する
+🐍 Found CPython 3.13 at /usr/bin/python3
+🔗 Found pyo3 bindings with abi3-py3.11 support
+   Compiling opcg_engine v0.0.1 (/home/user/opcg-sim-backend/rust/opcg_engine)
+    Finished `release` profile [optimized] target(s) in 1m 46s
+📦 Built wheel for abi3 Python ≥ 3.11 to target/wheels/opcg_engine-0.0.1-cp311-abi3-linux_x86_64.whl
+Processing ./target/wheels/opcg_engine-0.0.1-cp311-abi3-linux_x86_64.whl
+Installing collected packages: opcg-engine
+  Attempting uninstall: opcg-engine
+    Found existing installation: opcg_engine 0.0.1
+    Uninstalling opcg_engine-0.0.1:
+      Successfully uninstalled opcg_engine-0.0.1
+Successfully installed opcg-engine-0.0.1
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+EXIT 0

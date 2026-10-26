@@ -4,10 +4,15 @@
 1 か所へ集約したもの。**エンジンは Rust**（`opcg_sim.loop.driver`）だが、**判定規約は 1 文字も
 変えていない**——歴代の台帳・seed 帯・報告と地続きに読めることが測定の値打ちなので:
 
-- ペア＝同 seed で**席を入れ替えた 2 局**。候補は 2 局とも `la` を握る
-  （game a: cand=p1=la／game b: cand=p2=la・相手は 2 局とも `lb`）。**入れ替わるのは席（先後）
-  だけでリーダーは入れ替わらない**（2026-09-03 に台帳の発火イベントから判明した実態。総合勝率は
-  la/lb がランダムなので不偏だが、ペア内でリーダー相性は相殺されない）。
+- ペア＝同 seed・**同じ組のデッキ・同じ席で、ネットだけを入れ替えた 2 局**（2026-10-23・WP
+  `arena-pair-mirror`）。game a: p1=cand・p2=best／game b: p1=best・p2=cand で、両局とも
+  `build_pair(la, lb)` の同じ 2 デッキ（p1 が la 側・p2 が lb 側）。候補は a で la 側の先手、
+  b で lb 側の後手を握る＝**ペア内でデッキ相性も先後も相殺される**。同じネット同士なら 2 局は
+  同じ局になり、**どの条件でも全ペアがちょうど 1 勝 1 敗**（勝率 0.5 ちょうど）。
+  旧規約（〜2026-10-22）は game b を `build_pair(lb, la)` で組み、候補が 2 局とも `la` を握った
+  （入れ替わるのは席だけ）。`real`／`user`／`official` は seed がデッキを決めるので旧規約でも
+  同じ組＝結果は 1 局も変わらない。`synth*`・`singleton` の random 対面では候補が la に偏り、
+  同じネット同士でも 0.5 にならなかった（`docs/reports/2026-10-23_arena_pair_mirror.md`）。
 - リーダー対は `seed*7919+13` から決定論的に引く（`decks.leader_pair`）。
 - 勝率は**ペア水準**（0/0.5/1）で集計し 95% CI は正規近似（[`pair_level_ci`]）。
   2×pairs 局を独立 Bernoulli として扱う素朴 CI より狭い＝対照ペア設計の正しい区間。
@@ -118,7 +123,8 @@ class PairTimeout(BaseException):
 
 
 def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
-              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None):
+              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None,
+              best_kw=None):
     """子プロセス初期化: カード DB と席のつまみを 1 回だけ作る（以後の全ペアで共有）。
 
     `cand_kw` は**候補席にだけ**渡す探索のつまみ（`{"macro_moves": True}` 等）。機構を
@@ -130,6 +136,18 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
 
     `budget`（`--budget`）は**基準席の**戦闘箱の枝予算（None＝既定 8000・0＝無制限）。両席を出荷と
     同じ読みで打たせるときに `--cand-budget` と組で使う（2026-10-19・台帳 2+270）。
+
+    `best_kw`（`--rethink-ratio`／`--rethink-worlds`）は**基準席の**「迷う局面だけ世界 K 本で
+    読み直す」（`docs/search_efficiency_plan.md` §7.4）。None＝基準席は読み直さない（今までどおり）。
+    `arena_shard --omniscient` も同じ口から基準席へ `{"omniscient": True}` を渡す（§7.10）。
+    `arena_shard --reveal {fair,peek,opp_hand}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
+    `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
+    `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
+    `arena_shard --lethal-root-nodes N` も同じ口から `{"lethal_nodes": N}` を渡す（§7.49・WP `rs-lethal-nodes`）。
+    `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
+    `arena_shard --commit-hidden-legacy` も同じ口から `{"commit_hidden_legacy": True}` を渡す（§7.39・WP `rs-commit-hidden`）。
+    `arena_shard --confirm-trigger-legacy` も同じ口から `{"confirm_trigger_legacy": True}` を渡す（§7.44 の (B)・WP `rs-overflow-trigger`）。
+    `arena_shard --window-{carry,worlds,tree}-legacy` も同じ口から `{"window_*_legacy": True}` を渡す（§7.42・WP `rs-window-read`）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -140,8 +158,9 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     _G["cand_opts"] = dict(kw)                 # 台帳に書く候補席の設定（既定なら空）
     cand_sims = int(kw.pop("sims", sims))
     _G["cand"] = E.SeatSpec(cand_spec or None, sims=cand_sims, **kw)
-    _G["best"] = E.SeatSpec(best_spec or None, sims=sims,
-                            **({} if budget is None else {"budget": int(budget)}))
+    best_extra = {} if budget is None else {"budget": int(budget)}
+    best_extra.update({k: v for k, v in (best_kw or {}).items() if v is not None})
+    _G["best"] = E.SeatSpec(best_spec or None, sims=sims, **best_extra)
 
 
 def play_pair(seed: int) -> float:
@@ -161,10 +180,10 @@ def play_pair_detail(seed: int) -> Dict[str, Any]:
         signal.signal(signal.SIGALRM, _alarm)
         signal.alarm(int(_G["pair_timeout"]))
     try:
-        ab = D.build_pair(db, la, lb, seed, decks)          # game a: p1=cand=la / p2=best=lb
-        ba = D.build_pair(db, lb, la, seed, decks)          # game b: p1=best=lb / p2=cand=la
-        a = DR.run_game(seed, {"p1": cand, "p2": best}, *ab)
-        b = DR.run_game(seed, {"p1": best, "p2": cand}, *ba)
+        # 2 局とも同じ組のデッキ・同じ席で、ネットだけを入れ替える（WP `arena-pair-mirror`）。
+        ab = D.build_pair(db, la, lb, seed, decks)          # p1=la 側 / p2=lb 側（2 局共通）
+        a = DR.run_game(seed, {"p1": cand, "p2": best}, *ab)   # game a: cand=p1
+        b = DR.run_game(seed, {"p1": best, "p2": cand}, *ab)   # game b: cand=p2
         if a["winner"] is None or b["winner"] is None:
             raise DR.GameAborted(f"seed={seed} 決着せず（上限手数）")
     except (Exception, PairTimeout) as e:                    # noqa: BLE001  1 ペアで計測を止めない
@@ -177,7 +196,7 @@ def play_pair_detail(seed: int) -> Dict[str, Any]:
     wb = 1.0 if b["winner"] == "p2" else 0.0
     return _with_cand_opts(
         {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
-         "cand_leaders": [la, la], "turns": [a["turns"], b["turns"]]})
+         "cand_leaders": [ab[0][0], ab[1][0]], "turns": [a["turns"], b["turns"]]})
 
 
 def _with_cand_opts(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -203,6 +222,24 @@ CAND_FLAGS = {
     "box_commit": dict(box_commit=True),
     "no_box_commit": dict(box_commit=False),
     "residual_dig": dict(residual_dig=True),
+    # 全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用＝ゲームとしては不正な読み）。
+    "omniscient": dict(omniscient=True),
+    # 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。
+    "opp_blind": dict(opp_blind=True),
+    # 旧い手の署名（WP `rs-commit-sig`・測定専用＝箱の commit の照合で戦闘の手の札が落ちる 2026-10-22 までの形）。
+    "commit_sig_legacy": dict(commit_sig_legacy=True),
+    # 詰みの証明の守りの強い配り方を旧い形に（§7.33・測定用＝カウンターイベントを払えるかを見ずに積む）。
+    "lethal_deal_legacy": dict(lethal_deal_legacy=True),
+    # 見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用＝引き直した世界で選んだ札を本当の盤面で打つ）。
+    "commit_hidden_legacy": dict(commit_hidden_legacy=True),
+    # 窓・対話の決め方の旧い形（§7.42・WP `rs-window-read`・測定専用）。3 つまとめて立てれば修正前の打ち方。
+    "window_carry_legacy": dict(window_carry_legacy=True),
+    "window_worlds_legacy": dict(window_worlds_legacy=True),
+    "window_tree_legacy": dict(window_tree_legacy=True),
+    # トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・WP `rs-overflow-trigger`・測定専用）。
+    "confirm_trigger_legacy": dict(confirm_trigger_legacy=True),
+    # 守りの窓で相手から見た詰みの証明を使う（§7.51・WP `rs-defense-proof`・測定用＝既定 off）。
+    "defense_proof": dict(defense_proof=True),
 }
 
 
@@ -243,6 +280,61 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-budget", type=int, default=None,
                     help="候補席だけ戦闘箱の枝予算（1 decide あたり・既定 8000・0＝無制限）。"
                          "sims を上げると予算が先に切れる（2026-10-18・台帳 2+261）")
+    ap.add_argument("--cand-omniscient", action="store_true",
+                    help="候補席だけ全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）。"
+                         "探索の中で世界を引き直さず本当の盤面（相手の手札・両者の山札の並び）で読む"
+                         "（worlds は 1 扱い）。天井の切り分けにだけ使う")
+    ap.add_argument("--cand-reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="候補席だけ探索の世界の見える範囲を指定する（`docs/search_efficiency_plan.md` §7.11・§7.15）。"
+                         "省略＝既定の fair（自分に見えない物を全部混ぜ直し、知っている札は固定）。測定用に"
+                         "peek＝2026-10-21 までの既定（自分の山札と裏向きライフを本物のまま読む）／"
+                         "opp_hand＝相手の手札は本当のまま・相手の山札だけ混ぜ直す。--cand-omniscient とは排他")
+    ap.add_argument("--cand-opp-blind", action="store_true",
+                    help="候補席だけ、木の中の相手の番のノードを「こちらの手札＋山札＋裏向きライフを混ぜ直した"
+                         "複製」で評価する（`docs/search_efficiency_plan.md` §7.14・測定専用）。合法手と手の適用は"
+                         "本当の世界のまま。worlds・reveal・omniscient と併用できる")
+    ap.add_argument("--cand-lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                    help="候補席だけ詰みの証明（`docs/search_efficiency_plan.md` §7.21）。root＝自分のメインで届きうるとき"
+                         "公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ／root_reply＝加えて根の直後の相手の応手の"
+                         "節点でも証明する（省略＝off）")
+    ap.add_argument("--cand-lethal-root-nodes", type=int, default=None,
+                    help="候補席だけ根の詰みの証明の節点の上限（`docs/search_efficiency_plan.md` §7.49・測定用・"
+                         "opts の `lethal_nodes`）。省略＝Rust の既定（20,000）。--cand-lethal-proof と組で使う")
+    ap.add_argument("--cand-commit-sig-legacy", action="store_true",
+                    help="候補席だけ旧い手の署名で箱の commit を照合する（WP `rs-commit-sig`・測定専用）。"
+                         "2026-10-22 までの形＝戦闘の手（カウンター・ブロッカー）の札が署名から落ち、"
+                         "commit の続きは署名が一致する最初の合法手を打つ")
+    ap.add_argument("--cand-lethal-deal-legacy", action="store_true",
+                    help="候補席だけ詰みの証明の守りの強い配り方を旧い形にする（`docs/search_efficiency_plan.md` §7.33・"
+                         "測定用）。カウンターイベントを相手が払えるかを見ずに手札へ積む（2026-10-23 までの形）。"
+                         "省略＝既定（相手のアクティブのドン!!で払える枚数までだけ数える）。--cand-lethal-proof と組で使う")
+    ap.add_argument("--cand-commit-hidden-legacy", action="store_true",
+                    help="候補席だけ、箱の commit の続きに「commit した時点で見えていなかった札（山札・裏向きのライフ・"
+                         "相手の手札）から選ぶ段」も積む旧い形で打つ（`docs/search_efficiency_plan.md` §7.39・測定専用）。"
+                         "省略＝既定（その段から先を積まず、そこで読み直す）")
+    ap.add_argument("--cand-window-carry-legacy", action="store_true",
+                    help="候補席だけ、窓の根畳み・登場時の対話が決めた続き（効果の対話の段・戦闘の応手の段）を積む"
+                         "旧い形で打つ（`docs/search_efficiency_plan.md` §7.42 の 1・測定専用）。省略＝既定（積まずに読み直す）")
+    ap.add_argument("--cand-window-worlds-legacy", action="store_true",
+                    help="候補席だけ、窓の根畳みを世界 1 本で読む旧い形（§7.42 の 2・測定専用）。省略＝既定（世界 K 本の平均）")
+    ap.add_argument("--cand-window-tree-legacy", action="store_true",
+                    help="候補席だけ、ライフが少ない戦闘の応手を静的な値で比べる旧い形（§7.42 の 3・測定専用）。"
+                         "省略＝既定（短い木で読む）")
+    ap.add_argument("--cand-confirm-trigger-legacy", action="store_true",
+                    help="候補席だけ、トリガーの発動確認（ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけで打つ"
+                         "旧い形（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。省略＝既定（発動する／しないの 2 手）")
+    ap.add_argument("--cand-defense-proof", action="store_true",
+                    help="候補席だけ、相手の手番の守りの窓（自分のライフ ≤ 2・候補の値が平らか張り付き）で、各候補の後に"
+                         "相手から見た詰みの証明を回し、どの配り方でも相手が勝つ候補を外して選ぶ"
+                         "（`docs/search_efficiency_plan.md` §7.51・測定用）。省略＝既定（off）")
+    ap.add_argument("--cand-window-worlds", type=int, default=None,
+                    help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
+    # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
+    ap.add_argument("--cand-rethink-ratio", type=float, default=None,
+                    help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
+                         "で読み直す（省略＝off）。K 本ぶんスレッドを使うので --workers を下げること")
+    ap.add_argument("--cand-rethink-worlds", type=int, default=None,
+                    help="候補席の読み直しの世界の本数 K（省略＝4・--cand-rethink-ratio と組で使う）")
 
 
 #: `--cand-<flag>` → `Game.decide` の opts の欄（値をそのまま流す欄・省略＝既定）。
@@ -254,6 +346,13 @@ CAND_VALUE_FLAGS = {
     "cand_worlds": "worlds",
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
+    "cand_reveal": "reveal",
+    "cand_lethal_proof": "lethal_proof",
+    "cand_lethal_root_nodes": "lethal_nodes",
+    "cand_window_worlds": "window_worlds",
+    # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
+    "cand_rethink_ratio": "rethink_ratio",
+    "cand_rethink_worlds": "rethink_worlds",
 }
 
 

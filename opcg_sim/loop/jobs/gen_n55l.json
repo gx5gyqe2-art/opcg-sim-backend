@@ -1,0 +1,71 @@
+{
+ "kind": "gen",
+ "section": "§7.59",
+ "ledger_grep": "7.59 波 55L",
+ "about": "波 55L の生成（生成役 r24・相手の集団 r24:0.5／r23:0.2／r22:0.15／r13d:0.15・規則の直し〔リーダーのブロッカー・凍結〕の後・設定は波 54 と同じ・32 シャード × 480 局）",
+ "job": "n55l-w{K}",
+ "branch": "claude/n55l-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "2630000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n55l_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r24.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10",
+  "--opp-pool",
+  "r24:0.5,r23:0.2,r22:0.15,r13d:0.15"
+ ],
+ "log": "~/n55l_w{K}.log",
+ "copy_logs": [
+  "~/n55l_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--budget\""
+  },
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--opp-pool\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r24.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "opp_pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15"
+ },
+ "commit_message": "gen wave 55L shard {K}"
+}

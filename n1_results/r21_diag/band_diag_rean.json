@@ -1,0 +1,906 @@
+{
+ "rows": 5484,
+ "src": [
+  "/root/rean/n49_rean/w01",
+  "/root/rean/n49_rean/w02",
+  "/root/rean/n49_rean/w03",
+  "/root/rean/n49_rean/w04",
+  "/root/rean/n49_rean/w05",
+  "/root/rean/n49_rean/w06",
+  "/root/rean/n49_rean/w07",
+  "/root/rean/n49_rean/w08",
+  "/root/rean/n50_rean/w01",
+  "/root/rean/n50_rean/w02",
+  "/root/rean/n50_rean/w03",
+  "/root/rean/n50_rean/w04",
+  "/root/rean/n50_rean/w05",
+  "/root/rean/n50_rean/w06",
+  "/root/rean/n50_rean/w07",
+  "/root/rean/n50_rean/w08"
+ ],
+ "buckets": [
+  "all",
+  "turn1-4",
+  "turn5-8",
+  "turn9-99",
+  "after_removal",
+  "not_removal"
+ ],
+ "nets": {
+  "nrel_r13d.npz": {
+   "all": {
+    "v_mse": 0.7130178726495005,
+    "v_sign": 0.7151714077315828,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.1865028291940689,
+     "opp_turn_attacks": 0.2028977870941162,
+     "opp_turn_effects": 1.2957217693328857,
+     "my_turn_opp_life_lost": 0.21813321113586426,
+     "my_turn_attacks": 0.2958531379699707,
+     "my_turn_effects": 1.5005011558532715,
+     "next_my_board_power": 0.059150330722332,
+     "next_opp_board_power": 0.08484391868114471,
+     "next_my_board_n": 0.22807691991329193,
+     "next_opp_board_n": 0.2542065978050232,
+     "tok_attacked": 0.17133016884326935,
+     "tok_life_pushed": 0.031340230256319046,
+     "tok_ability": 0.11921729147434235,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.9178568801764275,
+    "v_sign": 0.6110471806674338,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12706886231899261,
+     "opp_turn_attacks": 0.13270224630832672,
+     "opp_turn_effects": 1.1974363327026367,
+     "my_turn_opp_life_lost": 0.16722354292869568,
+     "my_turn_attacks": 0.22602467238903046,
+     "my_turn_effects": 1.3445020914077759,
+     "next_my_board_power": 0.019516121596097946,
+     "next_opp_board_power": 0.04055348038673401,
+     "next_my_board_n": 0.16138942539691925,
+     "next_opp_board_n": 0.20686297118663788,
+     "tok_attacked": 0.12649095058441162,
+     "tok_life_pushed": 0.02092769555747509,
+     "tok_ability": 0.0941484346985817,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.7281667840297217,
+    "v_sign": 0.7230980123372173,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.28407028317451477,
+     "opp_turn_attacks": 0.300810307264328,
+     "opp_turn_effects": 1.5729494094848633,
+     "my_turn_opp_life_lost": 0.30483877658843994,
+     "my_turn_attacks": 0.3907974064350128,
+     "my_turn_effects": 1.7189468145370483,
+     "next_my_board_power": 0.08931557089090347,
+     "next_opp_board_power": 0.11035944521427155,
+     "next_my_board_n": 0.31212592124938965,
+     "next_opp_board_n": 0.3076900541782379,
+     "tok_attacked": 0.20548880100250244,
+     "tok_life_pushed": 0.04641282185912132,
+     "tok_ability": 0.1517016589641571,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.4417417681120771,
+    "v_sign": 0.8349188584219362,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2900073528289795,
+     "opp_turn_attacks": 0.34379318356513977,
+     "opp_turn_effects": 1.5956623554229736,
+     "my_turn_opp_life_lost": 0.2954570949077606,
+     "my_turn_attacks": 0.428580105304718,
+     "my_turn_effects": 1.8386151790618896,
+     "next_my_board_power": 0.14969268441200256,
+     "next_opp_board_power": 0.214820995926857,
+     "next_my_board_n": 0.36294615268707275,
+     "next_opp_board_n": 0.3473982512950897,
+     "tok_attacked": 0.2975451648235321,
+     "tok_life_pushed": 0.05025967210531235,
+     "tok_ability": 0.1823541820049286,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.7042143542806636,
+    "v_sign": 0.7236024844720497,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.23039956390857697,
+     "opp_turn_attacks": 0.28304147720336914,
+     "opp_turn_effects": 1.5171509981155396,
+     "my_turn_opp_life_lost": 0.27704235911369324,
+     "my_turn_attacks": 0.3151493966579437,
+     "my_turn_effects": 1.5606577396392822,
+     "next_my_board_power": 0.07319218665361404,
+     "next_opp_board_power": 0.10840734094381332,
+     "next_my_board_n": 0.24777451157569885,
+     "next_opp_board_n": 0.28506043553352356,
+     "tok_attacked": 0.21842172741889954,
+     "tok_life_pushed": 0.034373171627521515,
+     "tok_ability": 0.16867823898792267,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.7135670266430622,
+    "v_sign": 0.7146454862456412,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18352942168712616,
+     "opp_turn_attacks": 0.19746917486190796,
+     "opp_turn_effects": 1.2807230949401855,
+     "my_turn_opp_life_lost": 0.21414294838905334,
+     "my_turn_attacks": 0.29454606771469116,
+     "my_turn_effects": 1.4964264631271362,
+     "next_my_board_power": 0.058199185878038406,
+     "next_opp_board_power": 0.0832478255033493,
+     "next_my_board_n": 0.2267426699399948,
+     "next_opp_board_n": 0.25211668014526367,
+     "tok_attacked": 0.16814035177230835,
+     "tok_life_pushed": 0.031134791672229767,
+     "tok_ability": 0.1158669963479042,
+     "n": 3927
+    }
+   }
+  },
+  "nrel_r20.npz": {
+   "all": {
+    "v_mse": 0.6027405750555506,
+    "v_sign": 0.7733406272793582,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.1861373484134674,
+     "opp_turn_attacks": 0.20339496433734894,
+     "opp_turn_effects": 1.261429786682129,
+     "my_turn_opp_life_lost": 0.21566703915596008,
+     "my_turn_attacks": 0.28252992033958435,
+     "my_turn_effects": 1.385856032371521,
+     "next_my_board_power": 0.05607129633426666,
+     "next_opp_board_power": 0.07741423696279526,
+     "next_my_board_n": 0.2191527932882309,
+     "next_opp_board_n": 0.24909159541130066,
+     "tok_attacked": 0.169335275888443,
+     "tok_life_pushed": 0.031217467039823532,
+     "tok_ability": 0.11088937520980835,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7579888883065266,
+    "v_sign": 0.7105868814729575,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.13141684234142303,
+     "opp_turn_attacks": 0.12486634403467178,
+     "opp_turn_effects": 1.166164755821228,
+     "my_turn_opp_life_lost": 0.16200725734233856,
+     "my_turn_attacks": 0.2109849750995636,
+     "my_turn_effects": 1.2481392621994019,
+     "next_my_board_power": 0.018651368096470833,
+     "next_opp_board_power": 0.04127276688814163,
+     "next_my_board_n": 0.15191347897052765,
+     "next_opp_board_n": 0.20604346692562103,
+     "tok_attacked": 0.12367963045835495,
+     "tok_life_pushed": 0.0206645205616951,
+     "tok_ability": 0.08816548436880112,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.6215309665382286,
+    "v_sign": 0.7697052775873886,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.28390422463417053,
+     "opp_turn_attacks": 0.3081521689891815,
+     "opp_turn_effects": 1.5316739082336426,
+     "my_turn_opp_life_lost": 0.3066835403442383,
+     "my_turn_attacks": 0.37848207354545593,
+     "my_turn_effects": 1.56107759475708,
+     "next_my_board_power": 0.08441803604364395,
+     "next_opp_board_power": 0.10759758204221725,
+     "next_my_board_n": 0.29970255494117737,
+     "next_opp_board_n": 0.3007424771785736,
+     "tok_attacked": 0.20251275599002838,
+     "tok_life_pushed": 0.046333927661180496,
+     "tok_ability": 0.13994058966636658,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.3892921606525731,
+    "v_sign": 0.8601007274762171,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2747853994369507,
+     "opp_turn_attacks": 0.3471192419528961,
+     "opp_turn_effects": 1.539493441581726,
+     "my_turn_opp_life_lost": 0.28715309500694275,
+     "my_turn_attacks": 0.4191718101501465,
+     "my_turn_effects": 1.6765522956848145,
+     "next_my_board_power": 0.14130783081054688,
+     "next_opp_board_power": 0.1673869490623474,
+     "next_my_board_n": 0.35773372650146484,
+     "next_opp_board_n": 0.3301720917224884,
+     "tok_attacked": 0.28544315695762634,
+     "tok_life_pushed": 0.05004316195845604,
+     "tok_ability": 0.16730837523937225,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.5975893662909767,
+    "v_sign": 0.7701863354037267,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2300194501876831,
+     "opp_turn_attacks": 0.2921990156173706,
+     "opp_turn_effects": 1.492218017578125,
+     "my_turn_opp_life_lost": 0.28421565890312195,
+     "my_turn_attacks": 0.31549474596977234,
+     "my_turn_effects": 1.3700659275054932,
+     "next_my_board_power": 0.07045928388834,
+     "next_opp_board_power": 0.10717026889324188,
+     "next_my_board_n": 0.25172165036201477,
+     "next_opp_board_n": 0.2990233302116394,
+     "tok_attacked": 0.20860520005226135,
+     "tok_life_pushed": 0.033888086676597595,
+     "tok_ability": 0.1564476191997528,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.603061901909908,
+    "v_sign": 0.7735373886090663,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18316493928432465,
+     "opp_turn_attacks": 0.19737973809242249,
+     "opp_turn_effects": 1.2457971572875977,
+     "my_turn_opp_life_lost": 0.21102382242679596,
+     "my_turn_attacks": 0.2802969813346863,
+     "my_turn_effects": 1.3869256973266602,
+     "next_my_board_power": 0.05509670823812485,
+     "next_opp_board_power": 0.07539867609739304,
+     "next_my_board_n": 0.21694670617580414,
+     "next_opp_board_n": 0.2457094043493271,
+     "tok_attacked": 0.16667528450489044,
+     "tok_life_pushed": 0.03103657066822052,
+     "tok_ability": 0.10780343413352966,
+     "n": 3927
+    }
+   }
+  },
+  "nrel_r21.npz": {
+   "all": {
+    "v_mse": 0.5994906865443892,
+    "v_sign": 0.7800875273522976,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.1851014494895935,
+     "opp_turn_attacks": 0.19401627779006958,
+     "opp_turn_effects": 1.1998075246810913,
+     "my_turn_opp_life_lost": 0.21415475010871887,
+     "my_turn_attacks": 0.28312385082244873,
+     "my_turn_effects": 1.338425874710083,
+     "next_my_board_power": 0.056755296885967255,
+     "next_opp_board_power": 0.07215414941310883,
+     "next_my_board_n": 0.21628719568252563,
+     "next_opp_board_n": 0.24199223518371582,
+     "tok_attacked": 0.16595864295959473,
+     "tok_life_pushed": 0.031200801953673363,
+     "tok_ability": 0.1072179526090622,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7553991359660087,
+    "v_sign": 0.7140391254315305,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12772101163864136,
+     "opp_turn_attacks": 0.11632203310728073,
+     "opp_turn_effects": 1.1130956411361694,
+     "my_turn_opp_life_lost": 0.16058771312236786,
+     "my_turn_attacks": 0.21427516639232635,
+     "my_turn_effects": 1.2010599374771118,
+     "next_my_board_power": 0.018589746206998825,
+     "next_opp_board_power": 0.03911133110523224,
+     "next_my_board_n": 0.1537119299173355,
+     "next_opp_board_n": 0.20278392732143402,
+     "tok_attacked": 0.12021784484386444,
+     "tok_life_pushed": 0.02069835364818573,
+     "tok_ability": 0.08389472216367722,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.6123752407192272,
+    "v_sign": 0.7779300891021247,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.285286009311676,
+     "opp_turn_attacks": 0.29644775390625,
+     "opp_turn_effects": 1.4586879014968872,
+     "my_turn_opp_life_lost": 0.306090772151947,
+     "my_turn_attacks": 0.37768998742103577,
+     "my_turn_effects": 1.525032877922058,
+     "next_my_board_power": 0.08548355847597122,
+     "next_opp_board_power": 0.09837386757135391,
+     "next_my_board_n": 0.29408788681030273,
+     "next_opp_board_n": 0.28694313764572144,
+     "tok_attacked": 0.20294466614723206,
+     "tok_life_pushed": 0.04649710655212402,
+     "tok_ability": 0.1359635442495346,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.3869605889643356,
+    "v_sign": 0.8696138780078344,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2758508026599884,
+     "opp_turn_attacks": 0.32846829295158386,
+     "opp_turn_effects": 1.429445505142212,
+     "my_turn_opp_life_lost": 0.2843273878097534,
+     "my_turn_attacks": 0.418564110994339,
+     "my_turn_effects": 1.61072838306427,
+     "next_my_board_power": 0.14421755075454712,
+     "next_opp_board_power": 0.15669898688793182,
+     "next_my_board_n": 0.3462598919868469,
+     "next_opp_board_n": 0.32153525948524475,
+     "tok_attacked": 0.28679341077804565,
+     "tok_life_pushed": 0.05014004930853844,
+     "tok_ability": 0.16179847717285156,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.6014687413146267,
+    "v_sign": 0.7763975155279503,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.22589759528636932,
+     "opp_turn_attacks": 0.2746317386627197,
+     "opp_turn_effects": 1.394355058670044,
+     "my_turn_opp_life_lost": 0.27892497181892395,
+     "my_turn_attacks": 0.31766653060913086,
+     "my_turn_effects": 1.3865362405776978,
+     "next_my_board_power": 0.07496066391468048,
+     "next_opp_board_power": 0.09959746897220612,
+     "next_my_board_n": 0.24728824198246002,
+     "next_opp_board_n": 0.2832474708557129,
+     "tok_attacked": 0.20942053198814392,
+     "tok_life_pushed": 0.03365859389305115,
+     "tok_ability": 0.15311118960380554,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.5993672976183883,
+    "v_sign": 0.7803177063153817,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18233808875083923,
+     "opp_turn_attacks": 0.18855570256710052,
+     "opp_turn_effects": 1.1866295337677002,
+     "my_turn_opp_life_lost": 0.20976746082305908,
+     "my_turn_attacks": 0.2807840406894684,
+     "my_turn_effects": 1.3351670503616333,
+     "next_my_board_power": 0.0555221363902092,
+     "next_opp_board_power": 0.07029525935649872,
+     "next_my_board_n": 0.21418729424476624,
+     "next_opp_board_n": 0.2391977608203888,
+     "tok_attacked": 0.1630147248506546,
+     "tok_life_pushed": 0.03103432059288025,
+     "tok_ability": 0.10410933941602707,
+     "n": 3927
+    }
+   }
+  },
+  "nrel_r21b.npz": {
+   "all": {
+    "v_mse": 0.6003392800229925,
+    "v_sign": 0.7769876002917578,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18151135742664337,
+     "opp_turn_attacks": 0.18689687550067902,
+     "opp_turn_effects": 1.1813138723373413,
+     "my_turn_opp_life_lost": 0.21166329085826874,
+     "my_turn_attacks": 0.2838028371334076,
+     "my_turn_effects": 1.3251217603683472,
+     "next_my_board_power": 0.05422927811741829,
+     "next_opp_board_power": 0.07035855948925018,
+     "next_my_board_n": 0.214694544672966,
+     "next_opp_board_n": 0.23497772216796875,
+     "tok_attacked": 0.16735951602458954,
+     "tok_life_pushed": 0.03118407353758812,
+     "tok_ability": 0.10697869956493378,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7548220507639775,
+    "v_sign": 0.7042577675489068,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12567779421806335,
+     "opp_turn_attacks": 0.11346394568681717,
+     "opp_turn_effects": 1.1003427505493164,
+     "my_turn_opp_life_lost": 0.1592845469713211,
+     "my_turn_attacks": 0.2170010805130005,
+     "my_turn_effects": 1.1923922300338745,
+     "next_my_board_power": 0.0169573575258255,
+     "next_opp_board_power": 0.03740094229578972,
+     "next_my_board_n": 0.15095528960227966,
+     "next_opp_board_n": 0.1949475109577179,
+     "tok_attacked": 0.12335844337940216,
+     "tok_life_pushed": 0.020781254395842552,
+     "tok_ability": 0.08409702032804489,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.6172347783534454,
+    "v_sign": 0.7710760795065114,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.28017324209213257,
+     "opp_turn_attacks": 0.2862953245639801,
+     "opp_turn_effects": 1.4322606325149536,
+     "my_turn_opp_life_lost": 0.3010711371898651,
+     "my_turn_attacks": 0.37383002042770386,
+     "my_turn_effects": 1.5084587335586548,
+     "next_my_board_power": 0.08278053253889084,
+     "next_opp_board_power": 0.09731584042310715,
+     "next_my_board_n": 0.2903963327407837,
+     "next_opp_board_n": 0.2814120352268219,
+     "tok_attacked": 0.20299029350280762,
+     "tok_life_pushed": 0.046337418258190155,
+     "tok_ability": 0.13536858558654785,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.3877090466016938,
+    "v_sign": 0.8712926692781198,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2691551744937897,
+     "opp_turn_attacks": 0.31751537322998047,
+     "opp_turn_effects": 1.407891035079956,
+     "my_turn_opp_life_lost": 0.2818860113620758,
+     "my_turn_attacks": 0.42393994331359863,
+     "my_turn_effects": 1.593934178352356,
+     "next_my_board_power": 0.13790945708751678,
+     "next_opp_board_power": 0.154092475771904,
+     "next_my_board_n": 0.34818628430366516,
+     "next_opp_board_n": 0.31190577149391174,
+     "tok_attacked": 0.2852657735347748,
+     "tok_life_pushed": 0.04994973912835121,
+     "tok_ability": 0.16038106381893158,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.6001812213518157,
+    "v_sign": 0.7795031055900621,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.21752771735191345,
+     "opp_turn_attacks": 0.2764746844768524,
+     "opp_turn_effects": 1.385661244392395,
+     "my_turn_opp_life_lost": 0.27052977681159973,
+     "my_turn_attacks": 0.3181835412979126,
+     "my_turn_effects": 1.3699655532836914,
+     "next_my_board_power": 0.06745826452970505,
+     "next_opp_board_power": 0.09229199588298798,
+     "next_my_board_n": 0.24146826565265656,
+     "next_opp_board_n": 0.2701207101345062,
+     "tok_attacked": 0.21082919836044312,
+     "tok_life_pushed": 0.03389563411474228,
+     "tok_ability": 0.15200938284397125,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.6003491395526551,
+    "v_sign": 0.7768306857807051,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.17907173931598663,
+     "opp_turn_attacks": 0.18082919716835022,
+     "opp_turn_effects": 1.1674721240997314,
+     "my_turn_opp_life_lost": 0.20767587423324585,
+     "my_turn_attacks": 0.2814740240573883,
+     "my_turn_effects": 1.3220840692520142,
+     "next_my_board_power": 0.05333319306373596,
+     "next_opp_board_power": 0.06887287646532059,
+     "next_my_board_n": 0.21288098394870758,
+     "next_opp_board_n": 0.2325972616672516,
+     "tok_attacked": 0.16441504657268524,
+     "tok_life_pushed": 0.031000398099422455,
+     "tok_ability": 0.10392848402261734,
+     "n": 3927
+    }
+   }
+  },
+  "nrel_r21c.npz": {
+   "all": {
+    "v_mse": 0.5941062134316717,
+    "v_sign": 0.7771699489423778,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18115876615047455,
+     "opp_turn_attacks": 0.18747903406620026,
+     "opp_turn_effects": 1.2159123420715332,
+     "my_turn_opp_life_lost": 0.2143501192331314,
+     "my_turn_attacks": 0.2856082022190094,
+     "my_turn_effects": 1.3619229793548584,
+     "next_my_board_power": 0.05454548820853233,
+     "next_opp_board_power": 0.07249849289655685,
+     "next_my_board_n": 0.21559378504753113,
+     "next_opp_board_n": 0.23570983111858368,
+     "tok_attacked": 0.16655196249485016,
+     "tok_life_pushed": 0.031180400401353836,
+     "tok_ability": 0.10942518711090088,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7504204194640118,
+    "v_sign": 0.7094361334867664,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12685540318489075,
+     "opp_turn_attacks": 0.11365268379449844,
+     "opp_turn_effects": 1.1159230470657349,
+     "my_turn_opp_life_lost": 0.1622023731470108,
+     "my_turn_attacks": 0.21801820397377014,
+     "my_turn_effects": 1.2182234525680542,
+     "next_my_board_power": 0.017399927601218224,
+     "next_opp_board_power": 0.03970329090952873,
+     "next_my_board_n": 0.15442565083503723,
+     "next_opp_board_n": 0.19561676681041718,
+     "tok_attacked": 0.1240512952208519,
+     "tok_life_pushed": 0.020722707733511925,
+     "tok_ability": 0.08680740743875504,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.6045903443566327,
+    "v_sign": 0.7697052775873886,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.278033971786499,
+     "opp_turn_attacks": 0.2868245244026184,
+     "opp_turn_effects": 1.4840376377105713,
+     "my_turn_opp_life_lost": 0.30677589774131775,
+     "my_turn_attacks": 0.3776751756668091,
+     "my_turn_effects": 1.553038477897644,
+     "next_my_board_power": 0.08407196402549744,
+     "next_opp_board_power": 0.10029035806655884,
+     "next_my_board_n": 0.2907558083534241,
+     "next_opp_board_n": 0.2823047637939453,
+     "tok_attacked": 0.20435687899589539,
+     "tok_life_pushed": 0.04624392092227936,
+     "tok_ability": 0.1393953114748001,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.38115369953005224,
+    "v_sign": 0.8707330721880246,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2680114805698395,
+     "opp_turn_attacks": 0.31964316964149475,
+     "opp_turn_effects": 1.471024990081787,
+     "my_turn_opp_life_lost": 0.28079459071159363,
+     "my_turn_attacks": 0.4203893542289734,
+     "my_turn_effects": 1.664184331893921,
+     "next_my_board_power": 0.13599222898483276,
+     "next_opp_board_power": 0.15617449581623077,
+     "next_my_board_n": 0.3485707938671112,
+     "next_opp_board_n": 0.31607431173324585,
+     "tok_attacked": 0.2852146029472351,
+     "tok_life_pushed": 0.05007554963231087,
+     "tok_ability": 0.16342248022556305,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.6000282656018151,
+    "v_sign": 0.7763975155279503,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.22197052836418152,
+     "opp_turn_attacks": 0.2675180733203888,
+     "opp_turn_effects": 1.4387470483779907,
+     "my_turn_opp_life_lost": 0.289507657289505,
+     "my_turn_attacks": 0.3132675886154175,
+     "my_turn_effects": 1.4052236080169678,
+     "next_my_board_power": 0.0718710869550705,
+     "next_opp_board_power": 0.09794126451015472,
+     "next_my_board_n": 0.23965805768966675,
+     "next_opp_board_n": 0.28558069467544556,
+     "tok_attacked": 0.20772139728069305,
+     "tok_life_pushed": 0.03392254561185837,
+     "tok_ability": 0.15992353856563568,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.5937368021959519,
+    "v_sign": 0.7772181325067803,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.17839433252811432,
+     "opp_turn_attacks": 0.1820574849843979,
+     "opp_turn_effects": 1.2008183002471924,
+     "my_turn_opp_life_lost": 0.2092592418193817,
+     "my_turn_attacks": 0.28373464941978455,
+     "my_turn_effects": 1.358989953994751,
+     "next_my_board_power": 0.053371917456388474,
+     "next_opp_board_power": 0.070775106549263,
+     "next_my_board_n": 0.21396377682685852,
+     "next_opp_board_n": 0.2323317527770996,
+     "tok_attacked": 0.16376331448554993,
+     "tok_life_pushed": 0.030994659289717674,
+     "tok_ability": 0.10600462555885315,
+     "n": 3927
+    }
+   }
+  },
+  "nrel_r21d.npz": {
+   "all": {
+    "v_mse": 0.6045458672562141,
+    "v_sign": 0.774799416484318,
+    "n": 5484,
+    "aux": {
+     "opp_turn_my_life_lost": 0.18153241276741028,
+     "opp_turn_attacks": 0.18290016055107117,
+     "opp_turn_effects": 1.173714280128479,
+     "my_turn_opp_life_lost": 0.21062548458576202,
+     "my_turn_attacks": 0.2811683714389801,
+     "my_turn_effects": 1.3143343925476074,
+     "next_my_board_power": 0.05379336327314377,
+     "next_opp_board_power": 0.07020116597414017,
+     "next_my_board_n": 0.2141290158033371,
+     "next_opp_board_n": 0.23228895664215088,
+     "tok_attacked": 0.16472871601581573,
+     "tok_life_pushed": 0.031167740002274513,
+     "tok_ability": 0.10648120194673538,
+     "n": 4193
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7628685592542797,
+    "v_sign": 0.7088607594936709,
+    "n": 1738,
+    "aux": {
+     "opp_turn_my_life_lost": 0.1258029341697693,
+     "opp_turn_attacks": 0.1092505156993866,
+     "opp_turn_effects": 1.0961202383041382,
+     "my_turn_opp_life_lost": 0.160191610455513,
+     "my_turn_attacks": 0.2134750634431839,
+     "my_turn_effects": 1.1762642860412598,
+     "next_my_board_power": 0.016896246001124382,
+     "next_opp_board_power": 0.038055986166000366,
+     "next_my_board_n": 0.15302380919456482,
+     "next_opp_board_n": 0.19421464204788208,
+     "tok_attacked": 0.1215531975030899,
+     "tok_life_pushed": 0.020776333287358284,
+     "tok_ability": 0.08499369025230408,
+     "n": 1738
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.6171517922303326,
+    "v_sign": 0.7697052775873886,
+    "n": 1459,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2779252827167511,
+     "opp_turn_attacks": 0.27874884009361267,
+     "opp_turn_effects": 1.4212621450424194,
+     "my_turn_opp_life_lost": 0.29668349027633667,
+     "my_turn_attacks": 0.371695339679718,
+     "my_turn_effects": 1.497645616531372,
+     "next_my_board_power": 0.08339621126651764,
+     "next_opp_board_power": 0.09634703397750854,
+     "next_my_board_n": 0.2899680435657501,
+     "next_opp_board_n": 0.27408644556999207,
+     "tok_attacked": 0.20277142524719238,
+     "tok_life_pushed": 0.04634658619761467,
+     "tok_ability": 0.13436776399612427,
+     "n": 1336
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.3919861796646814,
+    "v_sign": 0.8640179071068831,
+    "n": 1787,
+    "aux": {
+     "opp_turn_my_life_lost": 0.27278706431388855,
+     "opp_turn_attacks": 0.31800395250320435,
+     "opp_turn_effects": 1.3876380920410156,
+     "my_turn_opp_life_lost": 0.28320589661598206,
+     "my_turn_attacks": 0.42444050312042236,
+     "my_turn_effects": 1.590206265449524,
+     "next_my_board_power": 0.13354399800300598,
+     "next_opp_board_power": 0.15386132895946503,
+     "next_my_board_n": 0.3425314128398895,
+     "next_opp_board_n": 0.31265321373939514,
+     "tok_attacked": 0.283743679523468,
+     "tok_life_pushed": 0.049990907311439514,
+     "tok_ability": 0.15845906734466553,
+     "n": 619
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.6295339953967387,
+    "v_sign": 0.7732919254658385,
+    "n": 322,
+    "aux": {
+     "opp_turn_my_life_lost": 0.22036771476268768,
+     "opp_turn_attacks": 0.26613324880599976,
+     "opp_turn_effects": 1.392868161201477,
+     "my_turn_opp_life_lost": 0.2712553143501282,
+     "my_turn_attacks": 0.31130683422088623,
+     "my_turn_effects": 1.3855384588241577,
+     "next_my_board_power": 0.06756766885519028,
+     "next_opp_board_power": 0.09528252482414246,
+     "next_my_board_n": 0.24119657278060913,
+     "next_opp_board_n": 0.2754311263561249,
+     "tok_attacked": 0.2065359503030777,
+     "tok_life_pushed": 0.03383797034621239,
+     "tok_ability": 0.15498307347297668,
+     "n": 266
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.6029871347375685,
+    "v_sign": 0.7748934521503293,
+    "n": 5162,
+    "aux": {
+     "opp_turn_my_life_lost": 0.17890188097953796,
+     "opp_turn_attacks": 0.17726226150989532,
+     "opp_turn_effects": 1.1588696241378784,
+     "my_turn_opp_life_lost": 0.20651863515377045,
+     "my_turn_attacks": 0.2791268825531006,
+     "my_turn_effects": 1.3095113039016724,
+     "next_my_board_power": 0.05286034196615219,
+     "next_opp_board_power": 0.06850224733352661,
+     "next_my_board_n": 0.2122955620288849,
+     "next_opp_board_n": 0.22936666011810303,
+     "tok_attacked": 0.16189688444137573,
+     "tok_life_pushed": 0.03098686970770359,
+     "tok_ability": 0.10319586843252182,
+     "n": 3927
+    }
+   }
+  }
+ },
+ "policy": {
+  "points": 5484,
+  "targets": [
+   "q_improved",
+   "visits"
+  ],
+  "p_net_src": "pol_p",
+  "gate_forms": [
+   "KO",
+   "bounce",
+   "deck",
+   "trash"
+  ],
+  "knobs": {
+   "n_min": 1.0,
+   "c_visit": 50.0,
+   "c_scale": 0.3
+  },
+  "teacher": {
+   "visits": {
+    "entropy": 1.114108057092204
+   },
+   "q_improved": {
+    "entropy": 0.5393807002031136
+   }
+  },
+  "nets": {
+   "nrel_r13d.npz": {
+    "points": 5484,
+    "top1_visits": 0.5920860685630926,
+    "ce_visits": 1.5620001772735173,
+    "top1_q_improved": 0.48322392414296134,
+    "ce_q_improved": 1.55983564681506,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.2584179387068312,
+     "argmax_removal": 0.25995125913891143,
+     "data_chose_removal": 0.24939073923639318
+    }
+   },
+   "nrel_r20.npz": {
+    "points": 5484,
+    "top1_visits": 0.5904449307075128,
+    "ce_visits": 1.5331581416223972,
+    "top1_q_improved": 0.5092997811816192,
+    "ce_q_improved": 1.5017270088891406,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.24373490250036559,
+     "argmax_removal": 0.2258326563769293,
+     "data_chose_removal": 0.24939073923639318
+    }
+   },
+   "nrel_r21.npz": {
+    "points": 5484,
+    "top1_visits": 0.5632749817651349,
+    "ce_visits": 1.566088909480278,
+    "top1_q_improved": 0.49033552151714077,
+    "ce_q_improved": 1.5325403832589337,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.25069618845177105,
+     "argmax_removal": 0.22908204711616573,
+     "data_chose_removal": 0.24939073923639318
+    }
+   },
+   "nrel_r21b.npz": {
+    "points": 5484,
+    "top1_visits": 0.5474106491611962,
+    "ce_visits": 1.5809884213949101,
+    "top1_q_improved": 0.47064186725018237,
+    "ce_q_improved": 1.5589321951723552,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.24576123404353675,
+     "argmax_removal": 0.2372055239642567,
+     "data_chose_removal": 0.24939073923639318
+    }
+   },
+   "nrel_r21c.npz": {
+    "points": 5484,
+    "top1_visits": 0.5760393873085339,
+    "ce_visits": 1.5613710165545507,
+    "top1_q_improved": 0.4899708242159008,
+    "ce_q_improved": 1.5380856119569073,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.2449320548979655,
+     "argmax_removal": 0.23395613322502032,
+     "data_chose_removal": 0.24939073923639318
+    }
+   },
+   "nrel_r21d.npz": {
+    "points": 5484,
+    "top1_visits": 0.5703865791393143,
+    "ce_visits": 1.5582817545083212,
+    "top1_q_improved": 0.48450036469730123,
+    "ce_q_improved": 1.5441943362713904,
+    "gate": {
+     "rows": 1231,
+     "p_mass_removal": 0.25032403541650927,
+     "argmax_removal": 0.2420796100731113,
+     "data_chose_removal": 0.24939073923639318
+    }
+   }
+  }
+ }
+}

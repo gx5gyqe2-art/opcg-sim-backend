@@ -1,0 +1,19 @@
+{
+ "off_n80k_proofs": 972,
+ "mode0_n80k_proofs": 952,
+ "lost": 25,
+ "new": 5,
+ "lost_by_true": {
+  "win": 23,
+  "no": 1,
+  "unknown": 1
+ },
+ "lost_to": {
+  "unknown": 19,
+  "no": 6
+ },
+ "false_off_n80k": [
+  "3012157:p2:12:124"
+ ],
+ "false_mode0_n80k": []
+}

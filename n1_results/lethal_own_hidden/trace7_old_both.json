@@ -1,0 +1,212 @@
+[
+ {
+  "point": "3012080:p1:11:103",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 288,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.01
+ },
+ {
+  "point": "3012080:p1:11:104",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 224,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ },
+ {
+  "point": "3012080:p1:11:105",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 152,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ },
+ {
+  "point": "3012080:p1:11:106",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 120,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ },
+ {
+  "point": "3012080:p1:11:107",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 88,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ },
+ {
+  "point": "3012080:p1:11:108",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 64,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ },
+ {
+  "point": "3012080:p1:11:109",
+  "seat": "p1",
+  "opp_life": 0,
+  "base": {
+   "status": "no",
+   "move": null,
+   "nodes": 16,
+   "deals": 8,
+   "line_len": 0
+  },
+  "analysis": {
+   "deals": 0
+  },
+  "opp_hand": [
+   "P-102",
+   "P-102",
+   "OP16-059",
+   "OP16-048"
+  ],
+  "my_deck_top": [
+   "OP13-044",
+   "ST22-011",
+   "OP08-049",
+   "OP09-044",
+   "OP08-044"
+  ],
+  "base_lines": null,
+  "sec": 0.0
+ }
+]

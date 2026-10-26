@@ -1,0 +1,76 @@
+{
+ "kind": "arena",
+ "section": "§7.51",
+ "ledger_grep": "7.51 根の詰みの証明の節点の上限の本番アリーナ",
+ "about": "根の詰みの証明の節点の上限を 80,000 にした形 vs 今の形（20,000・両席 r23・出荷の設定・random×real・作業ブランチ rs-lethal-nodes のコード）",
+ "job": "arena-lnodes-w{KK}",
+ "branch": "claude/arena-lnodes-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r23.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r23.npz"
+ },
+ "out_dir": "arena_lnodes",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "2",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root",
+  "--cand-lethal-root-nodes",
+  "80000"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3681000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "lnodes_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r23.npz + lethal_nodes 80000",
+  "baseline": "nrel_r23.npz (lethal_nodes default 20000)",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84,
+  "code": "claude/rs-lethal-nodes"
+ },
+ "commit_message": "arena lnodes shard {KK}",
+ "require": [
+  {
+   "file": "opcg_sim/loop/arena.py",
+   "grep": "cand-lethal-root-nodes"
+  }
+ ]
+}

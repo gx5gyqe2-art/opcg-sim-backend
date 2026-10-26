@@ -835,6 +835,52 @@ def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, c
     return pi, notes
 
 
+#: 価値の教師の作り方（`docs/search_efficiency_plan.md` §7.16・WP `omni-value`）。
+#: z＝勝敗（既定・今までと 1 bit も変わらない）／omni＝全部見える探索の根の評価 `v_omni`／
+#: mix＝0.5 z + 0.5 v_omni。`v_omni` が無い行（根の探索が無い点・復元に失敗した行）は z のまま。
+Z_MODES = ("z", "omni", "mix")
+
+
+def load_omni(pats):
+    """`omni_*.npz`（`tests/scripts/omni_value_relabel.py` の出力）→ (鍵, v_omni)。
+
+    鍵は (seed, step)＝局と判断点の番号（記録の行の対応鍵）。`v_omni` が NaN・`ok=0` の行は落とす。"""
+    files = []
+    for pat in pats:
+        files += sorted(glob.glob(os.path.expanduser(pat)))
+    if not files:
+        raise ValueError(f"--omni-in に当てはまる npz が無い: {pats}")
+    seed, step, vo = [], [], []
+    for f in files:
+        with np.load(f) as d:
+            m = np.isfinite(d["v_omni"]) & (d["ok"] == 1)
+            seed.append(d["seed"][m].astype(np.int64))
+            step.append(d["step"][m].astype(np.int64))
+            vo.append(d["v_omni"][m].astype(np.float32))
+    return (np.concatenate(seed), np.concatenate(step)), np.concatenate(vo)
+
+
+def value_teacher(z, seed, step, omni_key, v_omni, mode):
+    """価値の教師（行ごと）。`mode="z"` は `z` をそのまま返す（**同じオブジェクト**＝今までと同一）。
+
+    `omni`／`mix` は (seed, step) が `omni_key` に在る行だけ差し替え、`(教師 float32, 差し替えた行数)` を返す。"""
+    if mode == "z":
+        return z, 0
+    if mode not in Z_MODES:
+        raise ValueError(f"--z-mode に未知の値: {mode}（{Z_MODES}）")
+    key = lambda s, t: np.asarray(s, np.int64) * (1 << 20) + np.asarray(t, np.int64)  # noqa: E731
+    ok_k = key(*omni_key)
+    order = np.argsort(ok_k, kind="stable")
+    ok_k, vo = ok_k[order], np.asarray(v_omni, np.float32)[order]
+    rk = key(seed, step)
+    pos = np.clip(np.searchsorted(ok_k, rk), 0, max(len(ok_k) - 1, 0))
+    hit = (ok_k[pos] == rk) if len(ok_k) else np.zeros(len(rk), bool)
+    out = np.asarray(z, np.float32).copy()
+    v = vo[pos[hit]]
+    out[hit] = v if mode == "omni" else 0.5 * out[hit] + 0.5 * v
+    return out, int(hit.sum())
+
+
 def _expand(pats):
     dirs = []
     for pat in pats:
@@ -854,10 +900,19 @@ def train(args):
     ptab = NR.profile_table(db, vocab)
     rt = NR.RelTable(ptab)
     ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
+    pi_rows = getattr(args, "pi_rows", "all") or "all"
     V, P, C = DIO.load_dump(_expand(args.src), vocab, z_dirs=_expand(args.zsrc),
-                            cache_dir=args.cache_dir, n_tok=N_TOK)
+                            cache_dir=args.cache_dir, n_tok=N_TOK, pi_rows=pi_rows)
+    if pi_rows != "all":
+        print(f"pi-rows {pi_rows}: 方策点 {len(P['row'])}（価値の行は全部 {len(V['z'])}）", flush=True)
     if args.zsrc:
         print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
+    z_mode = getattr(args, "z_mode", "z") or "z"
+    if z_mode != "z":
+        steps = DIO.load_row_col(_expand(args.src), "step", _expand(args.zsrc))
+        omni_key, v_omni = load_omni(getattr(args, "omni_in", None) or [])
+        V["z"], n_rep = value_teacher(V["z"], V["seed"], steps, omni_key, v_omni, z_mode)
+        print(f"z-mode {z_mode}: v_omni で差し替えた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
     va_v = V["seed"] % args.holdout_mod == 0
     va_p = P["seed"] % args.holdout_mod == 0
@@ -1119,6 +1174,14 @@ def main(argv=None):
     tr = sub.add_parser("train")
     tr.add_argument("--in", dest="src", nargs="+", required=True, help="dump v2 のディレクトリ（glob 可）")
     tr.add_argument("--z-in", dest="zsrc", nargs="*", default=[], help="z 専用（π を読まない）dump v2")
+    tr.add_argument("--pi-rows", choices=DIO.PI_ROWS, default="all",
+                    help="方策の教師に使う行（§7.56）: all＝全部の席（既定・今まで）／learner＝相手の集団の波で"
+                         "学ぶ側のネットが打った席の行だけ（learner 列の無い波は全部）。価値の教師はどちらでも全部の行")
+    tr.add_argument("--z-mode", choices=Z_MODES, default="z",
+                    help="価値の教師（§7.16・WP omni-value）: z＝勝敗（**既定・今までと 1 bit も変わらない**）／"
+                         "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま")
+    tr.add_argument("--omni-in", nargs="*", default=[],
+                    help="--z-mode omni|mix の v_omni（omni_value_relabel.py の omni_*.npz・glob 可）")
     tr.add_argument("--epochs", type=int, default=2)
     tr.add_argument("--bs-v", type=int, default=256)
     tr.add_argument("--bs-p", type=int, default=64)
