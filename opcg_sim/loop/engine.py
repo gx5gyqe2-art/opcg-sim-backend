@@ -31,8 +31,10 @@ CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 #: **r24**（2026-10-25 採用・`docs/reports/r24_adoption_20261025.md`・r23 が打った波 53 の π と波 53＋52 の価値で r23 から育てた＝era14）。
 #: **r26**（2026-10-26 採用・`docs/reports/r26_adoption_20261026.md`・r24 を学ぶ側に相手の集団〔r24／r23／r22／r13d〕と打った
 #: 波 55L の π〔学ぶ側の行だけ〕と波 55L＋54 の価値で r24 から育てた＝era15・本番の設定で r24 に +18.9）。
-#: ロールバック先は r24（同梱 `nrel_r24.npz`）、その先は r23（`nrel_r23.npz`）、r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_r26.npz")
+#: **r27**（2026-10-26 採用・`docs/reports/r27_adoption_20261026.md`・r26 の自己対戦の 2 波〔波 56＋57〕の π と価値で r26 から育てた
+#: ＝era16・価値の教師は今の生成役の 2 波だけ〔2026-10-26 の決まり〕・本番の設定〔世界 4 本〕で r26 に +9.2）。
+#: ロールバック先は r26（同梱 `nrel_r26.npz`）、その先は r24（`nrel_r24.npz`）、r23（`nrel_r23.npz`）、r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r27.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。

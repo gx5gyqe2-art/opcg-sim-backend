@@ -1,0 +1,90 @@
+{
+ "kind": "train",
+ "section": "§7.61",
+ "ledger_grep": "7.61 伸びの切り分け",
+ "about": "r26r（r26 と全く同じ作り方・訓練の乱数だけ変える seed 14）＝作り直しの揺れの幅を測る",
+ "job": "train-r26r",
+ "branch": "claude/train-r26r",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n55l-w{ww}",
+   "shards": 32,
+   "dest": "~/n55l",
+   "glob": "~/n55l/n_records/n55l_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n54-w{ww}",
+   "shards": 32,
+   "dest": "~/n54",
+   "glob": "~/n54/n_records/n54_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r24.npz",
+  "--pi-rows",
+  "learner",
+  "--seed",
+  "14"
+ ],
+ "runs": [
+  {
+   "name": "r26r",
+   "in": [
+    "~/n55l/n_records/n55l_w*_p[0-3]"
+   ],
+   "z_in": [
+    "~/n54/n_records/n54_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r26r.npz",
+   "log": "~/train_r26r.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n55l/n_records/n55l_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r24.npz",
+    "opcg_sim/data/learned/nrel_r26.npz",
+    "~/nrel_r26r.npz",
+    "~/nrel_r26r.ep0.npz",
+    "~/nrel_r26r.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r26r.json",
+   "log": "~/band_r26r.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "commit_message": "r26r のセット（訓練・評価帯）"
+}

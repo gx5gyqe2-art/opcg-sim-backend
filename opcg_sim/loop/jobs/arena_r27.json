@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.63",
+ "ledger_grep": "7.63 波 56",
+ "about": "r27 vs r26 の判定アリーナ（公平同士・両席 160 回・主 random×real・副 固定ミラー・参考 random×synth_roles2）",
+ "job": "arena-r27-w{KK}",
+ "branch": "claude/arena-r27-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r27:n1_results/nrel_r27.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r26.npz"
+ },
+ "out_dir": "arena_r27",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "4071000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r27_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "4091000 + B*1000",
+   "args": [],
+   "out": "r27_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "4111000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r27_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r27.npz (claude/train-r27)",
+  "baseline": "nrel_r26.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r27 shard {KK}"
+}

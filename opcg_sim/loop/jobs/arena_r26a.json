@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.61",
+ "ledger_grep": "7.61 伸びの切り分け",
+ "about": "r26a vs r24 の判定アリーナ（r26 の判定と同じ seed＝同じ配り方で対にした比べ・公平同士・両席 160 回・3 条件）",
+ "job": "arena-r26a-w{KK}",
+ "branch": "claude/arena-r26a-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r26a:n1_results/nrel_r26a.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "out_dir": "arena_r26a",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3971000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r26a_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "3991000 + B*1000",
+   "args": [],
+   "out": "r26a_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "4011000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r26a_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r26a.npz (claude/train-r26a)",
+  "baseline": "nrel_r24.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r26a shard {KK}"
+}
