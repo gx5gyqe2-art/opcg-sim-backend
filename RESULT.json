@@ -1,7 +1,7 @@
 {
  "job": "n60-w09",
  "role": "gen",
- "status": "error",
+ "status": "partial",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r27.npz",
   "games": 480,
@@ -12,16 +12,18 @@
   "seed_base": 2735000
  },
  "outputs": {
-  "dirs": []
+  "dirs": [
+   "n_records/n60_w09_p0"
+  ]
  },
  "metrics": {
-  "parts_done": 0,
-  "games": 0,
-  "rows": 0,
+  "parts_done": 1,
+  "games": 120,
+  "rows": 20151,
   "dropped": 0,
-  "sec_play_mean": 0.0
+  "sec_play_mean": 32.62
  },
- "notes": "error: 失敗（1）: pip install -q numpy maturin",
+ "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n60.json",
   "k": 9,
