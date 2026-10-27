@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.67",
+ "ledger_grep": "7.67 教材 4 波",
+ "about": "r28b vs r27 の判定アリーナ（r28 の判定と同じ seed＝r28 と対にした比べ・公平同士・両席 160 回・3 条件）",
+ "job": "arena-r28b-w{KK}",
+ "branch": "claude/arena-r28b-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r28b:n1_results/nrel_r28b.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r27.npz"
+ },
+ "out_dir": "arena_r28b",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "4181000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r28b_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "4201000 + B*1000",
+   "args": [],
+   "out": "r28b_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "4221000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r28b_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r28b.npz (claude/train-r28b)",
+  "baseline": "nrel_r27.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r28b shard {KK}"
+}
