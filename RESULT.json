@@ -1,155 +1,372 @@
 {
- "job": "policy-attn-long",
+ "job": "hold-bias",
  "status": "done",
- "branch": "claude/policy-attn-long",
- "spec": "docs/search_efficiency_plan.md §7.57（本線 claude/cpu-spec-improvements-yw91jd @ daf3abf・台帳 2+429）",
- "report": "docs/reports/2026-10-25_policy_attn_long.md",
- "code": "変更なし（本線の opcg_sim/learned/train/n_rel_attn_desk.py をそのまま使用）。n1_results/policy_attn_long/summarize.py（表の出力・1 回きり）",
- "make_test": "green（torch を PYTHONPATH に入れない構成・cargo test 637 passed＋pytest 831 passed, 62 skipped〔skip は全部 torch の任意依存〕）",
- "material": {
-  "A_w53": {
-   "shards": "claude/n53-w01〜w16 の 64 シャード（生成役 r23・§7.52 と同じ）",
-   "value_rows": 1297134,
-   "policy_points": 522817,
-   "threads": 2,
-   "where": "このセッション"
-  },
-  "B_w5354": {
-   "shards": "上＋claude/n54-w01〜w16 の 64 シャード（生成役 r24）＝128 シャード",
-   "value_rows": 2626205,
-   "policy_points": 1060238,
-   "threads": 4,
-   "where": "Sonnet の作業セッション 2 本（claude/policy-attn-long-w54-base・-w54-attn・各約 4.8 時間・回収後アーカイブ）"
-  },
-  "val": "holdout seed%7 の先頭 20,000 点／20,000 行・全組で同じ点（全部波 53）"
+ "branch": "claude/hold-bias",
+ "spec": "docs/search_efficiency_plan.md §7.59（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+455）",
+ "report": "docs/reports/2026-10-26_hold_bias.md",
+ "results_dir": "n1_results/hold_bias/（games.jsonl・points.jsonl・points_shard0〜7.jsonl・summary.json）",
+ "code": "tests/scripts/hold_bias.py（道具だけ・1 回きり＝テスト無し）。エンジン・ネット・既定の挙動は変えていない",
+ "make_test": "green（push 前に実行）",
+ "seeds": "4171000〜4171149（150 局・決着せず 0）",
+ "nets": "両席 r27・出荷の設定（E.PLAY_*・1,280 回・世界 4 本・枝予算なし・詰みの証明 root・公平）・審判 r27 160 回・今のターンの残りは両席とも出荷の設定",
+ "points": 1450,
+ "k": {
+  "8": 1437,
+  "16": 13
  },
- "conditions": {
-  "epochs": 16,
-  "lr": 0.0005,
-  "bs_v": 256,
-  "bs_p": 64,
-  "ablate": "rel",
-  "pi_teacher": "visits",
-  "aux_heads": "off",
-  "attn": "§7.52 と同じ（d=64・4 頭・トークン 2 層＋候補→トークン 1 層＋候補どうし 2 層）",
-  "control": "B の材料で r24 から・今の頭・lr 2e-4・4 周（base_r24_w5354）"
- },
- "gap_attn_minus_base_val_ce": {
-  "A_first4": -0.0163,
-  "A_last4": -0.0156,
-  "B_first4": -0.0137,
-  "B_last4": -0.0153,
-  "A_ep15": -0.0151,
-  "B_ep15": -0.0147
- },
- "gap_attn_minus_base_train_probe_ce": {
-  "A_first4": -0.0155,
-  "A_last4": -0.031,
-  "B_first4": -0.0171,
-  "B_last4": -0.031
- },
- "best_val_ce": {
-  "A_base": 1.8542,
-  "A_attn": 1.8383,
-  "B_base": 1.8447,
-  "B_attn": 1.8296,
-  "r24_itself": 1.8606,
-  "r24_retrain_A_4ep": 1.8354,
-  "r24_retrain_B_4ep": 1.8352
- },
- "mis_last4": {
-  "A_base": 0.0745,
-  "A_attn": 0.07,
-  "B_base": 0.0718,
-  "B_attn": 0.0672,
-  "order_gap_A": -0.0006,
-  "order_gap_B": -0.0001
- },
- "final_epoch": {
-  "base_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.8201,
-   "train_probe_ce": 1.8068,
-   "val_ce": 1.8563,
-   "val_top1": 0.5222,
-   "val_mis": 0.0732,
-   "val_mis_atk": 0.0275,
-   "val_mis_order": 0.0203,
-   "val_mis_play": 0.0096,
-   "val_mis_other": 0.0158,
-   "val_vmse": 0.9019,
-   "sec": 383.1
+ "verdict": "偏りなし: 9 場面のどれでも、CPU が選んだ側（する／しない）の「選んだ − 次点」の 95% 区間の上限は 0 より上。平均はどれも正か 0 付近（CPU の手が良い向き）。メインで行動を選んだ点（ターン終了が次点）は +0.067［+0.036, +0.097］・序盤 +0.048［+0.005, +0.090］＝出しすぎの兆しなし。損の積もりの上限は 1 局 1 席あたり勝率 0.022（約 15 Elo 相当）",
+ "scenes": {
+  "main_end": {
+   "points": 300,
+   "do_minus_hold": {
+    "n": 300,
+    "mean": 0.0224,
+    "ci": [
+     0.0006,
+     0.0442
+    ],
+    "sd": 0.1928
+   },
+   "chose_do": {
+    "n": 167,
+    "chosen_minus_alt": {
+     "n": 167,
+     "mean": 0.0665,
+     "ci": [
+      0.0364,
+      0.0966
+     ],
+     "sd": 0.1985
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 133,
+    "chosen_minus_alt": {
+     "n": 133,
+     "mean": 0.0329,
+     "ci": [
+      0.0039,
+      0.0619
+     ],
+     "sd": 0.1706
+    },
+    "bias": false
+   }
   },
-  "attn_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.7888,
-   "train_probe_ce": 1.776,
-   "val_ce": 1.8411,
-   "val_top1": 0.5355,
-   "val_mis": 0.0696,
-   "val_mis_atk": 0.027,
-   "val_mis_order": 0.0194,
-   "val_mis_play": 0.0084,
-   "val_mis_other": 0.0147,
-   "val_vmse": 1.0142,
-   "sec": 721.2
+  "counter": {
+   "points": 200,
+   "do_minus_hold": {
+    "n": 200,
+    "mean": -0.0316,
+    "ci": [
+     -0.0571,
+     -0.0061
+    ],
+    "sd": 0.1841
+   },
+   "chose_do": {
+    "n": 56,
+    "chosen_minus_alt": {
+     "n": 56,
+     "mean": 0.01,
+     "ci": [
+      -0.0428,
+      0.0627
+     ],
+     "sd": 0.2015
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 144,
+    "chosen_minus_alt": {
+     "n": 144,
+     "mean": 0.0477,
+     "ci": [
+      0.0192,
+      0.0763
+     ],
+     "sd": 0.1749
+    },
+    "bias": false
+   }
   },
-  "base_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.8229,
-   "train_probe_ce": 1.8181,
-   "val_ce": 1.8463,
-   "val_top1": 0.5269,
-   "val_mis": 0.0714,
-   "val_mis_atk": 0.0282,
-   "val_mis_order": 0.0193,
-   "val_mis_play": 0.0092,
-   "val_mis_other": 0.0147,
-   "val_vmse": 0.7176,
-   "sec": 680.3
+  "confirm": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": 0.0499,
+    "ci": [
+     0.0167,
+     0.0831
+    ],
+    "sd": 0.2076
+   },
+   "chose_do": {
+    "n": 103,
+    "chosen_minus_alt": {
+     "n": 103,
+     "mean": 0.0953,
+     "ci": [
+      0.0527,
+      0.1379
+     ],
+     "sd": 0.2205
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 47,
+    "chosen_minus_alt": {
+     "n": 47,
+     "mean": 0.0495,
+     "ci": [
+      0.0121,
+      0.0868
+     ],
+     "sd": 0.1306
+    },
+    "bias": false
+   }
   },
-  "attn_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.7943,
-   "train_probe_ce": 1.7851,
-   "val_ce": 1.8316,
-   "val_top1": 0.5402,
-   "val_mis": 0.0683,
-   "val_mis_atk": 0.0259,
-   "val_mis_order": 0.0205,
-   "val_mis_play": 0.0089,
-   "val_mis_other": 0.013,
-   "val_vmse": 0.786,
-   "sec": 1017.7
+  "blocker": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": -0.0435,
+    "ci": [
+     -0.0747,
+     -0.0123
+    ],
+    "sd": 0.1951
+   },
+   "chose_do": {
+    "n": 51,
+    "chosen_minus_alt": {
+     "n": 51,
+     "mean": -0.0184,
+     "ci": [
+      -0.065,
+      0.0282
+     ],
+     "sd": 0.1697
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 99,
+    "chosen_minus_alt": {
+     "n": 99,
+     "mean": 0.0564,
+     "ci": [
+      0.0157,
+      0.0971
+     ],
+     "sd": 0.2066
+    },
+    "bias": false
+   }
   },
-  "base_r24_w5354": {
-   "ep": 3,
-   "train_ce_run": 1.8162,
-   "train_probe_ce": 1.8092,
-   "val_ce": 1.8352,
-   "val_top1": 0.5387,
-   "val_mis": 0.0694,
-   "val_mis_atk": 0.0246,
-   "val_mis_order": 0.0208,
-   "val_mis_play": 0.0091,
-   "val_mis_other": 0.015,
-   "val_vmse": 0.5067,
-   "sec": 642.9
+  "select_none": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": 0.0887,
+    "ci": [
+     0.054,
+     0.1235
+    ],
+    "sd": 0.2169
+   },
+   "chose_do": {
+    "n": 124,
+    "chosen_minus_alt": {
+     "n": 124,
+     "mean": 0.1164,
+     "ci": [
+      0.0776,
+      0.1553
+     ],
+     "sd": 0.2208
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 26,
+    "chosen_minus_alt": {
+     "n": 26,
+     "mean": 0.0433,
+     "ci": [
+      -0.0093,
+      0.0958
+     ],
+     "sd": 0.1367
+    },
+    "bias": false
+   }
+  },
+  "trigger:opp": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": -0.019,
+    "ci": [
+     -0.0487,
+     0.0106
+    ],
+    "sd": 0.1854
+   },
+   "chose_do": {
+    "n": 84,
+    "chosen_minus_alt": {
+     "n": 84,
+     "mean": 0.0104,
+     "ci": [
+      -0.0294,
+      0.0503
+     ],
+     "sd": 0.1863
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 66,
+    "chosen_minus_alt": {
+     "n": 66,
+     "mean": 0.0565,
+     "ci": [
+      0.0134,
+      0.0997
+     ],
+     "sd": 0.1787
+    },
+    "bias": false
+   }
+  },
+  "select_none:opp": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": 0.0238,
+    "ci": [
+     -0.0059,
+     0.0534
+    ],
+    "sd": 0.1851
+   },
+   "chose_do": {
+    "n": 80,
+    "chosen_minus_alt": {
+     "n": 80,
+     "mean": 0.0734,
+     "ci": [
+      0.035,
+      0.1119
+     ],
+     "sd": 0.1753
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 70,
+    "chosen_minus_alt": {
+     "n": 70,
+     "mean": 0.033,
+     "ci": [
+      -0.0093,
+      0.0754
+     ],
+     "sd": 0.1808
+    },
+    "bias": false
+   }
+  },
+  "confirm:opp": {
+   "points": 150,
+   "do_minus_hold": {
+    "n": 150,
+    "mean": -0.0104,
+    "ci": [
+     -0.0333,
+     0.0124
+    ],
+    "sd": 0.1427
+   },
+   "chose_do": {
+    "n": 89,
+    "chosen_minus_alt": {
+     "n": 89,
+     "mean": 0.0035,
+     "ci": [
+      -0.0239,
+      0.0309
+     ],
+     "sd": 0.132
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 61,
+    "chosen_minus_alt": {
+     "n": 61,
+     "mean": 0.0307,
+     "ci": [
+      -0.0084,
+      0.0699
+     ],
+     "sd": 0.1559
+    },
+    "bias": false
+   }
+  },
+  "trigger": {
+   "points": 50,
+   "do_minus_hold": {
+    "n": 50,
+    "mean": 0.0488,
+    "ci": [
+     0.0105,
+     0.087
+    ],
+    "sd": 0.1379
+   },
+   "chose_do": {
+    "n": 40,
+    "chosen_minus_alt": {
+     "n": 40,
+     "mean": 0.0359,
+     "ci": [
+      0.0097,
+      0.0622
+     ],
+     "sd": 0.0848
+    },
+    "bias": false
+   },
+   "chose_hold": {
+    "n": 10,
+    "chosen_minus_alt": {
+     "n": 10,
+     "mean": -0.1,
+     "ci": [
+      -0.2625,
+      0.0625
+     ],
+     "sd": 0.2622
+    },
+    "bias": false
+   }
   }
  },
- "forecast_check": {
-  "gap_opens_to_-0.02_-0.03_p0.3": "外れ（最後の 4 周の平均 A −0.0156・B −0.0153。開いたのは訓練側だけ −0.031）",
-  "scratch_attn_below_r24_p0.1": "A では外れ（1.8383＝r24 から再訓練 1.838 に並ぶだけ）・B では僅差で当たり（1.8305 対 同じ材料で r24 から 1.8352）"
- },
- "judgment": "差は −0.02 より小さいまま（−0.015 で一定）・順番の取り違えは減らない＝「頭の形では伸びない」を確定。本実装へは進まない（推薦）。1 手の時間の見積もりは §7.52 のまま（×2.5 前後・軽い版 ×1.3）。",
- "reading": "注意の頭の得は学ぶ速さの一定の 0.015 で、長く回しても開かない（両方とも周 6〜8 で頭打ち・残りの力は訓練側の覚え込みに使われる）。一から育てた注意の頭が r24 の積み上げと同じ種類の得を一度で取れる（B で r24 から再訓練を 0.005 下回る）が、§7.52 では r24 に足しても差 0.000＝足し算にならない。",
  "notes": [
-  "組 B（波 54 を足した組）は波 54 の前半 w01〜w16（64 シャード）だけを足した。波 54 は 32 シャードあるが、全部だと材料 3 倍で 16 周の注意の頭が 1 日を超えるため。前半同士で材料をちょうど倍にした",
-  "組 B は時間の都合で Sonnet の作業セッション 2 本に分けた（定型の訓練・CLAUDE.md の Sonnet の決まり）。結果ブランチ claude/policy-attn-long-w54-base・-w54-attn に push させ、jsonl とログをこのブランチへ写した。両セッションは回収後にアーカイブした",
-  "「r24 を下回るか」を同じ材料で比べるため、指示書に無い対照 base_r24_w5354（B の材料で r24 から・今の頭・4 周）を足した。A の材料の対照は §7.52 の base_r24 を使った",
-  "指示書の『r24 の 1.838』は r24 から再訓練した値（§7.52 の base_r24 周 3 1.8382）と読んだ。r24 そのもの（訓練前）は同じ検証点で 1.8606",
-  "組 A は 2 スレッドずつ 2 本並べたため §7.52（1 スレッド）と僅かに数字が違う（周 0 は同じ・周 1 の今の頭 1.8680 → 1.8698）",
-  "torch 2.14.1+cu130 を ~/torch_env（PYTHONPATH）に入れて訓練し、ゲートは torch を入れない構成で回した（§7.53・§7.54 と同じ扱い）。torch を入れた構成では tests/test_n_rel_train_torch.py::test_grads_match_numpy が数値の許容差で 1 件落ちる（コードは変えていないので本線の既知の件・この torch の版との相性）",
-  "台帳（docs/cpu_theory_gap.md）・計画（§7.57）の書き換えはコーディネータに任せた"
+  "配り方は 1 点 8 通り（仕様は K=32）。今のターンの残りを出荷の設定で打つので 1 点 95 秒・K=32 では約 1.5 日かかるため、点の数を保ち配り方を減らした。最初の 13 点だけ 16 通り。judge --more --k-from 8 で足せる",
+  "判定は 8 本に分けた（コーディネータの依頼・judge --shard i/8）。本 0 はこのセッション、本 1〜7 は claude/hold-bias-j1〜j7 の作業セッション。各ブランチの points_shard{i}.jsonl をここに集めた",
+  "続き（commit）・詰みの証明（lethal）の点は数えていない（候補 2 つ以上の点の 9.4%）・マリガンも数えない",
+  "場面の点は上限（既定 150・ターン終了 300・カウンター 200）まで局の記録だけで決まる無作為の順位で選んだ。自分の手番の【トリガー】は母集団が 50 点しかなく 150 点に届かない",
+  "「選んだ − 次点」は判定の今のターンの残りを同じ出荷の CPU が打つので、CPU の計画に合う手に有利な向きがある（仕様の形）",
+  "偏りのある場面が無いので、§7.59 手順 4 の『5〜10 点を読んで型を分ける』と手順 5 の直し方の案は行っていない（上限だけ）",
+  "見張りの場面（有意でない・平均が負）: 【起動メイン】を使った点 −0.039［−0.101, +0.024］（28 点）・ブロックした点 −0.018［−0.065, +0.028］（51 点）・自分の【トリガー】を使わなかった点 −0.100［−0.263, +0.063］（10 点）",
+  "コンテナの再起動で本 0 が一度止まったが、判定は再開でき点の欠けは無い"
  ]
 }
