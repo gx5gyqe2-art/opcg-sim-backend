@@ -1,0 +1,26 @@
+WHIFFS 25
+4171018 131 Ｘ・ドレーク fresh_same True here (False, '窓は出たが効く対象が無い（窓: CONFIRM_OPTIONAL）') first (False, '窓は出たが効く対象が無い（窓: CONFIRM_OPTIONAL）') d True b {"action_type": "ACTIVATE_MAIN", "card": "EB04-031"}
+4171019 193 カポネ・ベッジ fresh_same False here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "ACTIVATE_MAIN", "card": "OP10-114"}
+4171028 110 ガン・フォール fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "DON_BOX", "don_k": 1, "card": "OP05-106"}
+4171050 21 モンキー・Ｄ・ルフィ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "PLAY", "card": "OP12-004"}
+4171050 37 モンキー・Ｄ・ルフィ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "PLAY", "card": "OP12-009"}
+4171050 38 ジンベエ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "DON_BOX", "don_k": 0, "card": "OP12-001", "targets": ["OP09-042"]}
+4171051 81 トニートニー・チョッパー fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "ACTIVATE_MAIN", "card": "OP07-071"}
+4171057 57 シャム fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'ターンの最初には手札に無かった（このターンに引いた・手札に加えた）') d True b {"action_type": "DON_BOX", "don_k": 0, "card": "OP03-021", "targets": ["OP13-079"]}
+4171058 7 シャム fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "DON_BOX", "don_k": 0, "card": "OP03-021", "targets": ["OP12-081"]}
+4171058 123 イゾウ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "DON_BOX", "don_k": 0, "card": "OP03-021", "targets": ["OP12-094"]}
+4171061 119 ドンキホーテ・ロシナンテ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (True, '効果が対象に効いた（RAMP_DON）（窓: CONFIRM_OPTIONAL）') d False b {"action_type": "TURN_END"}
+4171063 19 マーガレット fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "PLAY", "card": "OP09-056"}
+4171063 20 Mr.3(ギャルディーノ) fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "TURN_END"}
+4171077 204 ドール fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (True, '効果が対象に効いた（BUFF）（窓: CONFIRM_OPTIONAL・SEARCH_AND_SELECT）') d False b {"action_type": "TURN_END"}
+4171092 34 ガン・フォール fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "TURN_END"}
+4171094 8 シャンクス fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "DON_BOX", "don_k": 1, "card": "OP12-001"}
+4171094 114 モンキー・Ｄ・ルフィ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "DON_BOX", "don_k": 1, "card": "OP12-001"}
+4171096 14 シャーロット・クラッカー fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d False b {"action_type": "PLAY", "card": "OP17-102"}
+4171096 26 シャーロット・スムージー fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "DON_BOX", "don_k": 0, "card": "OP17-099", "targets": ["OP16-041"]}
+4171101 61 ガン・フォール fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (False, '効果が動かない（窓も解決も無い）') d True b {"action_type": "PLAY", "card": "EB01-057"}
+4171113 9 つる fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d True b {"action_type": "PLAY", "card": "OP04-096"}
+4171123 100 レオ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (True, '効果が対象に効いた（MOVE_CARD,REST）（窓: CONFIRM_OPTIONAL・SEARCH_AND_SELECT・ARRANGE_DECK・SEARCH_AND_SELECT）') d False b {"action_type": "TURN_END"}
+4171132 4 ライムジュース fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "DON_BOX", "don_k": 3, "card": "OP09-001"}
+4171135 24 モンキー・Ｄ・ルフィ fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d False b {"action_type": "DON_BOX", "don_k": 0, "card": "OP12-001", "targets": ["OP04-085"]}
+4171135 75 バギー fresh_same True here (False, '効果が動かない（窓も解決も無い）') first (None, 'このターンの最初の手だった') d True b {"action_type": "PLAY", "card": "OP12-016"}
