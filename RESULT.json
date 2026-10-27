@@ -10,10 +10,12 @@
  },
  "outputs": {
   "files": [
+   "arena_r27l/r27l_mirror_w07.jsonl",
    "arena_r27l/r27l_real_w07.jsonl"
   ]
  },
  "metrics": {
+  "arena_r27l/r27l_mirror_w07.jsonl": 175,
   "arena_r27l/r27l_real_w07.jsonl": 175
  },
  "notes": "",
