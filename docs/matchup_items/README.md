@@ -12,3 +12,16 @@
 
 紫カイドウ対青ロックス（2026-10-27）の項目は `docs/search_efficiency_plan.md` §7.63 に書いた。
 言い換えの注意（抽出のときに見つかった食い違い）: 緑ミホークの記事は先後の選択が表（後攻）とまとめ（先攻）で食い違う・青ロックス対赤黒サボの記事は「仲間の夢」の枚数とグロリオーサのコストの表記が混在する。
+
+## 記事のデッキ（2026-10-27 にユーザが送った画像から書き起こし・`tests/fixtures/decks/article_decks_20261027.json`）
+
+| 対面（視点が先） | 視点の側のデッキ | 相手のデッキ |
+|---|---|---|
+| 紫カイドウ 対 青ロックス | `kaido_1027` | `rocks_kaido_article_1027` |
+| 紫エネル 対 青ロックス | `enel_1021` | `rocks_enel_article_1021` |
+| 黒ルフィ 対 赤黒サボ | `bluffy_1024` | `sabo_bluffy_article_1024` |
+| 青ロックス ミラー | `rocks_fortress_1005` | `rocks_fortress_1005` |
+| 緑ミホーク 対 赤黒サボ | `mihawk_0917` | `sabo_mihawk_article_0917` |
+| 青ロックス 対 赤黒サボ | `rocks_sabo_article_1015` | `sabo_rocks_article_1015` |
+
+画像の文字が読めず推定したカードは各デッキの `uncertain` に書いた。上の表の構築例（official）の列は、記事のデッキが無かったときの代わりで、今は記事のデッキを使う。
