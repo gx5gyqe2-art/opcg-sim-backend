@@ -1,0 +1,1 @@
+{"shard": 4, "games": 25, "branch": "claude/matchup-kr-p4", "notes": "log header said todo 25 (done 2) but games_shard4.jsonl has 25 lines and the log has [1/25]..[25/25]; ran straight through once. Run took ~55 min."}
