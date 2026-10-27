@@ -1,0 +1,1 @@
+{"shard": 7, "games": 25, "branch": "claude/matchup-kr-p7", "notes": "Log header said 'todo 25 (done 2)' at start, but all 25 games ran in this session ([1/25]..[25/25]); games_shard7.jsonl has 25 lines. All games had first=p2 (idx 103..199)."}
