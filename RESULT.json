@@ -26,7 +26,7 @@
   "dropped": 0,
   "sec_play_mean": 26.87
  },
- "notes": "",
+ "notes": "gen_n60.json の ledger_grep '7.67 教材 4 波' が台帳の実見出し '7.67 教材を 4 波に増やす' と合わず出どころの照合で止まったため、ledger_grep だけ '7.67 教材を 4 波' に直した手元の定義（--spec）で回した。他は本線の定義のまま。本線の定義の直しはコーディネータへ。",
  "worker": {
   "spec": "/tmp/claude-0/-home-user-opcg-sim-backend/67f5dbb4-153d-5789-9f13-b3e1651ecb91/scratchpad/gen_n60.json",
   "k": 17,
