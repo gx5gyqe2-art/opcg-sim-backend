@@ -13,15 +13,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n60_w14_p0"
+   "n_records/n60_w14_p0",
+   "n_records/n60_w14_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 20265,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 40683,
   "dropped": 0,
-  "sec_play_mean": 18.13
+  "sec_play_mean": 19.14
  },
  "notes": "",
  "worker": {
