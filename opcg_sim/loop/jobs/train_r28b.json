@@ -4,7 +4,7 @@
  "ledger_grep": "7.67 教材を 4 波",
  "about": "r28b（warm-start r27・π と価値とも波 58＋59＋60＋61＝今の生成役 r27 の 4 波・約 1,060 万行）→ 評価帯（波 59 holdout・r28 と同じ帯）",
  "job": "train-r28b",
- "branch": "claude/train-r28b",
+ "branch": "claude/train-r28b2",
  "base": {
   "branch": "claude/cpu-spec-improvements-yw91jd"
  },

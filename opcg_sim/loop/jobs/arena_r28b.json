@@ -14,7 +14,7 @@
   "B": "k - 1"
  },
  "nets": {
-  "candidate": "claude/train-r28b:n1_results/nrel_r28b.npz",
+  "candidate": "claude/train-r28b2:n1_results/nrel_r28b.npz",
   "baseline": "opcg_sim/data/learned/nrel_r27.npz"
  },
  "out_dir": "arena_r28b",
@@ -55,7 +55,7 @@
   }
  ],
  "inputs": {
-  "candidate": "nrel_r28b.npz (claude/train-r28b)",
+  "candidate": "nrel_r28b.npz (claude/train-r28b2)",
   "baseline": "nrel_r27.npz",
   "both": "sims 160 (fair)",
   "pairs": 175

@@ -328,10 +328,13 @@ class _Waves:
             out[:] = self.parts[0][idx] if self.cols is None else self.parts[0][idx][:, c]
             return out
         which = np.searchsorted(self.offsets, idx, side="right") - 1
-        for p in np.unique(which):
-            m = which == p
-            got = self.parts[p][idx[m] - self.offsets[p]]
-            out[m] = got if self.cols is None else got[:, c]
+        # 波（part）ごとにまとめて読む。並べ替えで束ねる＝part 数 × 行数のマスクを作らない
+        # （訓練のバッチは何百もの part をまたぐ）。書き戻す位置は元の順なので値は同じ。
+        order = np.argsort(which, kind="stable")
+        for g in np.split(order, np.flatnonzero(np.diff(which[order])) + 1):
+            p = int(which[g[0]])
+            got = self.parts[p][idx[g] - self.offsets[p]]
+            out[g] = got if self.cols is None else got[:, c]
         return out
 
 

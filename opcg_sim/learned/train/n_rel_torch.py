@@ -28,6 +28,7 @@ import numpy as np
 import torch
 
 from opcg_sim.learned import n_eff as NE
+from opcg_sim.learned.train import dump_io as DIO
 from opcg_sim.learned import n_rel as NL
 from opcg_sim.learned import n_rel_feat as NR
 from opcg_sim.learned.n_rel import (
@@ -547,8 +548,11 @@ class _Rows:
     float16／int16 でもそのまま動く）。"""
 
     def __init__(self, a, dtype):
-        self.a = np.asarray(a)
-        self.t = _maybe_tensor(self.a)
+        # 波をまたぐ memmap の view（`dump_io._Waves`）は**1 本にまとめない**＝RAM に載せない。
+        # `np.asarray` すると全波を連結した複製ができ、4 波（1,060 万行）で約 14GB になって
+        # 落ちた（2026-10-27・r28b）。1 波のときと同じく fancy index の経路で読む（値は同じ）。
+        self.a = a if isinstance(a, DIO._Waves) else np.asarray(a)
+        self.t = None if isinstance(self.a, DIO._Waves) else _maybe_tensor(self.a)
         self.dtype = dtype
 
     def _cast(self, out):
