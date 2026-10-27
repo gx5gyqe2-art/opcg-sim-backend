@@ -1,0 +1,3 @@
+PLAY shard=None todo 200 (done 0) -> n1_results/matchup_kr/games.jsonl
+[1/200] idx=100 first=p2 turns=17 kaido_won=False sec=372.6 (373s)
+[2/200] idx=101 first=p2 turns=14 kaido_won=True sec=483.8 (484s)
