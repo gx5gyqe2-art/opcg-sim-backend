@@ -10,10 +10,12 @@
  },
  "outputs": {
   "files": [
+   "arena_r28/r28_mirror_w10.jsonl",
    "arena_r28/r28_real_w10.jsonl"
   ]
  },
  "metrics": {
+  "arena_r28/r28_mirror_w10.jsonl": 175,
   "arena_r28/r28_real_w10.jsonl": 175
  },
  "notes": "",
