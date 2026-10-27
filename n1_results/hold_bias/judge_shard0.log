@@ -142,3 +142,15 @@ SCENE select_none:opp pool=159 take=150
 SCENE trigger pool=50 take=50
 SCENE trigger:opp pool=231 take=150
 JUDGE shard=0/8 todo 43 (done overall 239) k=8 k_from=0 -> n1_results/hold_bias/points_shard0.jsonl
+JUDGE seed=4171039 step=88 window select_none:opp a_hold=False why=None d=-0.25 sec=119.5 (1/43 122s)
+JUDGE seed=4171020 step=141 window select_none:opp a_hold=False why=None d=0.0 sec=5.4 (2/43 128s)
+JUDGE seed=4171003 step=70 window select_none:opp a_hold=False why=None d=0.0 sec=99.8 (3/43 228s)
+JUDGE seed=4171136 step=67 window select_none:opp a_hold=False why=None d=0.125 sec=231.2 (4/43 234s)
+JUDGE seed=4171130 step=69 window select_none:opp a_hold=False why=None d=-0.125 sec=62.0 (5/43 289s)
+JUDGE seed=4171021 step=121 window select_none:opp a_hold=True why=None d=0.0 sec=108.0 (6/43 342s)
+JUDGE seed=4171097 step=12 window select_none:opp a_hold=False why=None d=0.0 sec=355.6 (7/43 358s)
+JUDGE seed=4171005 step=75 window select_none:opp a_hold=True why=None d=-0.125 sec=413.4 (8/43 416s)
+JUDGE seed=4171108 step=142 window select_none:opp a_hold=True why=None d=0.0 sec=46.2 (9/43 462s)
+JUDGE seed=4171136 step=167 window select_none:opp a_hold=False why=None d=0.0 sec=18.1 (10/43 480s)
+JUDGE seed=4171110 step=130 window select_none:opp a_hold=False why=None d=-0.125 sec=156.5 (11/43 499s)
+JUDGE seed=4171003 step=36 window select_none:opp a_hold=True why=None d=0.0 sec=185.0 (12/43 543s)
