@@ -1,0 +1,1 @@
+{"shard": 6, "games": 25, "branch": "claude/matchup-kr-p6", "notes": "All 25 games have idx 3,7,...,99 (all <100, first=p1); the script log said done 2 at start but wrote 25 lines. Sequence/shard split as produced by matchup_kr.py unchanged; did not alter code."}
