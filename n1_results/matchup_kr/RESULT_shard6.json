@@ -1,0 +1,1 @@
+{"shard": 6, "branch": "claude/matchup-kr-j6", "status": "done", "notes": "7/7 points, k=16, workers 4, total 2812s (~47 min). Followed JUDGE_HOWTO.md as written; no code changes."}

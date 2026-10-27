@@ -1,0 +1,8 @@
+JUDGE shard=6/8 todo 7 (done 0) k=16 -> n1_results/matchup_kr/judge_points_shard6.jsonl
+[1/7] idx=118 step=28 item=5 ok=True diff=0.0 ci=[-0.253, 0.253] sec=1172.2 (1176s)
+[2/7] idx=182 step=87 item=6 ok=True diff=-0.1875 ci=[-0.385, 0.01] sec=1390.0 (1393s)
+[3/7] idx=168 step=71 item=10 ok=True diff=0.0 ci=[-0.1789, 0.1789] sec=1465.1 (1469s)
+[4/7] idx=86 step=69 item=3 ok=True diff=-0.25 ci=[-0.5329, 0.0329] sec=2059.5 (2063s)
+[5/7] idx=169 step=19 item=3 ok=True diff=0.0 ci=[-0.1789, 0.1789] sec=944.5 (2120s)
+[6/7] idx=97 step=26 item=5 ok=True diff=0.375 ci=[0.13, 0.62] sec=876.8 (2270s)
+[7/7] idx=38 step=77 item=3 ok=True diff=-0.125 ci=[-0.37, 0.12] sec=1343.9 (2812s)
