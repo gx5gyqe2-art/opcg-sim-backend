@@ -1,0 +1,1 @@
+{"shard": 2, "games": 25, "branch": "claude/matchup-kr-p2", "notes": "kaido_won 17/25, void 0. The first run reported 'done 2' at start (games_shard2.jsonl was not present locally; resumed count came from the tool); final jsonl has 25 unique games. Code unchanged."}
