@@ -11,12 +11,14 @@
  "outputs": {
   "files": [
    "arena_r27o/r27o_mirror_w09.jsonl",
-   "arena_r27o/r27o_real_w09.jsonl"
+   "arena_r27o/r27o_real_w09.jsonl",
+   "arena_r27o/r27o_synth2_w09.jsonl"
   ]
  },
  "metrics": {
   "arena_r27o/r27o_mirror_w09.jsonl": 175,
-  "arena_r27o/r27o_real_w09.jsonl": 175
+  "arena_r27o/r27o_real_w09.jsonl": 175,
+  "arena_r27o/r27o_synth2_w09.jsonl": 175
  },
  "notes": "",
  "worker": {
