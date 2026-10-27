@@ -1,0 +1,1 @@
+{"shard": 1, "branch": "claude/matchup-kr-j1", "status": "done", "points": 8, "notes": "JUDGE_HOWTO.md の I=1 のとおり実行（k=16, workers=4）。8/8 点 ok=True、約 2121 秒。迷った点なし。"}
