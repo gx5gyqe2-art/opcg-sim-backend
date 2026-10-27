@@ -343,7 +343,6 @@ def analyse_game(g, t):
                 cand("2", r["step"], b, "keep" if crit else "mulligan")
             break
     # (3) 理想の展開
-    k6_seen = False
     res["turns_play"] = {}
     res["ideal"] = {}
     for tn in sorted(by_turn):
@@ -369,8 +368,6 @@ def analyse_game(g, t):
                 b = {"kind": "game", "action_type": "PLAY", "payload": {"uuid": uu}}
                 if pts[s0]["kind"] == "main" and BA.key(pts[s0]["a_box"] or pts[s0]["move"]) != BA.key(b):
                     cand("3", s0, b, f"T{ot}:{top}", {"own_turn": ot})
-        if K6 in plays:
-            k6_seen = True
     # (5) リーダー効果
     res["leader"] = []
     k6_played = False
@@ -542,15 +539,20 @@ def analyse_game(g, t):
     # 評価の推移（紫カイドウから見た・判断点ごと）と相手の札の登場の前後
     vals = [(p["step"], p["turn"], kv(p)) for p in pts if p["kind"] in ("main", "window") and kv(p) is not None]
     res["values"] = vals
-    res["opp_enter"] = []
-    for i, r in enumerate(rows):
-        if r["seat"] == "p2" and r["tp"] == "p2" and r["mv"] and r["mv"]["at"] == "PLAY":
-            before = [v for s, _, v in vals if s < r["step"]]
-            # 相手のターンが終わって、紫カイドウの次の判断（自分のターンのメイン）まで
-            nt = next((x for x in rows[i:] if x["tp"] == "p1" and x["seat"] == "p1" and x["act"] == "MAIN_ACTION"), None)
-            after = [v for s, _, v in vals if nt is not None and s >= nt["step"]]
-            if before and after:
-                res["opp_enter"].append({"card": r["mv"]["card"], "turn": r["turn"], "delta_turn": round(after[0] - before[-1], 4)})
+    # 相手のターンの前後（紫カイドウ自身の評価だけで比べる＝読む側ごとの評価の癖を入れない）:
+    # 前＝その直前の自分のターンの最後のメインの判断、後＝次の自分のターンの最初のメインの判断
+    mains = [(p["step"], p["turn"], kv(p)) for p in pts if p["seat"] == "p1" and p["kind"] == "main"
+             and p["dtype"] != "mulligan" and kv(p) is not None]
+    res["opp_turns"] = []
+    for tn in sorted({r["turn"] for r in rows if r["tp"] == "p2"}):
+        bef = [v for s_, t_, v in mains if t_ < tn]
+        aft = [v for s_, t_, v in mains if t_ > tn]
+        if not bef or not aft:
+            continue
+        cards = sorted({r["mv"]["card"] for r in rows if r["turn"] == tn and r["seat"] == "p2" and r["mv"]
+                        and r["mv"]["at"] == "PLAY"})
+        res["opp_turns"].append({"turn": tn, "own_turn": own_turn(tn, "p2", kf), "before": bef[-1], "after": aft[0],
+                                 "cards": cards})
     return res, cands
 
 
@@ -808,12 +810,22 @@ def cmd_summary(a):
     S["rocks_bounce"] = {"n": len(RB), "targets": top_counts([[x["target"]] for x in RB if x["target"]], 6),
                          "by_turn": top_counts([[str(x["own_turn"])] for x in RB], 8)}
     # 厄介な札（相手の札の登場の前後で動いた紫カイドウの評価）
+    # 勝負がほぼ決まった局面（前の値の絶対値 ≥ 0.9）は外す。札ごとに「その札を出した相手のターン」の下がり幅の平均から、
+    # 全ての相手のターンの平均を引いた値（負＝その札が出たターンは紫カイドウの評価がふだんより下がる）
+    OT = [x for r in ok for x in r["opp_turns"] if abs(x["before"]) < DECIDED]
+    # 基準は相手の同じ「何ターン目」の平均（序盤の札と終盤の札を同じ物差しで比べるため）
+    bt = {}
+    for x in OT:
+        bt.setdefault(min(x["own_turn"], 8), []).append(x["after"] - x["before"])
+    base = {k: sum(v) / len(v) for k, v in bt.items()}
     oe = {}
-    for r in ok:
-        for x in r["opp_enter"]:
-            oe.setdefault(x["card"], []).append(x["delta_turn"])
-    S["opp_cards"] = sorted([[c, cname(c)[0], len(v), round(sum(v) / len(v), 4)] for c, v in oe.items() if len(v) >= 5],
+    for x in OT:
+        for c in x["cards"]:
+            oe.setdefault(c, []).append(x["after"] - x["before"] - base[min(x["own_turn"], 8)])
+    S["opp_turn_base"] = {"n": len(OT), "by_own_turn": {str(k): [len(bt[k]), round(base[k], 4)] for k in sorted(bt)}}
+    S["opp_cards"] = sorted([[c, cname(c)[0], len(v)] + [mean_ci(v)["mean"], mean_ci(v)["ci"]] for c, v in oe.items() if len(v) >= 8],
                             key=lambda x: x[3])
+    S["opp_turn_none"] = mean_ci([x["after"] - x["before"] - base[min(x["own_turn"], 8)] for x in OT if not x["cards"]])
     # 判定
     J = [x for x in read_glob(os.path.join(a.out, "judge_points*.jsonl"), lambda x: (x["idx"], x["step"], x["item"])).values() if x["ok"]]
     S["judge"] = {"points": len(J), "by_item": {}, "all": mean_ci([x["ref"]["diff"] for x in J])}
