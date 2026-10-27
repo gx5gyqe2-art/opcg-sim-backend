@@ -1,7 +1,7 @@
 {
  "job": "train-r28",
  "role": "train",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "warm_start": "opcg_sim/data/learned/nrel_r27.npz",
   "nets": {
