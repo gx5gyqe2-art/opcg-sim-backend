@@ -1,0 +1,1 @@
+{"shard": 7, "branch": "claude/matchup-kr-j7", "status": "done", "notes": "judge --k 16 --workers 4 --shard 7/8: 7/7 points ok (idx 117,127,30,17,115,194 + one earlier at [4/7]); see judge_shard7.log. Code unchanged."}
