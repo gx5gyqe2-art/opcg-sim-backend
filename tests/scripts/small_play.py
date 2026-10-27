@@ -174,7 +174,7 @@ def scan_one(g):
             if r["uuid"] not in field_of(game, r["seat"]):
                 r["left"] = where(game, r["seat"], r["uuid"])
                 r["left_turn"] = t
-                r["left_by_opp"] = name != r["seat"]
+                r["left_by_opp"] = t > r["turn"]  # 相手の次のターンに離れた（同じターンなら自分の手番の中）
                 live.remove(r)
             elif t > r["turn"] + 1:
                 r["left"] = None
