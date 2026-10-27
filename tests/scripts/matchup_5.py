@@ -446,8 +446,7 @@ def analyse_game(g, t):
             if not (r["seat"] == "p1" and r["tp"] == "p1" and r["mv"] and r["mv"]["at"] == "ATTACK"):
                 continue
             att = r["mv"].get("uuid")
-            to_leader = (r["mv"].get("tgt") or [None])[0] == cname(opp_leader)[0] or \
-                (r["mv"].get("tgt") or [None])[0] == umap.get(opp_leader)
+            to_leader = (r["mv"].get("tgt") or [None])[0] == umap.get(opp_leader)
             ot = own_turn(r["turn"], "p1", mf)
             scene("atk_leader", to_leader, ot, attacker=r["mv"].get("card"), target=(r["mv"].get("tgt") or [None])[0],
                   opp_life=r["st"]["p2"]["life"])
@@ -473,6 +472,7 @@ def analyse_game(g, t):
                 scene("enel_banrai", True, own_turn(r["turn"], "p1", mf), use="counter")
             if r["mv"]["at"] == "PLAY" and r["mv"].get("card") == BANRAI:
                 scene("enel_banrai", False, own_turn(r["turn"], "p1", mf), use="main")
+        seen_shiki = set()
         for tn, rs in sorted(by_turn["p1"].items()):
             ot = own_turn(tn, "p1", mf)
             mains = [r for r in rs if r["seat"] == "p1" and r["act"] == "MAIN_ACTION"]
@@ -482,8 +482,10 @@ def analyse_game(g, t):
                 used = [r["mv"]["card"] for r in rs if r["seat"] == "p1" and r["mv"] and r["mv"]["at"] == "PLAY"
                         and r["mv"].get("card") in ENEL_REMOVAL]
                 scene("enel_hold", not used, ot, used=used)
-            sh0 = {c[4] for c in mains[0]["st"]["p2"]["field"] if c[0] == SHIKI}
-            if sh0 and ot >= 3:
+            # 7シキが出て最初の自分のターン（1 体につき 1 場面）
+            sh0 = {c[4] for c in mains[0]["st"]["p2"]["field"] if c[0] == SHIKI} - seen_shiki
+            seen_shiki |= sh0
+            if sh0:
                 nxt = next((r for r in rows if r["turn"] > tn), None)
                 left = nxt is not None and not (sh0 & {c[4] for c in nxt["st"]["p2"]["field"]})
                 scene("enel_shiki", left, ot)
