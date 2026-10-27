@@ -1,0 +1,1 @@
+{"shard": 1, "games": 25, "branch": "claude/matchup-kr-p1", "notes": "Script skipped idx 100 because it is already in claude/matchup-kr's games.jsonl (done by shard 0), so games_shard1.jsonl holds 24 games (all idx>=100, p2 first); idx 100 is the 25th shard-1 game. Void count: 0."}
