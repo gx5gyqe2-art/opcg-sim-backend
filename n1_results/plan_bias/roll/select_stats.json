@@ -1,0 +1,16 @@
+{
+ "games": 40,
+ "attack_rows": 506,
+ "defense_rows": 433,
+ "candidates": {
+  "attack/board/face": 11,
+  "attack/board/mixed": 18,
+  "attack/face/board": 3,
+  "attack/face/mixed": 28,
+  "attack/mixed/board": 8,
+  "attack/mixed/face": 4,
+  "defense/guard/take": 32,
+  "defense/take/guard": 37
+ },
+ "kept": 60
+}

@@ -1,0 +1,190 @@
+{
+ "all": {
+  "points": 60,
+  "pairs": 960,
+  "win_a": 0.3469,
+  "win_b": 0.3156,
+  "diff_mean_over_points": -0.0312,
+  "ci_points": [
+   -0.0658,
+   0.0033
+  ],
+  "b_better": 0.1,
+  "b_worse": 0.283,
+  "b_sig_better": 2,
+  "b_sig_worse": 4,
+  "map_gap_mean": 0.0819,
+  "corr_gap_diff": -0.046
+ },
+ "attack": {
+  "points": 30,
+  "pairs": 480,
+  "win_a": 0.3708,
+  "win_b": 0.3458,
+  "diff_mean_over_points": -0.025,
+  "ci_points": [
+   -0.0718,
+   0.0218
+  ],
+  "b_better": 0.133,
+  "b_worse": 0.2,
+  "b_sig_better": 1,
+  "b_sig_worse": 2,
+  "map_gap_mean": 0.065,
+  "corr_gap_diff": -0.494
+ },
+ "attack:board<-face": {
+  "points": 5,
+  "pairs": 80,
+  "win_a": 0.7875,
+  "win_b": 0.7875,
+  "diff_mean_over_points": 0.0,
+  "ci_points": [
+   -0.0775,
+   0.0775
+  ],
+  "b_better": 0.2,
+  "b_worse": 0.2,
+  "b_sig_better": 0,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.1357,
+  "corr_gap_diff": -0.31
+ },
+ "attack:board<-mixed": {
+  "points": 4,
+  "pairs": 64,
+  "win_a": 0.2812,
+  "win_b": 0.2969,
+  "diff_mean_over_points": 0.0156,
+  "ci_points": [
+   -0.015,
+   0.0462
+  ],
+  "b_better": 0.25,
+  "b_worse": 0.0,
+  "b_sig_better": 0,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.0298,
+  "corr_gap_diff": 0.875
+ },
+ "attack:face<-board": {
+  "points": 2,
+  "pairs": 32,
+  "win_a": 0.2812,
+  "win_b": 0.25,
+  "diff_mean_over_points": -0.0312,
+  "ci_points": [
+   -0.215,
+   0.1525
+  ],
+  "b_better": 0.5,
+  "b_worse": 0.5,
+  "b_sig_better": 0,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.191,
+  "corr_gap_diff": null
+ },
+ "attack:face<-mixed": {
+  "points": 10,
+  "pairs": 160,
+  "win_a": 0.5437,
+  "win_b": 0.475,
+  "diff_mean_over_points": -0.0688,
+  "ci_points": [
+   -0.201,
+   0.0635
+  ],
+  "b_better": 0.1,
+  "b_worse": 0.3,
+  "b_sig_better": 1,
+  "b_sig_worse": 2,
+  "map_gap_mean": 0.0708,
+  "corr_gap_diff": -0.815
+ },
+ "attack:mixed<-board": {
+  "points": 7,
+  "pairs": 112,
+  "win_a": 0.0089,
+  "win_b": 0.0,
+  "diff_mean_over_points": -0.0089,
+  "ci_points": [
+   -0.0264,
+   0.0086
+  ],
+  "b_better": 0.0,
+  "b_worse": 0.143,
+  "b_sig_better": 0,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.006,
+  "corr_gap_diff": -0.086
+ },
+ "attack:mixed<-face": {
+  "points": 2,
+  "pairs": 32,
+  "win_a": 0.0,
+  "win_b": 0.0,
+  "diff_mean_over_points": 0.0,
+  "ci_points": [
+   0.0,
+   0.0
+  ],
+  "b_better": 0.0,
+  "b_worse": 0.0,
+  "b_sig_better": 0,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.0106,
+  "corr_gap_diff": null
+ },
+ "defense": {
+  "points": 30,
+  "pairs": 480,
+  "win_a": 0.3229,
+  "win_b": 0.2854,
+  "diff_mean_over_points": -0.0375,
+  "ci_points": [
+   -0.0889,
+   0.0139
+  ],
+  "b_better": 0.067,
+  "b_worse": 0.367,
+  "b_sig_better": 1,
+  "b_sig_worse": 2,
+  "map_gap_mean": 0.0987,
+  "corr_gap_diff": 0.126
+ },
+ "defense:guard<-take": {
+  "points": 14,
+  "pairs": 224,
+  "win_a": 0.5625,
+  "win_b": 0.4509,
+  "diff_mean_over_points": -0.1116,
+  "ci_points": [
+   -0.1798,
+   -0.0434
+  ],
+  "b_better": 0.0,
+  "b_worse": 0.643,
+  "b_sig_better": 0,
+  "b_sig_worse": 2,
+  "map_gap_mean": 0.0545,
+  "corr_gap_diff": 0.008
+ },
+ "defense:take<-guard": {
+  "points": 16,
+  "pairs": 256,
+  "win_a": 0.1133,
+  "win_b": 0.1406,
+  "diff_mean_over_points": 0.0273,
+  "ci_points": [
+   -0.0339,
+   0.0886
+  ],
+  "b_better": 0.125,
+  "b_worse": 0.125,
+  "b_sig_better": 1,
+  "b_sig_worse": 0,
+  "map_gap_mean": 0.1374,
+  "corr_gap_diff": 0.032
+ },
+ "errors": 0
+}

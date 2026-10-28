@@ -1,0 +1,241 @@
+{
+ "wp": "plan-bias",
+ "section": "§7.64",
+ "stage": 1,
+ "date": "2026-10-28",
+ "branch": "claude/plan-bias",
+ "verdict": "ずれは勝率の差ではない＝段 2 に進まないことを勧める（判断はユーザ）",
+ "report": "docs/reports/2026-10-28_plan_bias_stage1.md",
+ "map_net": {
+  "file": "n1_results/plan_bias/nrel_pmap.npz",
+  "warm_start": "nrel_r27.npz",
+  "waves": [
+   58,
+   59
+  ],
+  "epochs": 1,
+  "plan_weight": 0.1,
+  "val_vmse": 0.453,
+  "val_plan_mse": 0.4432,
+  "val_pi_top1": 0.4965,
+  "train_sec": 1399
+ },
+ "map": {
+  "holdout_games": 4390,
+  "attack": {
+   "agree": 0.30611764705882355,
+   "gap": 0.061801654112440256,
+   "gap_gt_0.1": 0.22072549019607843,
+   "argmax": {
+    "face": 0.3561298037001362,
+    "board": 0.4313946922642575,
+    "mixed": 0.21247550403560633
+   },
+   "played": {
+    "face": 0.3893725490196078,
+    "board": 0.17633333333333334,
+    "mixed": 0.43429411764705883
+   }
+  },
+  "attack_both_lethal": {
+   "n": 9275,
+   "v_face_minus_board": 0.17209973218692642,
+   "argmax": {
+    "face": 0.6191913746630727,
+    "board": 0.27256064690026954,
+    "mixed": 0.10824797843665768
+   },
+   "played": {
+    "face": 0.3412758583342359,
+    "board": 0.07050796057619409,
+    "mixed": 0.58821618108957
+   },
+   "agree": 0.3526481100400736,
+   "gap": 0.07713623934128014
+  },
+  "defense": {
+   "agree": 0.5602934921310081,
+   "gap": 0.033726140727944325,
+   "argmax_guard": 0.24126589386707312,
+   "played_guard": 0.4144247128881327
+  },
+  "clock_le2_attack": {
+   "n": 17560,
+   "argmax": {
+    "face": 0.48832574031890663,
+    "board": 0.30951025056947606,
+    "mixed": 0.2021640091116173
+   },
+   "played": {
+    "face": 0.3436525355203881,
+    "board": 0.13624812290631858,
+    "mixed": 0.5200993415732933
+   },
+   "agree": 0.33984059142890144,
+   "gap": 0.056787385801098655,
+   "winrate_by_played": {
+    "face": 0.6680672268907563,
+    "board": 0.10767274268757948,
+    "mixed": 0.499611327040533
+   },
+   "face_rec_played_face": 0.4197807379464812
+  },
+  "clock_le2_defense": {
+   "n": 17191,
+   "v_guard_minus_take": -0.03332459403235872,
+   "argmax_guard": 0.3654237682508289,
+   "played_guard": 0.324823882262677,
+   "agree": 0.6088442491455675,
+   "gap": 0.023418792553274264,
+   "winrate_by_played": {
+    "take": 0.39483471074380166,
+    "guard": 0.5716126261541765
+   }
+  },
+  "clock_le2_defense_enough": {
+   "n": 13391,
+   "played_guard": 0.3612667912107464,
+   "winrate_by_played": {
+    "take": 0.4129526462395543,
+    "guard": 0.5744890421078552
+   }
+  },
+  "capability": {
+   "t<=2": {
+    "board_played": 2359,
+    "board_played_face_avail": 0.9881305637982196,
+    "take_played": 9680,
+    "take_played_guard_avail": 0.949793388429752,
+    "take_played_guard_enough": 0.7417355371900827
+   },
+   "t3-4": {
+    "board_played": 3185,
+    "board_played_face_avail": 0.985243328100471,
+    "take_played": 7805,
+    "take_played_guard_avail": 0.9713004484304932,
+    "take_played_guard_enough": 0.8766175528507367
+   },
+   "t5+": {
+    "board_played": 3449,
+    "board_played_face_avail": 0.7442737025224703,
+    "take_played": 4542,
+    "take_played_guard_avail": 0.9830471158080141,
+    "take_played_guard_enough": 0.924262439453985
+   }
+  }
+ },
+ "rollouts": {
+  "games": 40,
+  "seed_range": [
+   7640000,
+   7640039
+  ],
+  "setting": "両席 r27・出荷の設定（1,280 回・世界 4 本・詰みの証明 root）・random × real",
+  "points": 60,
+  "k": 16,
+  "world_offset": 7640,
+  "referee": "r27 160 回（そのターンの残りは両席とも出荷の設定）",
+  "decided_points": 35,
+  "all": {
+   "points": 60,
+   "pairs": 960,
+   "win_a": 0.3469,
+   "win_b": 0.3156,
+   "diff_mean_over_points": -0.0312,
+   "ci_points": [
+    -0.0658,
+    0.0033
+   ],
+   "b_better": 0.1,
+   "b_worse": 0.283,
+   "b_sig_better": 2,
+   "b_sig_worse": 4,
+   "map_gap_mean": 0.0819,
+   "corr_gap_diff": -0.046
+  },
+  "attack": {
+   "points": 30,
+   "pairs": 480,
+   "win_a": 0.3708,
+   "win_b": 0.3458,
+   "diff_mean_over_points": -0.025,
+   "ci_points": [
+    -0.0718,
+    0.0218
+   ],
+   "b_better": 0.133,
+   "b_worse": 0.2,
+   "b_sig_better": 1,
+   "b_sig_worse": 2,
+   "map_gap_mean": 0.065,
+   "corr_gap_diff": -0.494
+  },
+  "defense": {
+   "points": 30,
+   "pairs": 480,
+   "win_a": 0.3229,
+   "win_b": 0.2854,
+   "diff_mean_over_points": -0.0375,
+   "ci_points": [
+    -0.0889,
+    0.0139
+   ],
+   "b_better": 0.067,
+   "b_worse": 0.367,
+   "b_sig_better": 1,
+   "b_sig_worse": 2,
+   "map_gap_mean": 0.0987,
+   "corr_gap_diff": 0.126
+  },
+  "defense_guard_rec_took": {
+   "points": 14,
+   "pairs": 224,
+   "win_a": 0.5625,
+   "win_b": 0.4509,
+   "diff_mean_over_points": -0.1116,
+   "ci_points": [
+    -0.1798,
+    -0.0434
+   ],
+   "b_better": 0.0,
+   "b_worse": 0.643,
+   "b_sig_better": 0,
+   "b_sig_worse": 2,
+   "map_gap_mean": 0.0545,
+   "corr_gap_diff": 0.008
+  },
+  "defense_take_rec_guarded": {
+   "points": 16,
+   "pairs": 256,
+   "win_a": 0.1133,
+   "win_b": 0.1406,
+   "diff_mean_over_points": 0.0273,
+   "ci_points": [
+    -0.0339,
+    0.0886
+   ],
+   "b_better": 0.125,
+   "b_worse": 0.125,
+   "b_sig_better": 1,
+   "b_sig_worse": 0,
+   "map_gap_mean": 0.1374,
+   "corr_gap_diff": 0.032
+  },
+  "defense_guard_rec_took_clock_ge1": {
+   "points": 13,
+   "diff": -0.1202,
+   "ci": [
+    -0.1915,
+    -0.0488
+   ]
+  }
+ },
+ "notes": [
+  "旧い計器 plan_value_map.py／time_plan_map.py（2026-10-01 退役・履歴 a623c54e）の数え方を plan_bias_map.py に 1 本で写し直した。",
+  "打ち比べは 1 判断点で 1 手だけ替える形（ターン全部の方針の強制ではない）。",
+  "守りの点 9 は決着までの自分の手番 0（その相手ターンで負け）を含めてしまった。除いた数を併記。",
+  "最初の訓練は作業プロセスの再起動で落ちたのでやり直した（キャッシュ済みの pack を使用）。",
+  "打ち比べは手元の 4 コアで回した（約 1.5 時間）。シャード用ジョブ定義 audit_plan_bias_roll.json は未使用。",
+  "地図の波は生成の設定・打ち比べの局は出荷の設定。"
+ ]
+}

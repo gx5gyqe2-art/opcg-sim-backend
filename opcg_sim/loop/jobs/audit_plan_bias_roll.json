@@ -1,0 +1,59 @@
+{
+ "kind": "audit",
+ "section": "§7.64",
+ "ledger_grep": "7.64 WP `plan-bias`",
+ "about": "plan-bias 段 1: 方針の地図のずれた点の打ち比べ（points.jsonl を 6 本に分けた k−1 本目・配り方 16 通り × 2 手・今のターンの残りは出荷の設定・その先は審判 r27 の 160 回）",
+ "job": "plan-bias-roll-w{KK}",
+ "branch": "claude/plan-bias-roll-w{KK}",
+ "base": {
+  "branch": "claude/plan-bias"
+ },
+ "shards": 6,
+ "hours": 1.0,
+ "vars": {
+  "SH": "k - 1"
+ },
+ "tool": "tests/scripts/plan_bias_roll.py",
+ "seed_base": "0",
+ "games": "0",
+ "out_dir": "n1_results/plan_bias/roll_w{KK}",
+ "push_every_min": 10,
+ "args": [
+  "--workers",
+  "4"
+ ],
+ "steps": [
+  {
+   "name": "judge",
+   "args": [
+    "judge",
+    "--src",
+    "n1_results/plan_bias/roll",
+    "--shard",
+    "{SH}/6",
+    "--k",
+    "16",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  }
+ ],
+ "points_file": {
+  "file": "judge_{SH}of6.jsonl"
+ },
+ "require": [
+  {
+   "file": "tests/scripts/plan_bias_roll.py",
+   "grep": "def cmd_judge"
+  },
+  {
+   "file": "n1_results/plan_bias/roll/points.jsonl",
+   "grep": "seed"
+  }
+ ],
+ "inputs": {
+  "setting": "§7.64 段 1: 両席 r27・出荷の設定の 40 局（seed 7,640,000〜7,640,039）・決着まで自席 2 ターン以内のずれた点・配り方の番号のずらし 7640"
+ },
+ "commit_message": "plan-bias 段 1 の打ち比べ シャード {KK}"
+}

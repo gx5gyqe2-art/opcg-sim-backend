@@ -1,0 +1,50 @@
+対局 4390・自席ターン 60214・相手ターン 49862
+攻め: agree 0.306 gap 0.062 gap>0.1 0.221 wr 一致/不一致 0.479/0.546
+  argmax {'face': 0.356, 'board': 0.431, 'mixed': 0.212} played {'face': 0.389, 'board': 0.176, 'mixed': 0.434}
+  calib face: n19858 v 0.076 z 0.131  board: n8993 v -0.214 z -0.196  mixed: n22149 v 0.038 z 0.081
+  lethal_only  n   4264 Vf−Vb -0.036 argmax_face 0.345 played_face 0.418 agree 0.236 gap 0.043 wr 0.870
+  threat_only  n  13666 Vf−Vb -0.062 argmax_face 0.197 played_face 0.205 agree 0.332 gap 0.052 wr 0.315
+  both_lethal  n   9275 Vf−Vb 0.172 argmax_face 0.619 played_face 0.341 agree 0.353 gap 0.077 wr 0.658
+  t1-4         n  17560 Vf−Vb 0.069 argmax_face 0.554 played_face 0.662 agree 0.346 gap 0.045 wr 0.500
+  t5-8         n  17560 Vf−Vb -0.106 argmax_face 0.122 played_face 0.396 agree 0.260 gap 0.077 wr 0.500
+  t9+          n  25094 Vf−Vb 0.036 argmax_face 0.381 played_face 0.285 agree 0.324 gap 0.058 wr 0.544
+守り: agree 0.560 gap 0.034 argmax_guard 0.241 played_guard 0.414
+  calib take: n22027 v -0.013 z -0.079  guard: n15589 v 0.120 z 0.111
+  life1  n   4749 Vg−Vt -0.076 argmax_guard 0.287 played_guard 0.458 wr 0.323
+  life2  n   7186 Vg−Vt -0.040 argmax_guard 0.322 played_guard 0.355 wr 0.419
+  life3  n  10692 Vg−Vt -0.043 argmax_guard 0.298 played_guard 0.377 wr 0.501
+  life4  n  14736 Vg−Vt -0.065 argmax_guard 0.200 played_guard 0.410 wr 0.515
+  life5  n   9201 Vg−Vt -0.091 argmax_guard 0.137 played_guard 0.427 wr 0.561
+--- 時計（決着までの自席ターン数・真値）---
+attack
+  t<=2   n  17560 Vf−Vb 0.085 argmax {'face': 0.488, 'board': 0.31, 'mixed': 0.202} played {'face': 0.344, 'board': 0.136, 'mixed': 0.52} agree 0.340 gap 0.057 wr打った face/board/mixed 0.668/0.108/0.500 face勧め→face 0.420
+  t3-4   n  17560 Vf−Vb -0.085 argmax {'face': 0.159, 'board': 0.668, 'mixed': 0.173} played {'face': 0.336, 'board': 0.186, 'mixed': 0.479} agree 0.258 gap 0.071 wr打った face/board/mixed 0.465/0.444/0.560 face勧め→face 0.411
+  t5+    n  25094 Vf−Vb 0.010 argmax {'face': 0.402, 'board': 0.351, 'mixed': 0.247} played {'face': 0.493, 'board': 0.209, 'mixed': 0.298} agree 0.321 gap 0.058 wr打った face/board/mixed 0.561/0.564/0.581 face勧め→face 0.582
+attack_both_avail
+  t<=2   n  16946 Vf−Vb 0.088 argmax {'face': 0.492, 'board': 0.304, 'mixed': 0.204} played {'face': 0.325, 'board': 0.139, 'mixed': 0.535} agree 0.338 gap 0.057 wr打った face/board/mixed 0.668/0.109/0.500 face勧め→face 0.406
+  t3-4   n  15681 Vf−Vb -0.088 argmax {'face': 0.147, 'board': 0.683, 'mixed': 0.17} played {'face': 0.274, 'board': 0.202, 'mixed': 0.524} agree 0.265 gap 0.068 wr打った face/board/mixed 0.471/0.449/0.560 face勧め→face 0.342
+  t5+    n  12252 Vf−Vb -0.064 argmax {'face': 0.2, 'board': 0.568, 'mixed': 0.232} played {'face': 0.381, 'board': 0.214, 'mixed': 0.405} agree 0.343 gap 0.054 wr打った face/board/mixed 0.547/0.596/0.583 face勧め→face 0.537
+attack_both_lethal
+  t<=2   n   7605 Vf−Vb 0.222 argmax {'face': 0.706, 'board': 0.19, 'mixed': 0.104} played {'face': 0.385, 'board': 0.05, 'mixed': 0.566} agree 0.384 gap 0.078 wr打った face/board/mixed 0.779/0.276/0.600 face勧め→face 0.437
+  t3-4   n   1516 Vf−Vb -0.052 argmax {'face': 0.229, 'board': 0.642, 'mixed': 0.129} played {'face': 0.147, 'board': 0.159, 'mixed': 0.694} agree 0.207 gap 0.072 wr打った face/board/mixed 0.543/0.674/0.718 face勧め→face 0.144
+  t5+    n    154 Vf−Vb -0.078 argmax {'face': 0.169, 'board': 0.701, 'mixed': 0.13} played {'face': 0.111, 'board': 0.229, 'mixed': 0.66} agree 0.222 gap 0.077 wr打った face/board/mixed 0.471/0.800/0.663 face勧め→face 0.120
+defense
+  t<=2   n  17191 Vg−Vt -0.033 argmax_guard 0.365 played_guard 0.325 agree 0.609 gap 0.023 wr take/guard 0.395/0.572 guard勧め→guard 0.402
+  t3-4   n  16597 Vg−Vt -0.061 argmax_guard 0.216 played_guard 0.419 agree 0.566 gap 0.033 wr take/guard 0.482/0.519 guard勧め→guard 0.463
+  t5+    n  11688 Vg−Vt -0.090 argmax_guard 0.106 played_guard 0.538 agree 0.482 gap 0.050 wr take/guard 0.563/0.580 guard勧め→guard 0.601
+defense_can
+  t<=2   n  16523 Vg−Vt -0.032 argmax_guard 0.371 played_guard 0.333 agree 0.603 gap 0.024 wr take/guard 0.396/0.571 guard勧め→guard 0.407
+  t3-4   n  16234 Vg−Vt -0.061 argmax_guard 0.217 played_guard 0.424 agree 0.564 gap 0.033 wr take/guard 0.482/0.518 guard勧め→guard 0.469
+  t5+    n  11545 Vg−Vt -0.090 argmax_guard 0.106 played_guard 0.541 agree 0.480 gap 0.051 wr take/guard 0.563/0.580 guard勧め→guard 0.606
+defense_enough
+  t<=2   n  13391 Vg−Vt -0.030 argmax_guard 0.395 played_guard 0.361 agree 0.585 gap 0.026 wr take/guard 0.413/0.574 guard勧め→guard 0.426
+  t3-4   n  14715 Vg−Vt -0.061 argmax_guard 0.217 played_guard 0.434 agree 0.556 gap 0.034 wr take/guard 0.488/0.519 guard勧め→guard 0.475
+  t5+    n  10973 Vg−Vt -0.091 argmax_guard 0.105 played_guard 0.550 agree 0.472 gap 0.052 wr take/guard 0.564/0.580 guard勧め→guard 0.613
+defense_enough_by_life
+  life1  n   2485 Vg−Vt -0.040 argmax_guard 0.353 played_guard 0.448 agree 0.575 gap 0.031 wr take/guard 0.396/0.541 guard勧め→guard 0.534
+  life2  n   3880 Vg−Vt -0.024 argmax_guard 0.399 played_guard 0.319 agree 0.600 gap 0.022 wr take/guard 0.394/0.578 guard勧め→guard 0.395
+  life3  n   3619 Vg−Vt -0.023 argmax_guard 0.425 played_guard 0.277 agree 0.615 gap 0.020 wr take/guard 0.409/0.620 guard勧め→guard 0.359
+  life4  n   2011 Vg−Vt -0.026 argmax_guard 0.416 played_guard 0.254 agree 0.633 gap 0.017 wr take/guard 0.443/0.681 guard勧め→guard 0.346
+  life5  n    503 Vg−Vt -0.030 argmax_guard 0.459 played_guard 0.258 agree 0.625 gap 0.014 wr take/guard 0.522/0.825 guard勧め→guard 0.359
+選べたか {"t<=2": {"board_played": 2359, "board_played_face_avail": 0.9881305637982196, "take_played": 9680, "take_played_guard_avail": 0.949793388429752, "take_played_guard_enough": 0.7417355371900827}, "t3-4": {"board_played": 3185, "board_played_face_avail": 0.985243328100471, "take_played": 7805, "take_played_guard_avail": 0.9713004484304932, "take_played_guard_enough": 0.8766175528507367}, "t5+": {"board_played": 3449, "board_played_face_avail": 0.7442737025224703, "take_played": 4542, "take_played_guard_avail": 0.9830471158080141, "take_played_guard_enough": 0.924262439453985}}
+→ n1_results/plan_bias/map_w58w59.json
