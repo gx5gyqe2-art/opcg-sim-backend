@@ -1,352 +1,344 @@
 {
- "wp": "matchup-5",
- "status": "done",
- "branch": "claude/matchup-5",
- "spec": "docs/search_efficiency_plan.md §7.65（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+471）",
- "report": "docs/reports/2026-10-28_matchup_5.md",
- "results_dir": "n1_results/matchup_5/",
- "tool": "tests/scripts/matchup_5.py",
- "decks": "tests/fixtures/decks/article_decks_20261027.json（記事のデッキ・official の構築例は使わない）",
- "games": {
-  "n": 720,
-  "void": 0,
-  "per_matchup": 120,
-  "shards": 18
+ "wp": "don-read",
+ "stage": 1,
+ "status": "stage1_done_waiting_decision",
+ "branch": "claude/don-read",
+ "spec": "docs/search_efficiency_plan.md §7.66（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+475）",
+ "report": "docs/reports/2026-10-28_don_read_stage1.md",
+ "results_dir": "n1_results/don_read/",
+ "tool": "tests/scripts/don_read.py",
+ "engine_changed": false,
+ "points": {
+  "total": 72,
+  "judged": 32,
+  "kaido_judged": 24,
+  "mihawk_judged": 8,
+  "kaido_extra_early": 40,
+  "failures": 0
  },
- "winrate": {
-  "enel_rocks": {
-   "name": "紫エネル 対 青ロックス",
-   "seed0": 4251000,
-   "all": 0.442,
-   "first": 0.45,
-   "second": 0.433
+ "worlds_per_point": 16,
+ "world_offset": 9000,
+ "tree_sims": 640,
+ "groups": {
+  "judged_all": {
+   "n": 32,
+   "diff_mean": 0.061,
+   "now": {
+    "picks_article": 1,
+    "picks_cpu": 31,
+    "mean": -0.082,
+    "corr_with_diff": -0.121,
+    "gain_if_followed": -0.002
+   },
+   "tree": {
+    "picks_article": 18,
+    "picks_cpu": 14,
+    "mean": 0.01,
+    "corr_with_diff": 0.576,
+    "gain_if_followed": 0.076
+   },
+   "tree2": {
+    "picks_article": 17,
+    "picks_cpu": 15,
+    "mean": 0.024,
+    "corr_with_diff": 0.543,
+    "gain_if_followed": 0.068
+   },
+   "next": {
+    "picks_article": 23,
+    "picks_cpu": 9,
+    "mean": 0.075,
+    "corr_with_diff": 0.78,
+    "gain_if_followed": 0.082
+   },
+   "next_net": {
+    "picks_article": 19,
+    "picks_cpu": 13,
+    "mean": 0.041,
+    "corr_with_diff": 0.649,
+    "gain_if_followed": 0.062
+   },
+   "don1_net_next_head": 0.179,
+   "don1_ref_next_head": 0.246,
+   "don1_net_window_close": 0.113
   },
-  "bluffy_sabo": {
-   "name": "黒ルフィ 対 赤黒サボ",
-   "seed0": 4252000,
-   "all": 0.533,
-   "first": 0.433,
-   "second": 0.633
+  "judged_kaido_decline": {
+   "n": 18,
+   "diff_mean": 0.094,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 18,
+    "mean": -0.051,
+    "corr_with_diff": -0.275,
+    "gain_if_followed": 0.0
+   },
+   "tree": {
+    "picks_article": 15,
+    "picks_cpu": 3,
+    "mean": 0.074,
+    "corr_with_diff": 0.609,
+    "gain_if_followed": 0.122
+   },
+   "tree2": {
+    "picks_article": 14,
+    "picks_cpu": 4,
+    "mean": 0.089,
+    "corr_with_diff": 0.589,
+    "gain_if_followed": 0.111
+   },
+   "next": {
+    "picks_article": 16,
+    "picks_cpu": 2,
+    "mean": 0.162,
+    "corr_with_diff": 0.844,
+    "gain_if_followed": 0.111
+   },
+   "next_net": {
+    "picks_article": 14,
+    "picks_cpu": 4,
+    "mean": 0.103,
+    "corr_with_diff": 0.695,
+    "gain_if_followed": 0.108
+   },
+   "don1_net_next_head": 0.238,
+   "don1_ref_next_head": 0.325,
+   "don1_net_window_close": 0.137
   },
-  "rocks_mirror": {
-   "name": "青ロックス ミラー",
-   "seed0": 4253000,
-   "all": 0.525,
-   "first": 0.467,
-   "second": 0.583
+  "judged_kaido_early": {
+   "n": 7,
+   "diff_mean": 0.214,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 7,
+    "mean": -0.055,
+    "corr_with_diff": -0.499,
+    "gain_if_followed": 0.0
+   },
+   "tree": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.255,
+    "corr_with_diff": 0.62,
+    "gain_if_followed": 0.214
+   },
+   "tree2": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.284,
+    "corr_with_diff": 0.639,
+    "gain_if_followed": 0.214
+   },
+   "next": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.259,
+    "corr_with_diff": 0.821,
+    "gain_if_followed": 0.214
+   },
+   "next_net": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.228,
+    "corr_with_diff": 0.492,
+    "gain_if_followed": 0.214
+   },
+   "don1_net_next_head": 0.323,
+   "don1_ref_next_head": 0.388,
+   "don1_net_window_close": 0.16
   },
-  "mihawk_sabo": {
-   "name": "緑ミホーク 対 赤黒サボ",
-   "seed0": 4254000,
-   "all": 0.783,
-   "first": 0.8,
-   "second": 0.767
+  "judged_kaido_use": {
+   "n": 6,
+   "diff_mean": -0.042,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 6,
+    "mean": -0.088,
+    "corr_with_diff": -0.406,
+    "gain_if_followed": 0.0
+   },
+   "tree": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.034,
+    "corr_with_diff": 0.604,
+    "gain_if_followed": 0.01
+   },
+   "tree2": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.014,
+    "corr_with_diff": 0.394,
+    "gain_if_followed": 0.01
+   },
+   "next": {
+    "picks_article": 4,
+    "picks_cpu": 2,
+    "mean": -0.093,
+    "corr_with_diff": 0.861,
+    "gain_if_followed": 0.042
+   },
+   "next_net": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.099,
+    "corr_with_diff": 0.832,
+    "gain_if_followed": 0.0
+   },
+   "don1_net_next_head": 0.063,
+   "don1_ref_next_head": 0.063,
+   "don1_net_window_close": 0.055
   },
-  "rocks_sabo": {
-   "name": "青ロックス 対 赤黒サボ",
-   "seed0": 4255000,
-   "all": 0.675,
-   "first": 0.533,
-   "second": 0.817
+  "judged_mihawk": {
+   "n": 8,
+   "diff_mean": 0.062,
+   "now": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.146,
+    "corr_with_diff": -0.102,
+    "gain_if_followed": -0.008
+   },
+   "tree": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.101,
+    "corr_with_diff": 0.859,
+    "gain_if_followed": 0.023
+   },
+   "tree2": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.096,
+    "corr_with_diff": 0.693,
+    "gain_if_followed": 0.016
+   },
+   "next": {
+    "picks_article": 3,
+    "picks_cpu": 5,
+    "mean": 0.006,
+    "corr_with_diff": 0.283,
+    "gain_if_followed": 0.047
+   },
+   "next_net": {
+    "picks_article": 3,
+    "picks_cpu": 5,
+    "mean": 0.004,
+    "corr_with_diff": -0.106,
+    "gain_if_followed": 0.008
+   },
+   "don1_net_next_head": 0.133,
+   "don1_ref_next_head": 0.204,
+   "don1_net_window_close": 0.103
   },
-  "kaido_rocks": {
-   "name": "紫カイドウ 対 青ロックス",
-   "seed0": 4256000,
-   "all": 0.708,
-   "first": 0.75,
-   "second": 0.667
+  "extra_early": {
+   "n": 40,
+   "diff_mean": null,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 40,
+    "mean": -0.036,
+    "corr_with_diff": null,
+    "gain_if_followed": null
+   },
+   "tree": {
+    "picks_article": 27,
+    "picks_cpu": 13,
+    "mean": 0.096,
+    "corr_with_diff": null,
+    "gain_if_followed": null
+   },
+   "tree2": {
+    "picks_article": 25,
+    "picks_cpu": 15,
+    "mean": 0.104,
+    "corr_with_diff": null,
+    "gain_if_followed": null
+   },
+   "next": {
+    "picks_article": 25,
+    "picks_cpu": 15,
+    "mean": 0.103,
+    "corr_with_diff": null,
+    "gain_if_followed": null
+   },
+   "next_net": {
+    "picks_article": 24,
+    "picks_cpu": 16,
+    "mean": 0.041,
+    "corr_with_diff": null,
+    "gain_if_followed": null
+   },
+   "don1_net_next_head": 0.172,
+   "don1_ref_next_head": 0.272,
+   "don1_net_window_close": 0.132
+  },
+  "early_all": {
+   "n": 47,
+   "diff_mean": 0.214,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 47,
+    "mean": -0.039,
+    "corr_with_diff": -0.499,
+    "gain_if_followed": 0.0
+   },
+   "tree": {
+    "picks_article": 34,
+    "picks_cpu": 13,
+    "mean": 0.12,
+    "corr_with_diff": 0.62,
+    "gain_if_followed": 0.032
+   },
+   "tree2": {
+    "picks_article": 32,
+    "picks_cpu": 15,
+    "mean": 0.131,
+    "corr_with_diff": 0.639,
+    "gain_if_followed": 0.032
+   },
+   "next": {
+    "picks_article": 32,
+    "picks_cpu": 15,
+    "mean": 0.126,
+    "corr_with_diff": 0.821,
+    "gain_if_followed": 0.032
+   },
+   "next_net": {
+    "picks_article": 31,
+    "picks_cpu": 16,
+    "mean": 0.069,
+    "corr_with_diff": 0.492,
+    "gain_if_followed": 0.032
+   },
+   "don1_net_next_head": 0.194,
+   "don1_ref_next_head": 0.289,
+   "don1_net_window_close": 0.137
   }
  },
- "items": {
-  "enel_rocks": {
-   "mull": {
-    "agree": 0.667,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.729,
-    "scenes": 391
-   },
-   "enel_kyo": {
-    "agree": 0.391,
-    "scenes": 110
-   },
-   "enel_shiki": {
-    "agree": 0.164,
-    "scenes": 116
-   },
-   "enel_hold": {
-    "agree": 0.517,
-    "scenes": 60
-   },
-   "enel_banrai": {
-    "agree": 0.782,
-    "scenes": 308
-   }
-  },
-  "bluffy_sabo": {
-   "mull": {
-    "agree": 0.7,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.716,
-    "scenes": 522
-   },
-   "atk_leader": {
-    "agree": 0.859,
-    "scenes": 1464
-   },
-   "luffy8_pick": {
-    "agree": 0.946,
-    "scenes": 112
-   },
-   "loki_keep": {
-    "agree": 0.0,
-    "scenes": 14
-   }
-  },
-  "rocks_mirror": {
-   "mull": {
-    "agree": 0.425,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.603,
-    "scenes": 614
-   },
-   "shiki_keep": {
-    "agree": 0.212,
-    "scenes": 160
-   }
-  },
-  "mihawk_sabo": {
-   "mull": {
-    "agree": 0.825,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.853,
-    "scenes": 354
-   },
-   "perona_t1": {
-    "agree": 0.353,
-    "scenes": 17
-   },
-   "atk_leader": {
-    "agree": 0.744,
-    "scenes": 1788
-   },
-   "mihawk_leader": {
-    "agree": 0.6,
-    "scenes": 422
-   }
-  },
-  "rocks_sabo": {
-   "mull": {
-    "agree": 0.458,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.623,
-    "scenes": 432
-   },
-   "shiki_rush": {
-    "agree": 0.968,
-    "scenes": 31
-   }
-  },
-  "kaido_rocks": {
-   "mull": {
-    "agree": 0.617,
-    "scenes": 120
-   },
-   "ideal": {
-    "agree": 0.652,
-    "scenes": 607
-   },
-   "kr_leader": {
-    "agree": 0.843,
-    "scenes": 1001
-   },
-   "kr_k6bounce": {
-    "agree": 0.6,
-    "scenes": 15
-   },
-   "kr_bk_keep": {
-    "agree": 0.087,
-    "scenes": 69
-   },
-   "kr_rk_john": {
-    "agree": 0.5,
-    "scenes": 8
-   },
-   "kaido_banrai": {
-    "agree": 0.963,
-    "scenes": 109
-   }
-  }
+ "kaido_gain_per_point": {
+  "tree": 0.094,
+  "tree2": 0.086,
+  "next": 0.094,
+  "tree_own_turn_le3": 0.083
  },
- "judge": {
-  "points": 240,
-  "article_better_sig": 13,
-  "cpu_better_sig": 23,
-  "by_matchup": {
-   "enel_rocks": {
-    "n": 40,
-    "mean": -0.0203,
-    "ci": [
-     -0.0743,
-     0.0337
-    ]
-   },
-   "bluffy_sabo": {
-    "n": 40,
-    "mean": -0.0422,
-    "ci": [
-     -0.1027,
-     0.0183
-    ]
-   },
-   "rocks_mirror": {
-    "n": 40,
-    "mean": -0.0437,
-    "ci": [
-     -0.0951,
-     0.0076
-    ]
-   },
-   "mihawk_sabo": {
-    "n": 40,
-    "mean": -0.0219,
-    "ci": [
-     -0.0718,
-     0.028
-    ]
-   },
-   "rocks_sabo": {
-    "n": 40,
-    "mean": -0.0578,
-    "ci": [
-     -0.1264,
-     0.0108
-    ]
-   },
-   "kaido_rocks": {
-    "n": 40,
-    "mean": 0.0056,
-    "ci": [
-     -0.063,
-     0.0742
-    ]
-   }
-  },
-  "by_type": {
-   "resource": {
-    "n": 18,
-    "mean": 0.0486,
-    "ci": [
-     -0.0606,
-     0.1578
-    ],
-    "article_sig": 4,
-    "cpu_sig": 1
-   },
-   "mull": {
-    "n": 36,
-    "mean": 0.0322,
-    "ci": [
-     -0.0242,
-     0.0887
-    ],
-    "article_sig": 2,
-    "cpu_sig": 2
-   },
-   "defense": {
-    "n": 37,
-    "mean": 0.0186,
-    "ci": [
-     -0.0284,
-     0.0655
-    ],
-    "article_sig": 2,
-    "cpu_sig": 1
-   },
-   "order": {
-    "n": 127,
-    "mean": -0.0541,
-    "ci": [
-     -0.0861,
-     -0.0222
-    ],
-    "article_sig": 4,
-    "cpu_sig": 15
-   },
-   "target": {
-    "n": 22,
-    "mean": -0.1392,
-    "ci": [
-     -0.23,
-     -0.0484
-    ],
-    "article_sig": 1,
-    "cpu_sig": 4
-   },
-   "lethal": "not measured"
-  },
-  "notable": {
-   "kaido_leader_early_t2": {
-    "n": 3,
-    "mean": 0.3125,
-    "ci": [
-     -0.0116,
-     0.6366
-    ],
-    "article_sig": 2
-   },
-   "mihawk_leader_before_play": {
-    "n": 8,
-    "mean": 0.0625,
-    "ci": [
-     -0.033,
-     0.158
-    ]
-   },
-   "rocks_vs_sabo_first_t3_linlin": {
-    "n": 11,
-    "mean": 0.085,
-    "ci": [
-     -0.0387,
-     0.2091
-    ],
-    "article_sig": 3
-   },
-   "rocks_mirror_first_t3_linlin": {
-    "n": 2,
-    "mean": -0.281
-   }
-  }
- },
- "next_fix_type_rank": [
-  "resource（ドン・リソースの読み）",
-  "mull",
-  "defense",
-  "order（CPU が有意に良い）",
-  "target（CPU が有意に良い）"
+ "conclusion": [
+  "今の読み（窓の根畳み）は紫カイドウの点の全部で使うを選ぶ（差は平均 0.05 前後）",
+  "窓を閉じた盤面から短い木（640 回）だと序盤 7 点の全部・記事が控える 18 点中 15 で控えるに変わる。次のターンの頭まで読むと 18 点中 16",
+  "読みの差と打ち比べの差の相関: 次のターンの頭 0.78・短い木 0.58・今の読み −0.12（32 点）",
+  "ネットはドン 1 枚を小さく見ていない（次のターンの頭で 0.18・序盤 0.32）が、窓を閉じた直後（相手のターンの途中）では半分ほど（0.11・0.16）",
+  "緑ミホーク（メインの木の選択）は短い木では変わらない＝段 2 の対象外を提案"
  ],
  "prediction_check": {
-  "same_turn_items_agree": "当たり（3 ターン目の主役の札 98〜100%）",
-  "article_sig_0_to_3_per_matchup": "ほぼ当たり（紫カイドウだけ 6）",
-  "resource_type_in_2plus_matchups": "半分当たり（紫カイドウは有意・緑ミホークは同じ向きで有意でない）"
+  "next_turn_mostly_decline": "当たり（16/18）",
+  "short_tree_about_half": "外れ（もっと多い 15/18）",
+  "net_sees_don_small": "外れ（大きく見る・ただし相手のターンの途中では割り引く）"
  },
- "gate": "make test green（cargo 640 passed・pytest 885 passed 13 skipped）",
+ "proposal_stage2": "ドンを代金にする確認の窓だけ短い木（世界 2 本・640 回・§2.5.12 の 3 と同じ道具）＋序盤だけに限る旗・既定 off・符号化は変えない",
  "notes": [
-  "最初に公式サイトの構築例（README の表）で打ち始めたが、記事の構築と大きく違った（赤黒サボ deck_086 は 2025-08 の革命軍型、緑ミホーク deck_096 は 2025-11 の型など）ため、コーディネータとユーザが記事のデッキを用意し、全局を記事のデッキで打ち直した。旧デッキの 38 局は official_pilot/ に退避（未使用）。",
-  "紫カイドウ対青ロックスを記事のデッキで打ち直して 6 対面目に加えた（seed 4256000〜・コーディネータの指示）。",
-  "河松（OP12-023・緑ミホーク 4 枚）は DB に本文が無く台帳にも無い＝効果なしの 5 コスト 6000 として打たれた。他の 90 種は確認済み台帳で ok。画像から推定したカードは article_cards.md。",
-  "緑ミホークの記事は先後の選択が表（後攻）とまとめ（先攻）で食い違う＝報告に両方書いた。CPU 同士では先後の差は無い（0.80／0.77）。",
-  "リーサルの項目・攻撃の値の読み・仲間の夢・放電・大秘宝のサーチ先などは機械の決まりに直せず測っていない。紫エネルの凶／7シキ／除去の温存／万雷は一致の数だけ（記事の手を 1 つに決められない）。",
-  "打ち比べの記事の手は、各項目で最初に当てはまる場面の手に限った。例外の多くは決まりに入れていない。",
-  "当て直し（trace）の出力は大きいのでリポジトリに置いていない（同じ道具で再生成できる）。"
+  "試験台は CPU が記事と違う手を打った点なので、今の読みが CPU の手を選ぶのは選び方の結果。CPU が控えた序盤の点で短い木が逆に使うへ変えないかは未測定（段 3・4 で確かめる）",
+  "短い木は Python から同じ形を組んだもの（窓を閉じた盤面の値が今の読みと一致することは確認）。木の乱数の配り方はエンジンの実装と違う",
+  "記事が使う 6 点では短い木が 4 点で控えるを選ぶが、その 4 点は打ち比べでも控えるが良かった（−0.08）",
+  "作業セッション j3 は RESULT.json を上書きしていたので、読みのファイルだけ回収した",
+  "make test を回すため fastapi などを opcg_sim/requirements.txt から入れた（この環境の初期状態には無かった）"
  ]
 }

@@ -1,0 +1,4201 @@
+{
+ "groups": {
+  "judged_all": {
+   "n": 32,
+   "now": {
+    "picks_article": 1,
+    "picks_cpu": 31,
+    "mean": -0.082,
+    "corr_with_diff": -0.121,
+    "gain_if_followed": -0.002,
+    "diff_when_article": -0.062,
+    "diff_when_cpu": 0.065
+   },
+   "tree": {
+    "picks_article": 18,
+    "picks_cpu": 14,
+    "mean": 0.01,
+    "corr_with_diff": 0.576,
+    "gain_if_followed": 0.076,
+    "diff_when_article": 0.135,
+    "diff_when_cpu": -0.036
+   },
+   "tree2": {
+    "picks_article": 17,
+    "picks_cpu": 15,
+    "mean": 0.024,
+    "corr_with_diff": 0.543,
+    "gain_if_followed": 0.068,
+    "diff_when_article": 0.129,
+    "diff_when_cpu": -0.017
+   },
+   "next": {
+    "picks_article": 23,
+    "picks_cpu": 9,
+    "mean": 0.075,
+    "corr_with_diff": 0.78,
+    "gain_if_followed": 0.082,
+    "diff_when_article": 0.114,
+    "diff_when_cpu": -0.076
+   },
+   "next_net": {
+    "picks_article": 19,
+    "picks_cpu": 13,
+    "mean": 0.041,
+    "corr_with_diff": 0.649,
+    "gain_if_followed": 0.062,
+    "diff_when_article": 0.105,
+    "diff_when_cpu": -0.005
+   },
+   "tree_net": {
+    "picks_article": 7,
+    "picks_cpu": 25,
+    "mean": -0.042,
+    "corr_with_diff": -0.045,
+    "gain_if_followed": 0.008,
+    "diff_when_article": 0.036,
+    "diff_when_cpu": 0.068
+   },
+   "diff_mean": 0.061,
+   "don1_net": 0.179,
+   "don1_ref": 0.246,
+   "don1_close_net": 0.113
+  },
+  "judged_kaido_decline": {
+   "n": 18,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 18,
+    "mean": -0.051,
+    "corr_with_diff": -0.275,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": 0.094
+   },
+   "tree": {
+    "picks_article": 15,
+    "picks_cpu": 3,
+    "mean": 0.074,
+    "corr_with_diff": 0.609,
+    "gain_if_followed": 0.122,
+    "diff_when_article": 0.146,
+    "diff_when_cpu": -0.167
+   },
+   "tree2": {
+    "picks_article": 14,
+    "picks_cpu": 4,
+    "mean": 0.089,
+    "corr_with_diff": 0.589,
+    "gain_if_followed": 0.111,
+    "diff_when_article": 0.143,
+    "diff_when_cpu": -0.078
+   },
+   "next": {
+    "picks_article": 16,
+    "picks_cpu": 2,
+    "mean": 0.162,
+    "corr_with_diff": 0.844,
+    "gain_if_followed": 0.111,
+    "diff_when_article": 0.125,
+    "diff_when_cpu": -0.156
+   },
+   "next_net": {
+    "picks_article": 14,
+    "picks_cpu": 4,
+    "mean": 0.103,
+    "corr_with_diff": 0.695,
+    "gain_if_followed": 0.108,
+    "diff_when_article": 0.138,
+    "diff_when_cpu": -0.062
+   },
+   "tree_net": {
+    "picks_article": 2,
+    "picks_cpu": 16,
+    "mean": -0.047,
+    "corr_with_diff": -0.116,
+    "gain_if_followed": 0.0,
+    "diff_when_article": 0.0,
+    "diff_when_cpu": 0.105
+   },
+   "diff_mean": 0.094,
+   "don1_net": 0.238,
+   "don1_ref": 0.325,
+   "don1_close_net": 0.137
+  },
+  "judged_kaido_early": {
+   "n": 7,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 7,
+    "mean": -0.055,
+    "corr_with_diff": -0.499,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": 0.214
+   },
+   "tree": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.255,
+    "corr_with_diff": 0.62,
+    "gain_if_followed": 0.214,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "tree2": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.284,
+    "corr_with_diff": 0.639,
+    "gain_if_followed": 0.214,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "next": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.259,
+    "corr_with_diff": 0.821,
+    "gain_if_followed": 0.214,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "next_net": {
+    "picks_article": 7,
+    "picks_cpu": 0,
+    "mean": 0.228,
+    "corr_with_diff": 0.492,
+    "gain_if_followed": 0.214,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "tree_net": {
+    "picks_article": 0,
+    "picks_cpu": 7,
+    "mean": -0.049,
+    "corr_with_diff": -0.458,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": 0.214
+   },
+   "diff_mean": 0.214,
+   "don1_net": 0.323,
+   "don1_ref": 0.388,
+   "don1_close_net": 0.16
+  },
+  "judged_kaido_use": {
+   "n": 6,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 6,
+    "mean": -0.088,
+    "corr_with_diff": -0.406,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": -0.042
+   },
+   "tree": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.034,
+    "corr_with_diff": 0.604,
+    "gain_if_followed": 0.01,
+    "diff_when_article": 0.031,
+    "diff_when_cpu": -0.078
+   },
+   "tree2": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.014,
+    "corr_with_diff": 0.394,
+    "gain_if_followed": 0.01,
+    "diff_when_article": 0.031,
+    "diff_when_cpu": -0.078
+   },
+   "next": {
+    "picks_article": 4,
+    "picks_cpu": 2,
+    "mean": -0.093,
+    "corr_with_diff": 0.861,
+    "gain_if_followed": 0.042,
+    "diff_when_article": 0.062,
+    "diff_when_cpu": -0.25
+   },
+   "next_net": {
+    "picks_article": 2,
+    "picks_cpu": 4,
+    "mean": -0.099,
+    "corr_with_diff": 0.832,
+    "gain_if_followed": 0.0,
+    "diff_when_article": 0.0,
+    "diff_when_cpu": -0.062
+   },
+   "tree_net": {
+    "picks_article": 1,
+    "picks_cpu": 5,
+    "mean": -0.071,
+    "corr_with_diff": -0.681,
+    "gain_if_followed": -0.01,
+    "diff_when_article": -0.062,
+    "diff_when_cpu": -0.037
+   },
+   "diff_mean": -0.042,
+   "don1_net": 0.063,
+   "don1_ref": 0.063,
+   "don1_close_net": 0.055
+  },
+  "judged_mihawk": {
+   "n": 8,
+   "now": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.146,
+    "corr_with_diff": -0.102,
+    "gain_if_followed": -0.008,
+    "diff_when_article": -0.062,
+    "diff_when_cpu": 0.08
+   },
+   "tree": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.101,
+    "corr_with_diff": 0.859,
+    "gain_if_followed": 0.023,
+    "diff_when_article": 0.188,
+    "diff_when_cpu": 0.045
+   },
+   "tree2": {
+    "picks_article": 1,
+    "picks_cpu": 7,
+    "mean": -0.096,
+    "corr_with_diff": 0.693,
+    "gain_if_followed": 0.016,
+    "diff_when_article": 0.125,
+    "diff_when_cpu": 0.054
+   },
+   "next": {
+    "picks_article": 3,
+    "picks_cpu": 5,
+    "mean": 0.006,
+    "corr_with_diff": 0.283,
+    "gain_if_followed": 0.047,
+    "diff_when_article": 0.125,
+    "diff_when_cpu": 0.025
+   },
+   "next_net": {
+    "picks_article": 3,
+    "picks_cpu": 5,
+    "mean": 0.004,
+    "corr_with_diff": -0.106,
+    "gain_if_followed": 0.008,
+    "diff_when_article": 0.021,
+    "diff_when_cpu": 0.087
+   },
+   "tree_net": {
+    "picks_article": 4,
+    "picks_cpu": 4,
+    "mean": -0.01,
+    "corr_with_diff": 0.057,
+    "gain_if_followed": 0.039,
+    "diff_when_article": 0.078,
+    "diff_when_cpu": 0.047
+   },
+   "diff_mean": 0.062,
+   "don1_net": 0.133,
+   "don1_ref": 0.204,
+   "don1_close_net": 0.103
+  },
+  "extra_early": {
+   "n": 40,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 40,
+    "mean": -0.036,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "tree": {
+    "picks_article": 27,
+    "picks_cpu": 13,
+    "mean": 0.096,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "tree2": {
+    "picks_article": 25,
+    "picks_cpu": 15,
+    "mean": 0.104,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "next": {
+    "picks_article": 25,
+    "picks_cpu": 15,
+    "mean": 0.103,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "next_net": {
+    "picks_article": 24,
+    "picks_cpu": 16,
+    "mean": 0.041,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "tree_net": {
+    "picks_article": 7,
+    "picks_cpu": 33,
+    "mean": -0.03,
+    "corr_with_diff": null,
+    "gain_if_followed": null,
+    "diff_when_article": null,
+    "diff_when_cpu": null
+   },
+   "diff_mean": null,
+   "don1_net": 0.172,
+   "don1_ref": 0.272,
+   "don1_close_net": 0.132
+  },
+  "early_all": {
+   "n": 47,
+   "now": {
+    "picks_article": 0,
+    "picks_cpu": 47,
+    "mean": -0.039,
+    "corr_with_diff": -0.499,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": 0.214
+   },
+   "tree": {
+    "picks_article": 34,
+    "picks_cpu": 13,
+    "mean": 0.12,
+    "corr_with_diff": 0.62,
+    "gain_if_followed": 0.032,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "tree2": {
+    "picks_article": 32,
+    "picks_cpu": 15,
+    "mean": 0.131,
+    "corr_with_diff": 0.639,
+    "gain_if_followed": 0.032,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "next": {
+    "picks_article": 32,
+    "picks_cpu": 15,
+    "mean": 0.126,
+    "corr_with_diff": 0.821,
+    "gain_if_followed": 0.032,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "next_net": {
+    "picks_article": 31,
+    "picks_cpu": 16,
+    "mean": 0.069,
+    "corr_with_diff": 0.492,
+    "gain_if_followed": 0.032,
+    "diff_when_article": 0.214,
+    "diff_when_cpu": null
+   },
+   "tree_net": {
+    "picks_article": 7,
+    "picks_cpu": 40,
+    "mean": -0.033,
+    "corr_with_diff": -0.458,
+    "gain_if_followed": 0.0,
+    "diff_when_article": null,
+    "diff_when_cpu": 0.214
+   },
+   "diff_mean": 0.214,
+   "don1_net": 0.194,
+   "don1_ref": 0.289,
+   "don1_close_net": 0.137
+  }
+ },
+ "table": [
+  {
+   "pid": 0,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 173,
+   "step": 141,
+   "item": "5",
+   "why": "bk_on",
+   "turn": 12,
+   "own_turn": 6,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 10,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.212,
+   "tree": 0.066,
+   "tree_ci": [
+    -0.006,
+    0.138
+   ],
+   "tree_net": -0.157,
+   "tree_net_ci": [
+    -0.176,
+    -0.137
+   ],
+   "next": 0.053,
+   "next_ci": [
+    -0.197,
+    0.303
+   ],
+   "next_net": -0.037,
+   "next_net_ci": [
+    -0.255,
+    0.18
+   ],
+   "tree2": 0.209,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.054,
+   "don1_ref": 0.056,
+   "don1_n": 10,
+   "don1_close_net": 0.055,
+   "errs": 0
+  },
+  {
+   "pid": 1,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 37,
+   "step": 66,
+   "item": "5",
+   "why": "bk_on",
+   "turn": 9,
+   "own_turn": 5,
+   "judged": true,
+   "diff": 0.0625,
+   "ci": [
+    -0.1543,
+    0.2793
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 10,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.077,
+   "tree": 0.026,
+   "tree_ci": [
+    0.009,
+    0.042
+   ],
+   "tree_net": -0.077,
+   "tree_net_ci": [
+    -0.086,
+    -0.069
+   ],
+   "next": 0.007,
+   "next_ci": [
+    -0.162,
+    0.176
+   ],
+   "next_net": 0.023,
+   "next_net_ci": [
+    -0.17,
+    0.217
+   ],
+   "tree2": 0.007,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.096,
+   "don1_ref": 0.131,
+   "don1_n": 16,
+   "don1_close_net": 0.048,
+   "errs": 0
+  },
+  {
+   "pid": 2,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 73,
+   "step": 202,
+   "item": "5",
+   "why": "bk_on",
+   "turn": 15,
+   "own_turn": 8,
+   "judged": true,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 10,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.013,
+   "tree": -0.01,
+   "tree_ci": [
+    -0.046,
+    0.026
+   ],
+   "tree_net": -0.029,
+   "tree_net_ci": [
+    -0.052,
+    -0.007
+   ],
+   "next": -0.005,
+   "next_ci": [
+    -0.338,
+    0.328
+   ],
+   "next_net": 0.001,
+   "next_net_ci": [
+    -0.325,
+    0.326
+   ],
+   "tree2": -0.04,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.017,
+   "don1_ref": 0.005,
+   "don1_n": 15,
+   "don1_close_net": 0.012,
+   "errs": 0
+  },
+  {
+   "pid": 3,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 94,
+   "step": 24,
+   "item": "5",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": true,
+   "diff": -0.125,
+   "ci": [
+    -0.4284,
+    0.1784
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.065,
+   "tree": 0.173,
+   "tree_ci": [
+    0.139,
+    0.206
+   ],
+   "tree_net": -0.065,
+   "tree_net_ci": [
+    -0.065,
+    -0.064
+   ],
+   "next": 0.174,
+   "next_ci": [
+    0.131,
+    0.217
+   ],
+   "next_net": 0.234,
+   "next_net_ci": [
+    0.223,
+    0.244
+   ],
+   "tree2": 0.225,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.415,
+   "don1_ref": 0.314,
+   "don1_n": 16,
+   "don1_close_net": 0.124,
+   "errs": 0
+  },
+  {
+   "pid": 4,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 78,
+   "step": 31,
+   "item": "5",
+   "why": "big_next",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.1875,
+   "ci": [
+    -0.079,
+    0.454
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 6,
+    "attached": 1,
+    "deck": 3
+   },
+   "now": -0.071,
+   "tree": 0.081,
+   "tree_ci": [
+    0.067,
+    0.094
+   ],
+   "tree_net": -0.074,
+   "tree_net_ci": [
+    -0.105,
+    -0.043
+   ],
+   "next": 0.112,
+   "next_ci": [
+    0.011,
+    0.214
+   ],
+   "next_net": 0.17,
+   "next_net_ci": [
+    0.076,
+    0.264
+   ],
+   "tree2": 0.089,
+   "don_next_a": 8.0,
+   "don_next_b": 8.5,
+   "don1_net": 0.419,
+   "don1_ref": 0.383,
+   "don1_n": 16,
+   "don1_close_net": 0.187,
+   "errs": 0
+  },
+  {
+   "pid": 5,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 82,
+   "step": 152,
+   "item": "5",
+   "why": "big_next",
+   "turn": 12,
+   "own_turn": 6,
+   "judged": true,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 5,
+    "attached": 1,
+    "deck": 2
+   },
+   "now": -0.004,
+   "tree": -1.007,
+   "tree_ci": [
+    -1.165,
+    -0.85
+   ],
+   "tree_net": -0.069,
+   "tree_net_ci": [
+    -0.078,
+    -0.06
+   ],
+   "next": -0.008,
+   "next_ci": [
+    -0.017,
+    0.002
+   ],
+   "next_net": -0.035,
+   "next_net_ci": [
+    -0.051,
+    -0.018
+   ],
+   "tree2": -1.102,
+   "don_next_a": 8.94,
+   "don_next_b": 9.75,
+   "don1_net": 0.016,
+   "don1_ref": 0.036,
+   "don1_n": 16,
+   "don1_close_net": 0.076,
+   "errs": 0
+  },
+  {
+   "pid": 6,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 188,
+   "step": 29,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": true,
+   "diff": 0.375,
+   "ci": [
+    0.13,
+    0.62
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 3,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.06,
+   "tree": 0.663,
+   "tree_ci": [
+    0.566,
+    0.76
+   ],
+   "tree_net": -0.048,
+   "tree_net_ci": [
+    -0.064,
+    -0.033
+   ],
+   "next": 0.478,
+   "next_ci": [
+    0.399,
+    0.556
+   ],
+   "next_net": 0.366,
+   "next_net_ci": [
+    0.347,
+    0.384
+   ],
+   "tree2": 0.629,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.4,
+   "don1_ref": 0.646,
+   "don1_n": 16,
+   "don1_close_net": 0.15,
+   "errs": 0
+  },
+  {
+   "pid": 7,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 40,
+   "step": 34,
+   "item": "5",
+   "why": "big_next",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 7,
+    "attached": 0,
+    "deck": 2
+   },
+   "now": -0.02,
+   "tree": 0.065,
+   "tree_ci": [
+    0.045,
+    0.086
+   ],
+   "tree_net": 0.05,
+   "tree_net_ci": [
+    0.03,
+    0.071
+   ],
+   "next": 0.06,
+   "next_ci": [
+    0.039,
+    0.081
+   ],
+   "next_net": 0.145,
+   "next_net_ci": [
+    0.106,
+    0.184
+   ],
+   "tree2": 0.11,
+   "don_next_a": 9.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.236,
+   "don1_ref": 0.095,
+   "don1_n": 16,
+   "don1_close_net": 0.069,
+   "errs": 0
+  },
+  {
+   "pid": 8,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 28,
+   "step": 44,
+   "item": "5",
+   "why": "big_next",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 7,
+    "attached": 0,
+    "deck": 2
+   },
+   "now": -0.007,
+   "tree": 0.016,
+   "tree_ci": [
+    0.009,
+    0.024
+   ],
+   "tree_net": -0.009,
+   "tree_net_ci": [
+    -0.016,
+    -0.002
+   ],
+   "next": 0.024,
+   "next_ci": [
+    0.013,
+    0.036
+   ],
+   "next_net": 0.013,
+   "next_net_ci": [
+    -0.009,
+    0.034
+   ],
+   "tree2": 0.011,
+   "don_next_a": 9.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.135,
+   "don1_ref": 0.071,
+   "don1_n": 16,
+   "don1_close_net": 0.068,
+   "errs": 0
+  },
+  {
+   "pid": 9,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 118,
+   "step": 28,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 3,
+    "attached": 0,
+    "deck": 5
+   },
+   "now": -0.041,
+   "tree": 0.134,
+   "tree_ci": [
+    0.09,
+    0.178
+   ],
+   "tree_net": -0.01,
+   "tree_net_ci": [
+    -0.033,
+    0.013
+   ],
+   "next": 0.147,
+   "next_ci": [
+    0.11,
+    0.185
+   ],
+   "next_net": 0.033,
+   "next_net_ci": [
+    0.026,
+    0.041
+   ],
+   "tree2": 0.215,
+   "don_next_a": 6.0,
+   "don_next_b": 7.0,
+   "don1_net": 0.17,
+   "don1_ref": 0.325,
+   "don1_n": 16,
+   "don1_close_net": 0.197,
+   "errs": 0
+  },
+  {
+   "pid": 10,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 97,
+   "step": 26,
+   "item": "5",
+   "why": "big_next",
+   "turn": 5,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.375,
+   "ci": [
+    0.13,
+    0.62
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 8,
+    "attached": 0,
+    "deck": 2
+   },
+   "now": -0.093,
+   "tree": 0.359,
+   "tree_ci": [
+    0.23,
+    0.488
+   ],
+   "tree_net": -0.027,
+   "tree_net_ci": [
+    -0.029,
+    -0.026
+   ],
+   "next": 0.524,
+   "next_ci": [
+    0.354,
+    0.694
+   ],
+   "next_net": 0.15,
+   "next_net_ci": [
+    0.021,
+    0.279
+   ],
+   "tree2": 0.51,
+   "don_next_a": 8.88,
+   "don_next_b": 9.94,
+   "don1_net": 0.205,
+   "don1_ref": 0.685,
+   "don1_n": 16,
+   "don1_close_net": 0.15,
+   "errs": 0
+  },
+  {
+   "pid": 11,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 141,
+   "step": 43,
+   "item": "5",
+   "why": "big_next",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 6,
+    "attached": 1,
+    "deck": 2
+   },
+   "now": -0.01,
+   "tree": 0.005,
+   "tree_ci": [
+    -0.026,
+    0.035
+   ],
+   "tree_net": -0.048,
+   "tree_net_ci": [
+    -0.087,
+    -0.01
+   ],
+   "next": 0.005,
+   "next_ci": [
+    -0.002,
+    0.012
+   ],
+   "next_net": -0.011,
+   "next_net_ci": [
+    -0.024,
+    0.002
+   ],
+   "tree2": -0.012,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.137,
+   "don1_ref": 0.146,
+   "don1_n": 16,
+   "don1_close_net": 0.102,
+   "errs": 0
+  },
+  {
+   "pid": 12,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 115,
+   "step": 93,
+   "item": "5",
+   "why": "big_next",
+   "turn": 9,
+   "own_turn": 4,
+   "judged": true,
+   "diff": 0.0625,
+   "ci": [
+    -0.2707,
+    0.3957
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 7,
+    "attached": 1,
+    "deck": 2
+   },
+   "now": -0.077,
+   "tree": 0.193,
+   "tree_ci": [
+    0.123,
+    0.262
+   ],
+   "tree_net": -0.099,
+   "tree_net_ci": [
+    -0.139,
+    -0.059
+   ],
+   "next": 0.221,
+   "next_ci": [
+    0.141,
+    0.3
+   ],
+   "next_net": -0.072,
+   "next_net_ci": [
+    -0.1,
+    -0.044
+   ],
+   "tree2": 0.167,
+   "don_next_a": 9.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.266,
+   "don1_ref": 0.704,
+   "don1_n": 16,
+   "don1_close_net": 0.181,
+   "errs": 0
+  },
+  {
+   "pid": 13,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 194,
+   "step": 37,
+   "item": "5",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.3125,
+   "ci": [
+    0.0779,
+    0.5471
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 5,
+    "rested": 0,
+    "attached": 1,
+    "deck": 4
+   },
+   "now": -0.015,
+   "tree": 0.243,
+   "tree_ci": [
+    0.197,
+    0.29
+   ],
+   "tree_net": -0.007,
+   "tree_net_ci": [
+    -0.027,
+    0.014
+   ],
+   "next": 0.253,
+   "next_ci": [
+    0.182,
+    0.324
+   ],
+   "next_net": 0.437,
+   "next_net_ci": [
+    0.301,
+    0.573
+   ],
+   "tree2": 0.23,
+   "don_next_a": 7.44,
+   "don_next_b": 8.56,
+   "don1_net": 0.429,
+   "don1_ref": 0.222,
+   "don1_n": 16,
+   "don1_close_net": 0.159,
+   "errs": 0
+  },
+  {
+   "pid": 14,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 132,
+   "step": 55,
+   "item": "5",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 1,
+    "deck": 0
+   },
+   "now": -0.04,
+   "tree": -0.103,
+   "tree_ci": [
+    -0.133,
+    -0.072
+   ],
+   "tree_net": -0.081,
+   "tree_net_ci": [
+    -0.113,
+    -0.049
+   ],
+   "next": -0.114,
+   "next_ci": [
+    -0.167,
+    -0.062
+   ],
+   "next_net": -0.151,
+   "next_net_ci": [
+    -0.193,
+    -0.11
+   ],
+   "tree2": -0.071,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.117,
+   "don1_ref": 0.405,
+   "don1_n": 16,
+   "don1_close_net": 0.136,
+   "errs": 0
+  },
+  {
+   "pid": 15,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 85,
+   "step": 50,
+   "item": "5",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 9,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.078,
+   "tree": 0.004,
+   "tree_ci": [
+    -0.075,
+    0.083
+   ],
+   "tree_net": -0.136,
+   "tree_net_ci": [
+    -0.153,
+    -0.119
+   ],
+   "next": -0.238,
+   "next_ci": [
+    -0.379,
+    -0.097
+   ],
+   "next_net": -0.272,
+   "next_net_ci": [
+    -0.339,
+    -0.204
+   ],
+   "tree2": -0.001,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.085,
+   "don1_ref": 0.405,
+   "don1_n": 16,
+   "don1_close_net": 0.078,
+   "errs": 0
+  },
+  {
+   "pid": 16,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 187,
+   "step": 19,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 4,
+    "rested": 0,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.017,
+   "tree": 0.37,
+   "tree_ci": [
+    0.276,
+    0.465
+   ],
+   "tree_net": -0.012,
+   "tree_net_ci": [
+    -0.023,
+    -0.002
+   ],
+   "next": 0.678,
+   "next_ci": [
+    0.575,
+    0.781
+   ],
+   "next_net": 0.364,
+   "next_net_ci": [
+    0.293,
+    0.434
+   ],
+   "tree2": 0.516,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.415,
+   "don1_ref": 0.781,
+   "don1_n": 16,
+   "don1_close_net": 0.158,
+   "errs": 0
+  },
+  {
+   "pid": 17,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 53,
+   "step": 17,
+   "item": "5",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 3,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.038,
+   "tree": 0.396,
+   "tree_ci": [
+    0.346,
+    0.446
+   ],
+   "tree_net": -0.038,
+   "tree_net_ci": [
+    -0.038,
+    -0.038
+   ],
+   "next": 0.524,
+   "next_ci": [
+    0.479,
+    0.57
+   ],
+   "next_net": 0.333,
+   "next_net_ci": [
+    0.298,
+    0.367
+   ],
+   "tree2": 0.398,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.412,
+   "don1_ref": 0.63,
+   "don1_n": 16,
+   "don1_close_net": 0.113,
+   "errs": 0
+  },
+  {
+   "pid": 18,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 93,
+   "step": 41,
+   "item": "5",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 3,
+    "rested": 0,
+    "attached": 2,
+    "deck": 5
+   },
+   "now": -0.027,
+   "tree": -0.002,
+   "tree_ci": [
+    -0.018,
+    0.013
+   ],
+   "tree_net": -0.034,
+   "tree_net_ci": [
+    -0.042,
+    -0.025
+   ],
+   "next": -0.016,
+   "next_ci": [
+    -0.037,
+    0.005
+   ],
+   "next_net": -0.006,
+   "next_net_ci": [
+    -0.012,
+    0.001
+   ],
+   "tree2": -0.001,
+   "don_next_a": 6.0,
+   "don_next_b": 6.69,
+   "don1_net": 0.097,
+   "don1_ref": 0.148,
+   "don1_n": 16,
+   "don1_close_net": 0.081,
+   "errs": 0
+  },
+  {
+   "pid": 19,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 142,
+   "step": 61,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.079,
+   "tree": -0.097,
+   "tree_ci": [
+    -0.124,
+    -0.069
+   ],
+   "tree_net": -0.042,
+   "tree_net_ci": [
+    -0.057,
+    -0.028
+   ],
+   "next": -0.226,
+   "next_ci": [
+    -0.29,
+    -0.162
+   ],
+   "next_net": -0.214,
+   "next_net_ci": [
+    -0.256,
+    -0.173
+   ],
+   "tree2": -0.063,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.081,
+   "don1_ref": 0.101,
+   "don1_n": 16,
+   "don1_close_net": 0.06,
+   "errs": 0
+  },
+  {
+   "pid": 20,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 19,
+   "step": 33,
+   "item": "5",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 0,
+    "attached": 3,
+    "deck": 5
+   },
+   "now": -0.017,
+   "tree": 0.026,
+   "tree_ci": [
+    0.007,
+    0.044
+   ],
+   "tree_net": -0.005,
+   "tree_net_ci": [
+    -0.036,
+    0.025
+   ],
+   "next": 0.094,
+   "next_ci": [
+    -0.032,
+    0.22
+   ],
+   "next_net": 0.03,
+   "next_net_ci": [
+    -0.101,
+    0.16
+   ],
+   "tree2": 0.055,
+   "don_next_a": 6.0,
+   "don_next_b": 6.75,
+   "don1_net": 0.095,
+   "don1_ref": 0.117,
+   "don1_n": 16,
+   "don1_close_net": 0.093,
+   "errs": 0
+  },
+  {
+   "pid": 21,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 27,
+   "step": 15,
+   "item": "5",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 3,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.03,
+   "tree": 0.451,
+   "tree_ci": [
+    0.383,
+    0.518
+   ],
+   "tree_net": -0.03,
+   "tree_net_ci": [
+    -0.03,
+    -0.03
+   ],
+   "next": 0.569,
+   "next_ci": [
+    0.522,
+    0.616
+   ],
+   "next_net": 0.304,
+   "next_net_ci": [
+    0.275,
+    0.333
+   ],
+   "tree2": 0.493,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.404,
+   "don1_ref": 0.649,
+   "don1_n": 16,
+   "don1_close_net": 0.132,
+   "errs": 0
+  },
+  {
+   "pid": 22,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 63,
+   "step": 58,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 7,
+    "attached": 0,
+    "deck": 3
+   },
+   "now": -0.06,
+   "tree": 0.258,
+   "tree_ci": [
+    0.214,
+    0.303
+   ],
+   "tree_net": -0.06,
+   "tree_net_ci": [
+    -0.06,
+    -0.06
+   ],
+   "next": 0.23,
+   "next_ci": [
+    0.132,
+    0.329
+   ],
+   "next_net": 0.293,
+   "next_net_ci": [
+    0.193,
+    0.393
+   ],
+   "tree2": 0.268,
+   "don_next_a": 8.0,
+   "don_next_b": 9.0,
+   "don1_net": 0.259,
+   "don1_ref": 0.059,
+   "don1_n": 16,
+   "don1_close_net": 0.143,
+   "errs": 0
+  },
+  {
+   "pid": 23,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 17,
+   "step": 24,
+   "item": "5",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.061,
+   "tree": 0.102,
+   "tree_ci": [
+    0.066,
+    0.139
+   ],
+   "tree_net": -0.054,
+   "tree_net_ci": [
+    -0.078,
+    -0.029
+   ],
+   "next": 0.08,
+   "next_ci": [
+    0.061,
+    0.098
+   ],
+   "next_net": 0.059,
+   "next_net_ci": [
+    0.027,
+    0.09
+   ],
+   "tree2": 0.117,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.211,
+   "don1_ref": 0.219,
+   "don1_n": 16,
+   "don1_close_net": 0.152,
+   "errs": 0
+  },
+  {
+   "pid": 24,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 155,
+   "step": 26,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 0,
+    "attached": 2,
+    "deck": 6
+   },
+   "now": -0.025,
+   "tree": 0.74,
+   "tree_ci": [
+    0.692,
+    0.788
+   ],
+   "tree_net": -0.025,
+   "tree_net_ci": [
+    -0.025,
+    -0.025
+   ],
+   "next": 0.752,
+   "next_ci": [
+    0.677,
+    0.828
+   ],
+   "next_net": 0.265,
+   "next_net_ci": [
+    0.242,
+    0.287
+   ],
+   "tree2": 0.723,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.372,
+   "don1_ref": 0.807,
+   "don1_n": 16,
+   "don1_close_net": 0.146,
+   "errs": 0
+  },
+  {
+   "pid": 25,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 3,
+   "step": 65,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.019,
+   "tree": 0.046,
+   "tree_ci": [
+    0.018,
+    0.075
+   ],
+   "tree_net": -0.047,
+   "tree_net_ci": [
+    -0.073,
+    -0.021
+   ],
+   "next": -0.025,
+   "next_ci": [
+    -0.069,
+    0.019
+   ],
+   "next_net": -0.018,
+   "next_net_ci": [
+    -0.062,
+    0.027
+   ],
+   "tree2": 0.058,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.11,
+   "don1_ref": 0.151,
+   "don1_n": 16,
+   "don1_close_net": 0.109,
+   "errs": 0
+  },
+  {
+   "pid": 26,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 167,
+   "step": 73,
+   "item": "5",
+   "why": "early",
+   "turn": 9,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.08,
+   "tree": 0.049,
+   "tree_ci": [
+    0.039,
+    0.06
+   ],
+   "tree_net": -0.06,
+   "tree_net_ci": [
+    -0.089,
+    -0.031
+   ],
+   "next": 0.003,
+   "next_ci": [
+    -0.084,
+    0.091
+   ],
+   "next_net": -0.014,
+   "next_net_ci": [
+    -0.068,
+    0.04
+   ],
+   "tree2": 0.045,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.041,
+   "don1_ref": 0.157,
+   "don1_n": 16,
+   "don1_close_net": 0.159,
+   "errs": 0
+  },
+  {
+   "pid": 27,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 132,
+   "step": 79,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 8,
+    "attached": 1,
+    "deck": 1
+   },
+   "now": -0.05,
+   "tree": -0.062,
+   "tree_ci": [
+    -0.191,
+    0.068
+   ],
+   "tree_net": -0.069,
+   "tree_net_ci": [
+    -0.115,
+    -0.024
+   ],
+   "next": -0.133,
+   "next_ci": [
+    -0.321,
+    0.055
+   ],
+   "next_net": -0.269,
+   "next_net_ci": [
+    -0.406,
+    -0.131
+   ],
+   "tree2": -0.495,
+   "don_next_a": 9.5,
+   "don_next_b": 10.0,
+   "don1_net": 0.105,
+   "don1_ref": 0.252,
+   "don1_n": 16,
+   "don1_close_net": 0.181,
+   "errs": 0
+  },
+  {
+   "pid": 28,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 68,
+   "step": 54,
+   "item": "5",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.086,
+   "tree": 0.007,
+   "tree_ci": [
+    -0.094,
+    0.109
+   ],
+   "tree_net": -0.039,
+   "tree_net_ci": [
+    -0.08,
+    0.002
+   ],
+   "next": -0.07,
+   "next_ci": [
+    -0.217,
+    0.078
+   ],
+   "next_net": -0.13,
+   "next_net_ci": [
+    -0.274,
+    0.013
+   ],
+   "tree2": -0.123,
+   "don_next_a": 9.75,
+   "don_next_b": 10.0,
+   "don1_net": 0.266,
+   "don1_ref": 0.486,
+   "don1_n": 16,
+   "don1_close_net": 0.149,
+   "errs": 0
+  },
+  {
+   "pid": 29,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 104,
+   "step": 27,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 6,
+    "attached": 0,
+    "deck": 4
+   },
+   "now": -0.027,
+   "tree": 0.058,
+   "tree_ci": [
+    0.027,
+    0.09
+   ],
+   "tree_net": -0.016,
+   "tree_net_ci": [
+    -0.047,
+    0.016
+   ],
+   "next": 0.062,
+   "next_ci": [
+    0.015,
+    0.11
+   ],
+   "next_net": 0.025,
+   "next_net_ci": [
+    -0.009,
+    0.059
+   ],
+   "tree2": 0.057,
+   "don_next_a": 7.0,
+   "don_next_b": 7.94,
+   "don1_net": 0.206,
+   "don1_ref": 0.204,
+   "don1_n": 16,
+   "don1_close_net": 0.219,
+   "errs": 0
+  },
+  {
+   "pid": 30,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 197,
+   "step": 19,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 3,
+    "attached": 1,
+    "deck": 6
+   },
+   "now": -0.031,
+   "tree": 0.104,
+   "tree_ci": [
+    0.023,
+    0.185
+   ],
+   "tree_net": 0.005,
+   "tree_net_ci": [
+    -0.04,
+    0.05
+   ],
+   "next": 0.205,
+   "next_ci": [
+    0.046,
+    0.365
+   ],
+   "next_net": 0.109,
+   "next_net_ci": [
+    0.037,
+    0.181
+   ],
+   "tree2": 0.063,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.188,
+   "don1_ref": 0.283,
+   "don1_n": 16,
+   "don1_close_net": 0.135,
+   "errs": 0
+  },
+  {
+   "pid": 31,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 115,
+   "step": 71,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 8,
+    "attached": 1,
+    "deck": 1
+   },
+   "now": -0.008,
+   "tree": -0.01,
+   "tree_ci": [
+    -0.136,
+    0.116
+   ],
+   "tree_net": 0.011,
+   "tree_net_ci": [
+    0.002,
+    0.019
+   ],
+   "next": -0.048,
+   "next_ci": [
+    -0.278,
+    0.182
+   ],
+   "next_net": -0.157,
+   "next_net_ci": [
+    -0.348,
+    0.033
+   ],
+   "tree2": 0.142,
+   "don_next_a": 9.56,
+   "don_next_b": 10.0,
+   "don1_net": 0.145,
+   "don1_ref": 0.384,
+   "don1_n": 16,
+   "don1_close_net": 0.092,
+   "errs": 0
+  },
+  {
+   "pid": 32,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 168,
+   "step": 30,
+   "item": "5",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 4,
+    "attached": 0,
+    "deck": 5
+   },
+   "now": -0.006,
+   "tree": 0.144,
+   "tree_ci": [
+    0.097,
+    0.191
+   ],
+   "tree_net": -0.021,
+   "tree_net_ci": [
+    -0.058,
+    0.016
+   ],
+   "next": 0.093,
+   "next_ci": [
+    0.049,
+    0.138
+   ],
+   "next_net": 0.061,
+   "next_net_ci": [
+    0.05,
+    0.072
+   ],
+   "tree2": 0.086,
+   "don_next_a": 6.0,
+   "don_next_b": 7.0,
+   "don1_net": 0.19,
+   "don1_ref": 0.302,
+   "don1_n": 16,
+   "don1_close_net": 0.223,
+   "errs": 0
+  },
+  {
+   "pid": 33,
+   "src": "kr",
+   "mu": "kaido_rocks_official",
+   "idx": 76,
+   "step": 53,
+   "item": "5",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.004,
+   "tree": -0.099,
+   "tree_ci": [
+    -0.15,
+    -0.048
+   ],
+   "tree_net": -0.014,
+   "tree_net_ci": [
+    -0.032,
+    0.004
+   ],
+   "next": -0.096,
+   "next_ci": [
+    -0.131,
+    -0.06
+   ],
+   "next_net": -0.076,
+   "next_net_ci": [
+    -0.09,
+    -0.062
+   ],
+   "tree2": -0.123,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.124,
+   "don1_ref": 0.288,
+   "don1_n": 16,
+   "don1_close_net": 0.146,
+   "errs": 0
+  },
+  {
+   "pid": 34,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 102,
+   "step": 148,
+   "item": "kr_leader",
+   "why": "big_next",
+   "turn": 11,
+   "own_turn": 5,
+   "judged": true,
+   "diff": 0.125,
+   "ci": [
+    -0.12,
+    0.37
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 6,
+    "attached": 0,
+    "deck": 3
+   },
+   "now": -0.054,
+   "tree": 0.116,
+   "tree_ci": [
+    0.088,
+    0.143
+   ],
+   "tree_net": -0.052,
+   "tree_net_ci": [
+    -0.089,
+    -0.016
+   ],
+   "next": 0.207,
+   "next_ci": [
+    0.131,
+    0.283
+   ],
+   "next_net": 0.189,
+   "next_net_ci": [
+    0.126,
+    0.252
+   ],
+   "tree2": 0.04,
+   "don_next_a": 7.56,
+   "don_next_b": 7.94,
+   "don1_net": 0.204,
+   "don1_ref": 0.155,
+   "don1_n": 16,
+   "don1_close_net": 0.294,
+   "errs": 0
+  },
+  {
+   "pid": 35,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 53,
+   "step": 18,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": true,
+   "diff": 0.375,
+   "ci": [
+    0.0228,
+    0.7272
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 3,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.105,
+   "tree": 0.099,
+   "tree_ci": [
+    0.011,
+    0.188
+   ],
+   "tree_net": -0.128,
+   "tree_net_ci": [
+    -0.167,
+    -0.089
+   ],
+   "next": 0.238,
+   "next_ci": [
+    0.129,
+    0.348
+   ],
+   "next_net": 0.243,
+   "next_net_ci": [
+    0.11,
+    0.375
+   ],
+   "tree2": 0.209,
+   "don_next_a": 5.0,
+   "don_next_b": 6.06,
+   "don1_net": 0.25,
+   "don1_ref": 0.339,
+   "don1_n": 16,
+   "don1_close_net": 0.163,
+   "errs": 0
+  },
+  {
+   "pid": 36,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 77,
+   "step": 25,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": true,
+   "diff": -0.0625,
+   "ci": [
+    -0.3957,
+    0.2707
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 2,
+    "rested": 0,
+    "attached": 2,
+    "deck": 6
+   },
+   "now": 0.011,
+   "tree": -0.087,
+   "tree_ci": [
+    -0.129,
+    -0.045
+   ],
+   "tree_net": 0.228,
+   "tree_net_ci": [
+    0.193,
+    0.263
+   ],
+   "next": -0.006,
+   "next_ci": [
+    -0.139,
+    0.128
+   ],
+   "next_net": 0.078,
+   "next_net_ci": [
+    -0.055,
+    0.212
+   ],
+   "tree2": -0.019,
+   "don_next_a": 6.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.182,
+   "don1_ref": 0.233,
+   "don1_n": 16,
+   "don1_close_net": 0.272,
+   "errs": 0
+  },
+  {
+   "pid": 37,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 107,
+   "step": 60,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": true,
+   "diff": 0.1875,
+   "ci": [
+    -0.1335,
+    0.5085
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 5,
+    "attached": 2,
+    "deck": 2
+   },
+   "now": -0.133,
+   "tree": 0.012,
+   "tree_ci": [
+    -0.02,
+    0.043
+   ],
+   "tree_net": 0.029,
+   "tree_net_ci": [
+    0.008,
+    0.051
+   ],
+   "next": 0.016,
+   "next_ci": [
+    -0.197,
+    0.228
+   ],
+   "next_net": -0.069,
+   "next_net_ci": [
+    -0.189,
+    0.05
+   ],
+   "tree2": -0.002,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.25,
+   "don1_ref": 0.853,
+   "don1_n": 16,
+   "don1_close_net": 0.072,
+   "errs": 0
+  },
+  {
+   "pid": 38,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 65,
+   "step": 34,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": true,
+   "diff": 0.5625,
+   "ci": [
+    0.2542,
+    0.8708
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 3,
+    "attached": 1,
+    "deck": 6
+   },
+   "now": -0.093,
+   "tree": 0.461,
+   "tree_ci": [
+    0.417,
+    0.505
+   ],
+   "tree_net": -0.082,
+   "tree_net_ci": [
+    -0.095,
+    -0.068
+   ],
+   "next": 0.507,
+   "next_ci": [
+    0.48,
+    0.535
+   ],
+   "next_net": 0.203,
+   "next_net_ci": [
+    0.174,
+    0.232
+   ],
+   "tree2": 0.476,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.418,
+   "don1_ref": 0.801,
+   "don1_n": 16,
+   "don1_close_net": 0.209,
+   "errs": 0
+  },
+  {
+   "pid": 39,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 49,
+   "step": 46,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 7,
+   "own_turn": 4,
+   "judged": true,
+   "diff": 0.125,
+   "ci": [
+    -0.2272,
+    0.4772
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 6,
+    "attached": 0,
+    "deck": 3
+   },
+   "now": -0.136,
+   "tree": -0.036,
+   "tree_ci": [
+    -0.097,
+    0.024
+   ],
+   "tree_net": 0.218,
+   "tree_net_ci": [
+    0.197,
+    0.239
+   ],
+   "next": 0.049,
+   "next_ci": [
+    -0.114,
+    0.211
+   ],
+   "next_net": -0.127,
+   "next_net_ci": [
+    -0.213,
+    -0.041
+   ],
+   "tree2": 0.015,
+   "don_next_a": 9.0,
+   "don_next_b": 9.0,
+   "don1_net": 0.198,
+   "don1_ref": 0.178,
+   "don1_n": 16,
+   "don1_close_net": 0.102,
+   "errs": 0
+  },
+  {
+   "pid": 40,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 80,
+   "step": 127,
+   "item": "kr_leader",
+   "why": "bk_on",
+   "turn": 12,
+   "own_turn": 6,
+   "judged": true,
+   "diff": -0.4375,
+   "ci": [
+    -0.7458,
+    -0.1292
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 10,
+    "rested": 0,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.062,
+   "tree": -0.205,
+   "tree_ci": [
+    -0.275,
+    -0.136
+   ],
+   "tree_net": -0.011,
+   "tree_net_ci": [
+    -0.019,
+    -0.003
+   ],
+   "next": -0.644,
+   "next_ci": [
+    -1.039,
+    -0.25
+   ],
+   "next_net": -0.471,
+   "next_net_ci": [
+    -0.736,
+    -0.207
+   ],
+   "tree2": -0.174,
+   "don_next_a": 10.0,
+   "don_next_b": 8.43,
+   "don1_net": 0.022,
+   "don1_ref": 0.041,
+   "don1_n": 7,
+   "don1_close_net": 0.082,
+   "errs": 0
+  },
+  {
+   "pid": 41,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 73,
+   "step": 129,
+   "item": "kr_leader",
+   "why": "big_next",
+   "turn": 11,
+   "own_turn": 5,
+   "judged": true,
+   "diff": -0.25,
+   "ci": [
+    -0.6296,
+    0.1296
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 6,
+    "attached": 1,
+    "deck": 3
+   },
+   "now": -0.044,
+   "tree": -0.276,
+   "tree_ci": [
+    -0.317,
+    -0.236
+   ],
+   "tree_net": -0.044,
+   "tree_net_ci": [
+    -0.044,
+    -0.044
+   ],
+   "next": -0.188,
+   "next_ci": [
+    -0.224,
+    -0.153
+   ],
+   "next_net": -0.358,
+   "next_net_ci": [
+    -0.43,
+    -0.286
+   ],
+   "tree2": -0.215,
+   "don_next_a": 8.0,
+   "don_next_b": 8.06,
+   "don1_net": 0.275,
+   "don1_ref": 0.354,
+   "don1_n": 16,
+   "don1_close_net": 0.132,
+   "errs": 0
+  },
+  {
+   "pid": 42,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 68,
+   "step": 44,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": true,
+   "diff": 0.0625,
+   "ci": [
+    -0.2186,
+    0.3436
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 5,
+    "attached": 0,
+    "deck": 4
+   },
+   "now": -0.119,
+   "tree": -0.104,
+   "tree_ci": [
+    -0.158,
+    -0.05
+   ],
+   "tree_net": 0.498,
+   "tree_net_ci": [
+    0.483,
+    0.513
+   ],
+   "next": -0.042,
+   "next_ci": [
+    -0.139,
+    0.054
+   ],
+   "next_net": -0.078,
+   "next_net_ci": [
+    -0.159,
+    0.004
+   ],
+   "tree2": -0.212,
+   "don_next_a": 8.0,
+   "don_next_b": 8.0,
+   "don1_net": 0.173,
+   "don1_ref": 0.148,
+   "don1_n": 16,
+   "don1_close_net": 0.117,
+   "errs": 0
+  },
+  {
+   "pid": 43,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 4,
+   "step": 122,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 11,
+   "own_turn": 6,
+   "judged": true,
+   "diff": 0.0625,
+   "ci": [
+    -0.1543,
+    0.2793
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 2,
+    "rested": 8,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.104,
+   "tree": -0.121,
+   "tree_ci": [
+    -0.138,
+    -0.105
+   ],
+   "tree_net": -0.195,
+   "tree_net_ci": [
+    -0.218,
+    -0.173
+   ],
+   "next": -0.068,
+   "next_ci": [
+    -0.165,
+    0.029
+   ],
+   "next_net": 0.018,
+   "next_net_ci": [
+    -0.013,
+    0.049
+   ],
+   "tree2": -0.098,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.042,
+   "don1_ref": 0.038,
+   "don1_n": 16,
+   "don1_close_net": 0.031,
+   "errs": 0
+  },
+  {
+   "pid": 44,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 35,
+   "step": 129,
+   "item": "kr_leader",
+   "why": "big_next",
+   "turn": 12,
+   "own_turn": 6,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 6,
+    "attached": 0,
+    "deck": 2
+   },
+   "now": -0.005,
+   "tree": 0.026,
+   "tree_ci": [
+    0.005,
+    0.046
+   ],
+   "tree_net": 0.006,
+   "tree_net_ci": [
+    0.006,
+    0.006
+   ],
+   "next": 0.009,
+   "next_ci": [
+    -0.004,
+    0.022
+   ],
+   "next_net": 0.065,
+   "next_net_ci": [
+    0.018,
+    0.112
+   ],
+   "tree2": -0.015,
+   "don_next_a": 9.0,
+   "don_next_b": 9.19,
+   "don1_net": 0.038,
+   "don1_ref": 0.02,
+   "don1_n": 16,
+   "don1_close_net": 0.022,
+   "errs": 0
+  },
+  {
+   "pid": 45,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 28,
+   "step": 76,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 9,
+   "own_turn": 5,
+   "judged": true,
+   "diff": 0.0625,
+   "ci": [
+    -0.2186,
+    0.3436
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 3,
+    "rested": 6,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.532,
+   "tree": -0.132,
+   "tree_ci": [
+    -0.174,
+    -0.09
+   ],
+   "tree_net": -0.392,
+   "tree_net_ci": [
+    -0.424,
+    -0.36
+   ],
+   "next": 0.189,
+   "next_ci": [
+    -0.015,
+    0.393
+   ],
+   "next_net": 0.28,
+   "next_net_ci": [
+    0.086,
+    0.473
+   ],
+   "tree2": -0.091,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.11,
+   "don1_ref": 0.091,
+   "don1_n": 16,
+   "don1_close_net": 0.14,
+   "errs": 0
+  },
+  {
+   "pid": 46,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 80,
+   "step": 97,
+   "item": "kr_leader",
+   "why": "bk_on",
+   "turn": 10,
+   "own_turn": 5,
+   "judged": true,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 10,
+    "rested": 0,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.155,
+   "tree": -0.074,
+   "tree_ci": [
+    -0.092,
+    -0.056
+   ],
+   "tree_net": -0.155,
+   "tree_net_ci": [
+    -0.155,
+    -0.155
+   ],
+   "next": 0.019,
+   "next_ci": [
+    -0.045,
+    0.084
+   ],
+   "next_net": -0.05,
+   "next_net_ci": [
+    -0.181,
+    0.082
+   ],
+   "tree2": -0.078,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.158,
+   "don1_ref": 0.109,
+   "don1_n": 16,
+   "don1_close_net": 0.117,
+   "errs": 0
+  },
+  {
+   "pid": 47,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 117,
+   "step": 127,
+   "item": "kr_leader",
+   "why": "big_next",
+   "turn": 11,
+   "own_turn": 5,
+   "judged": true,
+   "diff": -0.1875,
+   "ci": [
+    -0.385,
+    0.01
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 7,
+    "attached": 0,
+    "deck": 3
+   },
+   "now": -0.151,
+   "tree": -0.023,
+   "tree_ci": [
+    -0.087,
+    0.042
+   ],
+   "tree_net": -0.139,
+   "tree_net_ci": [
+    -0.14,
+    -0.138
+   ],
+   "next": 0.135,
+   "next_ci": [
+    -0.067,
+    0.338
+   ],
+   "next_net": 0.003,
+   "next_net_ci": [
+    -0.124,
+    0.13
+   ],
+   "tree2": 0.029,
+   "don_next_a": 8.0,
+   "don_next_b": 8.5,
+   "don1_net": 0.086,
+   "don1_ref": 0.481,
+   "don1_n": 16,
+   "don1_close_net": 0.064,
+   "errs": 0
+  },
+  {
+   "pid": 48,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 71,
+   "step": 117,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 10,
+   "own_turn": 5,
+   "judged": true,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 9,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.063,
+   "tree": -0.038,
+   "tree_ci": [
+    -0.085,
+    0.01
+   ],
+   "tree_net": -0.204,
+   "tree_net_ci": [
+    -0.235,
+    -0.174
+   ],
+   "next": -0.011,
+   "next_ci": [
+    -0.062,
+    0.039
+   ],
+   "next_net": -0.008,
+   "next_net_ci": [
+    -0.053,
+    0.036
+   ],
+   "tree2": -0.03,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.059,
+   "don1_ref": 0.022,
+   "don1_n": 16,
+   "don1_close_net": 0.042,
+   "errs": 0
+  },
+  {
+   "pid": 49,
+   "src": "m5",
+   "mu": "mihawk_sabo",
+   "idx": 115,
+   "step": 129,
+   "item": "mihawk_leader",
+   "why": "play_first",
+   "turn": 12,
+   "own_turn": 6,
+   "judged": true,
+   "diff": -0.1875,
+   "ci": [
+    -0.454,
+    0.079
+   ],
+   "kind": "main",
+   "turn_player": "p1",
+   "don0": {
+    "active": 1,
+    "rested": 7,
+    "attached": 2,
+    "deck": 0
+   },
+   "now": -0.089,
+   "tree": -0.299,
+   "tree_ci": [
+    -0.435,
+    -0.163
+   ],
+   "tree_net": -0.265,
+   "tree_net_ci": [
+    -0.265,
+    -0.265
+   ],
+   "next": -0.078,
+   "next_ci": [
+    -0.342,
+    0.187
+   ],
+   "next_net": -0.059,
+   "next_net_ci": [
+    -0.312,
+    0.195
+   ],
+   "tree2": -0.327,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.051,
+   "don1_ref": 0.067,
+   "don1_n": 15,
+   "don1_close_net": 0.044,
+   "errs": 0
+  },
+  {
+   "pid": 50,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 9,
+   "step": 163,
+   "item": "kr_leader",
+   "why": "bk_on",
+   "turn": 13,
+   "own_turn": 7,
+   "judged": true,
+   "diff": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ],
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 10,
+    "rested": 0,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.008,
+   "tree": -0.005,
+   "tree_ci": [
+    -0.007,
+    -0.002
+   ],
+   "tree_net": 0.004,
+   "tree_net_ci": [
+    0.002,
+    0.005
+   ],
+   "next": 0.013,
+   "next_ci": [
+    -0.016,
+    0.042
+   ],
+   "next_net": -0.058,
+   "next_net_ci": [
+    -0.096,
+    -0.019
+   ],
+   "tree2": -0.007,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.03,
+   "don1_ref": 0.038,
+   "don1_n": 16,
+   "don1_close_net": 0.015,
+   "errs": 0
+  },
+  {
+   "pid": 51,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 71,
+   "step": 32,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": true,
+   "diff": 0.0,
+   "ci": [
+    -0.3099,
+    0.3099
+   ],
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 6,
+    "attached": 0,
+    "deck": 4
+   },
+   "now": -0.004,
+   "tree": 0.011,
+   "tree_ci": [
+    0.001,
+    0.02
+   ],
+   "tree_net": -0.004,
+   "tree_net_ci": [
+    -0.02,
+    0.011
+   ],
+   "next": 0.016,
+   "next_ci": [
+    0.007,
+    0.025
+   ],
+   "next_net": 0.08,
+   "next_net_ci": [
+    0.066,
+    0.095
+   ],
+   "tree2": 0.004,
+   "don_next_a": 7.0,
+   "don_next_b": 8.0,
+   "don1_net": 0.182,
+   "don1_ref": 0.071,
+   "don1_n": 16,
+   "don1_close_net": 0.118,
+   "errs": 0
+  },
+  {
+   "pid": 52,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 83,
+   "step": 37,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 5,
+    "attached": 0,
+    "deck": 5
+   },
+   "now": -0.01,
+   "tree": 0.036,
+   "tree_ci": [
+    0.025,
+    0.048
+   ],
+   "tree_net": -0.031,
+   "tree_net_ci": [
+    -0.056,
+    -0.006
+   ],
+   "next": 0.052,
+   "next_ci": [
+    0.032,
+    0.073
+   ],
+   "next_net": 0.051,
+   "next_net_ci": [
+    0.007,
+    0.096
+   ],
+   "tree2": 0.058,
+   "don_next_a": 6.0,
+   "don_next_b": 7.0,
+   "don1_net": 0.159,
+   "don1_ref": 0.147,
+   "don1_n": 16,
+   "don1_close_net": 0.15,
+   "errs": 0
+  },
+  {
+   "pid": 53,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 10,
+   "step": 65,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 3,
+    "rested": 0,
+    "attached": 2,
+    "deck": 5
+   },
+   "now": -0.018,
+   "tree": -0.004,
+   "tree_ci": [
+    -0.04,
+    0.032
+   ],
+   "tree_net": 0.028,
+   "tree_net_ci": [
+    0.015,
+    0.04
+   ],
+   "next": -0.009,
+   "next_ci": [
+    -0.022,
+    0.005
+   ],
+   "next_net": -0.004,
+   "next_net_ci": [
+    -0.021,
+    0.013
+   ],
+   "tree2": 0.041,
+   "don_next_a": 6.0,
+   "don_next_b": 7.0,
+   "don1_net": 0.05,
+   "don1_ref": 0.043,
+   "don1_n": 16,
+   "don1_close_net": 0.047,
+   "errs": 0
+  },
+  {
+   "pid": 54,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 71,
+   "step": 77,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.013,
+   "tree": 0.131,
+   "tree_ci": [
+    0.114,
+    0.148
+   ],
+   "tree_net": -0.028,
+   "tree_net_ci": [
+    -0.029,
+    -0.027
+   ],
+   "next": 0.161,
+   "next_ci": [
+    0.093,
+    0.228
+   ],
+   "next_net": 0.113,
+   "next_net_ci": [
+    0.03,
+    0.196
+   ],
+   "tree2": 0.125,
+   "don_next_a": 9.38,
+   "don_next_b": 10.0,
+   "don1_net": 0.036,
+   "don1_ref": 0.201,
+   "don1_n": 16,
+   "don1_close_net": 0.074,
+   "errs": 0
+  },
+  {
+   "pid": 55,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 33,
+   "step": 22,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.053,
+   "tree": 0.375,
+   "tree_ci": [
+    0.319,
+    0.43
+   ],
+   "tree_net": 0.004,
+   "tree_net_ci": [
+    -0.007,
+    0.015
+   ],
+   "next": 0.293,
+   "next_ci": [
+    0.252,
+    0.333
+   ],
+   "next_net": 0.161,
+   "next_net_ci": [
+    0.135,
+    0.187
+   ],
+   "tree2": 0.355,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.279,
+   "don1_ref": 0.428,
+   "don1_n": 16,
+   "don1_close_net": 0.106,
+   "errs": 0
+  },
+  {
+   "pid": 56,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 18,
+   "step": 55,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.081,
+   "tree": -0.226,
+   "tree_ci": [
+    -0.311,
+    -0.14
+   ],
+   "tree_net": -0.078,
+   "tree_net_ci": [
+    -0.09,
+    -0.066
+   ],
+   "next": -0.018,
+   "next_ci": [
+    -0.079,
+    0.042
+   ],
+   "next_net": -0.098,
+   "next_net_ci": [
+    -0.221,
+    0.026
+   ],
+   "tree2": -0.085,
+   "don_next_a": 9.75,
+   "don_next_b": 10.0,
+   "don1_net": 0.05,
+   "don1_ref": 0.233,
+   "don1_n": 16,
+   "don1_close_net": 0.093,
+   "errs": 0
+  },
+  {
+   "pid": 57,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 29,
+   "step": 70,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.109,
+   "tree": -0.043,
+   "tree_ci": [
+    -0.06,
+    -0.026
+   ],
+   "tree_net": -0.102,
+   "tree_net_ci": [
+    -0.117,
+    -0.088
+   ],
+   "next": -0.037,
+   "next_ci": [
+    -0.063,
+    -0.01
+   ],
+   "next_net": -0.1,
+   "next_net_ci": [
+    -0.175,
+    -0.026
+   ],
+   "tree2": -0.039,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.186,
+   "don1_ref": 0.104,
+   "don1_n": 16,
+   "don1_close_net": 0.156,
+   "errs": 0
+  },
+  {
+   "pid": 58,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 54,
+   "step": 20,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 1,
+    "rested": 3,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.023,
+   "tree": 0.474,
+   "tree_ci": [
+    0.382,
+    0.565
+   ],
+   "tree_net": -0.009,
+   "tree_net_ci": [
+    -0.015,
+    -0.003
+   ],
+   "next": 0.419,
+   "next_ci": [
+    0.344,
+    0.494
+   ],
+   "next_net": 0.355,
+   "next_net_ci": [
+    0.336,
+    0.374
+   ],
+   "tree2": 0.686,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.355,
+   "don1_ref": 0.472,
+   "don1_n": 16,
+   "don1_close_net": 0.1,
+   "errs": 0
+  },
+  {
+   "pid": 59,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 14,
+   "step": 28,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.026,
+   "tree": 0.09,
+   "tree_ci": [
+    -0.019,
+    0.199
+   ],
+   "tree_net": -0.012,
+   "tree_net_ci": [
+    -0.05,
+    0.025
+   ],
+   "next": 0.045,
+   "next_ci": [
+    -0.014,
+    0.105
+   ],
+   "next_net": 0.051,
+   "next_net_ci": [
+    -0.009,
+    0.112
+   ],
+   "tree2": 0.389,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.213,
+   "don1_ref": 0.231,
+   "don1_n": 16,
+   "don1_close_net": 0.173,
+   "errs": 0
+  },
+  {
+   "pid": 60,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 20,
+   "step": 49,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 7,
+    "attached": 0,
+    "deck": 3
+   },
+   "now": -0.006,
+   "tree": 0.018,
+   "tree_ci": [
+    0.003,
+    0.032
+   ],
+   "tree_net": 0.007,
+   "tree_net_ci": [
+    -0.003,
+    0.018
+   ],
+   "next": 0.04,
+   "next_ci": [
+    0.023,
+    0.056
+   ],
+   "next_net": 0.097,
+   "next_net_ci": [
+    0.08,
+    0.115
+   ],
+   "tree2": 0.004,
+   "don_next_a": 8.0,
+   "don_next_b": 8.94,
+   "don1_net": 0.09,
+   "don1_ref": 0.021,
+   "don1_n": 16,
+   "don1_close_net": 0.112,
+   "errs": 0
+  },
+  {
+   "pid": 61,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 32,
+   "step": 24,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.005,
+   "tree": 0.328,
+   "tree_ci": [
+    0.282,
+    0.374
+   ],
+   "tree_net": 0.04,
+   "tree_net_ci": [
+    0.027,
+    0.053
+   ],
+   "next": 0.348,
+   "next_ci": [
+    0.311,
+    0.384
+   ],
+   "next_net": 0.282,
+   "next_net_ci": [
+    0.263,
+    0.301
+   ],
+   "tree2": 0.381,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.289,
+   "don1_ref": 0.327,
+   "don1_n": 16,
+   "don1_close_net": 0.114,
+   "errs": 0
+  },
+  {
+   "pid": 62,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 10,
+   "step": 14,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 0,
+    "attached": 1,
+    "deck": 7
+   },
+   "now": -0.081,
+   "tree": -0.117,
+   "tree_ci": [
+    -0.177,
+    -0.057
+   ],
+   "tree_net": -0.089,
+   "tree_net_ci": [
+    -0.13,
+    -0.049
+   ],
+   "next": 0.164,
+   "next_ci": [
+    0.056,
+    0.273
+   ],
+   "next_net": 0.008,
+   "next_net_ci": [
+    -0.041,
+    0.056
+   ],
+   "tree2": -0.167,
+   "don_next_a": 4.0,
+   "don_next_b": 4.88,
+   "don1_net": 0.184,
+   "don1_ref": 0.185,
+   "don1_n": 16,
+   "don1_close_net": 0.146,
+   "errs": 0
+  },
+  {
+   "pid": 63,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 81,
+   "step": 31,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 5,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 6,
+    "attached": 0,
+    "deck": 4
+   },
+   "now": -0.007,
+   "tree": -0.018,
+   "tree_ci": [
+    -0.021,
+    -0.014
+   ],
+   "tree_net": -0.007,
+   "tree_net_ci": [
+    -0.007,
+    -0.007
+   ],
+   "next": -0.012,
+   "next_ci": [
+    -0.017,
+    -0.007
+   ],
+   "next_net": 0.031,
+   "next_net_ci": [
+    0.023,
+    0.04
+   ],
+   "tree2": -0.017,
+   "don_next_a": 7.0,
+   "don_next_b": 8.0,
+   "don1_net": 0.087,
+   "don1_ref": 0.031,
+   "don1_n": 16,
+   "don1_close_net": 0.104,
+   "errs": 0
+  },
+  {
+   "pid": 64,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 9,
+   "step": 21,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.013,
+   "tree": 0.093,
+   "tree_ci": [
+    0.055,
+    0.13
+   ],
+   "tree_net": -0.017,
+   "tree_net_ci": [
+    -0.044,
+    0.009
+   ],
+   "next": 0.037,
+   "next_ci": [
+    0.019,
+    0.054
+   ],
+   "next_net": 0.011,
+   "next_net_ci": [
+    -0.024,
+    0.046
+   ],
+   "tree2": 0.2,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.187,
+   "don1_ref": 0.16,
+   "don1_n": 16,
+   "don1_close_net": 0.199,
+   "errs": 0
+  },
+  {
+   "pid": 65,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 79,
+   "step": 62,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p1",
+   "don0": {
+    "active": 0,
+    "rested": 9,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.014,
+   "tree": 0.042,
+   "tree_ci": [
+    0.035,
+    0.048
+   ],
+   "tree_net": -0.01,
+   "tree_net_ci": [
+    -0.014,
+    -0.007
+   ],
+   "next": -0.019,
+   "next_ci": [
+    -0.059,
+    0.021
+   ],
+   "next_net": -0.018,
+   "next_net_ci": [
+    -0.067,
+    0.03
+   ],
+   "tree2": 0.054,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.074,
+   "don1_ref": 0.152,
+   "don1_n": 16,
+   "don1_close_net": 0.122,
+   "errs": 0
+  },
+  {
+   "pid": 66,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 53,
+   "step": 58,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 8,
+   "own_turn": 4,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 6,
+    "rested": 3,
+    "attached": 0,
+    "deck": 1
+   },
+   "now": -0.019,
+   "tree": -0.084,
+   "tree_ci": [
+    -0.094,
+    -0.074
+   ],
+   "tree_net": -0.021,
+   "tree_net_ci": [
+    -0.043,
+    0.001
+   ],
+   "next": -0.132,
+   "next_ci": [
+    -0.151,
+    -0.114
+   ],
+   "next_net": -0.151,
+   "next_net_ci": [
+    -0.177,
+    -0.125
+   ],
+   "tree2": -0.079,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.028,
+   "don1_ref": 0.1,
+   "don1_n": 16,
+   "don1_close_net": 0.156,
+   "errs": 0
+  },
+  {
+   "pid": 67,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 33,
+   "step": 45,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 3,
+    "attached": 1,
+    "deck": 4
+   },
+   "now": -0.003,
+   "tree": 0.066,
+   "tree_ci": [
+    0.032,
+    0.1
+   ],
+   "tree_net": -0.002,
+   "tree_net_ci": [
+    -0.007,
+    0.003
+   ],
+   "next": 0.059,
+   "next_ci": [
+    0.033,
+    0.085
+   ],
+   "next_net": 0.067,
+   "next_net_ci": [
+    0.041,
+    0.092
+   ],
+   "tree2": 0.167,
+   "don_next_a": 7.0,
+   "don_next_b": 8.06,
+   "don1_net": 0.179,
+   "don1_ref": 0.059,
+   "don1_n": 16,
+   "don1_close_net": 0.178,
+   "errs": 0
+  },
+  {
+   "pid": 68,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 46,
+   "step": 34,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 6,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 2,
+    "rested": 0,
+    "attached": 2,
+    "deck": 6
+   },
+   "now": -0.026,
+   "tree": 0.043,
+   "tree_ci": [
+    -0.024,
+    0.111
+   ],
+   "tree_net": -0.01,
+   "tree_net_ci": [
+    -0.019,
+    -0.001
+   ],
+   "next": 0.137,
+   "next_ci": [
+    -0.012,
+    0.285
+   ],
+   "next_net": 0.048,
+   "next_net_ci": [
+    -0.019,
+    0.115
+   ],
+   "tree2": -0.07,
+   "don_next_a": 4.94,
+   "don_next_b": 5.38,
+   "don1_net": 0.174,
+   "don1_ref": 0.283,
+   "don1_n": 16,
+   "don1_close_net": 0.147,
+   "errs": 0
+  },
+  {
+   "pid": 69,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 71,
+   "step": 53,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 10,
+    "attached": 0,
+    "deck": 0
+   },
+   "now": -0.04,
+   "tree": -0.015,
+   "tree_ci": [
+    -0.037,
+    0.008
+   ],
+   "tree_net": -0.037,
+   "tree_net_ci": [
+    -0.047,
+    -0.027
+   ],
+   "next": 0.003,
+   "next_ci": [
+    -0.008,
+    0.013
+   ],
+   "next_net": 0.007,
+   "next_net_ci": [
+    -0.011,
+    0.025
+   ],
+   "tree2": -0.006,
+   "don_next_a": 10.0,
+   "don_next_b": 10.0,
+   "don1_net": 0.004,
+   "don1_ref": 0.419,
+   "don1_n": 16,
+   "don1_close_net": 0.12,
+   "errs": 0
+  },
+  {
+   "pid": 70,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 117,
+   "step": 53,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 7,
+   "own_turn": 3,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 3,
+    "rested": 0,
+    "attached": 2,
+    "deck": 5
+   },
+   "now": -0.01,
+   "tree": 0.028,
+   "tree_ci": [
+    -0.03,
+    0.086
+   ],
+   "tree_net": 0.008,
+   "tree_net_ci": [
+    -0.006,
+    0.022
+   ],
+   "next": 0.007,
+   "next_ci": [
+    -0.056,
+    0.071
+   ],
+   "next_net": -0.008,
+   "next_net_ci": [
+    -0.04,
+    0.025
+   ],
+   "tree2": -0.006,
+   "don_next_a": 5.56,
+   "don_next_b": 6.0,
+   "don1_net": 0.065,
+   "don1_ref": 0.122,
+   "don1_n": 16,
+   "don1_close_net": 0.108,
+   "errs": 0
+  },
+  {
+   "pid": 71,
+   "src": "m5",
+   "mu": "kaido_rocks",
+   "idx": 56,
+   "step": 18,
+   "item": "kr_leader",
+   "why": "early",
+   "turn": 4,
+   "own_turn": 2,
+   "judged": false,
+   "diff": null,
+   "ci": null,
+   "kind": "window",
+   "turn_player": "p2",
+   "don0": {
+    "active": 0,
+    "rested": 4,
+    "attached": 0,
+    "deck": 6
+   },
+   "now": -0.104,
+   "tree": 0.258,
+   "tree_ci": [
+    0.094,
+    0.421
+   ],
+   "tree_net": -0.056,
+   "tree_net_ci": [
+    -0.102,
+    -0.01
+   ],
+   "next": 0.259,
+   "next_ci": [
+    0.094,
+    0.424
+   ],
+   "next_net": 0.199,
+   "next_net_ci": [
+    0.08,
+    0.318
+   ],
+   "tree2": 0.032,
+   "don_next_a": 5.0,
+   "don_next_b": 6.0,
+   "don1_net": 0.26,
+   "don1_ref": 0.34,
+   "don1_n": 16,
+   "don1_close_net": 0.186,
+   "errs": 0
+  }
+ ]
+}
