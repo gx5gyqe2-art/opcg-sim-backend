@@ -1,0 +1,25 @@
+value 5308955行（val 758237） policy 2106520点（val 300770） 301s
+warm-start: opcg_sim/data/learned/nrel_r27.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 3829125/5308955
+plan: on λ=0.1 有効行 4681217/5308955
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 26713849行 92.4s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5183521677983869, "entropy_q_improved": 1.0935209802250097}
+  ep0 step 5000/45990 mse 0.4924 ce 1.7032 628s
+  ep0 step 10000/45990 mse 0.4897 ce 1.7010 779s
+  ep0 step 15000/45990 mse 0.4881 ce 1.7008 930s
+  ep0 step 20000/45990 mse 0.4868 ce 1.6996 1078s
+  ep0 step 25000/45990 mse 0.4856 ce 1.6985 1224s
+  ep0 step 30000/45990 mse 0.4849 ce 1.6983 1373s
+  ep0 step 35000/45990 mse 0.4840 ce 1.6980 1526s
+  ep0 step 40000/45990 mse 0.4832 ce 1.6979 1679s
+  ep0 step 45000/45990 mse 0.4827 ce 1.6975 1830s
+ep0 train mse 0.4826 ce 1.6973 | val v_mse 0.4530 v_sign 0.830 pi_top1 0.496 ce 1.759 1861s
+  aux val huber 0.4395 tok 0.1152
+  plan val mse 0.4432（17646 行）
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 1398.912, "steps": 45990, "breakdown": {"budget_p": 4.229, "holdout": 1.346, "rel_p": 0.112, "rel_v": 95.01, "slice_p": 63.224, "slice_v": 119.163, "step_p": 0.171, "step_p_bwd": 343.951, "step_p_fwd": 199.784, "step_v": 0.325, "step_v_bwd": 331.446, "step_v_fwd": 237.25, "step_v_prep": 0.131}, "train_mse": 0.48256900429920124, "train_ce": 1.6973243377679732, "val_vmse": 0.4529733955860138, "val_vsign": 0.82985, "val_pi_top1": 0.4965, "val_p_loss": 1.7588364562988281, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5183521677983869, "entropy_q_improved": 1.0935209802250097}, "val_pi_top1_visits": 0.5255, "val_p_loss_visits": 1.9004555206298828, "aux_weight": 0.1, "val_aux": 0.43945269621516914, "val_aux_tok": 0.11520858088501633, "train_aux": [0.41028743982315063, 0.12061318010091782], "plan_weight": 0.1, "val_plan_mse": 0.44319254623493365, "val_plan_rows": 17646, "train_plan": [0.5742971301078796, 226]}
+  ep0 の重みを /root/nrel_pmap.ep0.npz に保存
+  ep0 を /root/nrel_pmap.npz に保存（暫定最良）
+best ep0 val v_mse 0.4530 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_pmap.npz"}
