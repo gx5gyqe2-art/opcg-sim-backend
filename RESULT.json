@@ -1,344 +1,572 @@
 {
- "wp": "don-read",
+ "wp": "window-read-all",
  "stage": 1,
  "status": "stage1_done_waiting_decision",
- "branch": "claude/don-read",
- "spec": "docs/search_efficiency_plan.md §7.66（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+475）",
- "report": "docs/reports/2026-10-28_don_read_stage1.md",
- "results_dir": "n1_results/don_read/",
- "tool": "tests/scripts/don_read.py",
+ "branch": "claude/window-read-all",
+ "spec": "docs/search_efficiency_plan.md §7.67（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+477）",
+ "report": "docs/reports/2026-10-28_window_read_all_stage1.md",
+ "results_dir": "n1_results/window_read_all/",
+ "tool": "tests/scripts/window_read_all.py",
  "engine_changed": false,
  "points": {
-  "total": 72,
-  "judged": 32,
-  "kaido_judged": 24,
-  "mihawk_judged": 8,
-  "kaido_extra_early": 40,
-  "failures": 0
- },
- "worlds_per_point": 16,
- "world_offset": 9000,
- "tree_sims": 640,
- "groups": {
-  "judged_all": {
-   "n": 32,
-   "diff_mean": 0.061,
-   "now": {
-    "picks_article": 1,
-    "picks_cpu": 31,
-    "mean": -0.082,
-    "corr_with_diff": -0.121,
-    "gain_if_followed": -0.002
-   },
-   "tree": {
-    "picks_article": 18,
-    "picks_cpu": 14,
-    "mean": 0.01,
-    "corr_with_diff": 0.576,
-    "gain_if_followed": 0.076
-   },
-   "tree2": {
-    "picks_article": 17,
-    "picks_cpu": 15,
-    "mean": 0.024,
-    "corr_with_diff": 0.543,
-    "gain_if_followed": 0.068
-   },
-   "next": {
-    "picks_article": 23,
-    "picks_cpu": 9,
-    "mean": 0.075,
-    "corr_with_diff": 0.78,
-    "gain_if_followed": 0.082
-   },
-   "next_net": {
-    "picks_article": 19,
-    "picks_cpu": 13,
-    "mean": 0.041,
-    "corr_with_diff": 0.649,
-    "gain_if_followed": 0.062
-   },
-   "don1_net_next_head": 0.179,
-   "don1_ref_next_head": 0.246,
-   "don1_net_window_close": 0.113
-  },
-  "judged_kaido_decline": {
-   "n": 18,
-   "diff_mean": 0.094,
-   "now": {
-    "picks_article": 0,
-    "picks_cpu": 18,
-    "mean": -0.051,
-    "corr_with_diff": -0.275,
-    "gain_if_followed": 0.0
-   },
-   "tree": {
-    "picks_article": 15,
-    "picks_cpu": 3,
-    "mean": 0.074,
-    "corr_with_diff": 0.609,
-    "gain_if_followed": 0.122
-   },
-   "tree2": {
-    "picks_article": 14,
-    "picks_cpu": 4,
-    "mean": 0.089,
-    "corr_with_diff": 0.589,
-    "gain_if_followed": 0.111
-   },
-   "next": {
-    "picks_article": 16,
-    "picks_cpu": 2,
-    "mean": 0.162,
-    "corr_with_diff": 0.844,
-    "gain_if_followed": 0.111
-   },
-   "next_net": {
-    "picks_article": 14,
-    "picks_cpu": 4,
-    "mean": 0.103,
-    "corr_with_diff": 0.695,
-    "gain_if_followed": 0.108
-   },
-   "don1_net_next_head": 0.238,
-   "don1_ref_next_head": 0.325,
-   "don1_net_window_close": 0.137
-  },
-  "judged_kaido_early": {
-   "n": 7,
-   "diff_mean": 0.214,
-   "now": {
-    "picks_article": 0,
-    "picks_cpu": 7,
-    "mean": -0.055,
-    "corr_with_diff": -0.499,
-    "gain_if_followed": 0.0
-   },
-   "tree": {
-    "picks_article": 7,
-    "picks_cpu": 0,
-    "mean": 0.255,
-    "corr_with_diff": 0.62,
-    "gain_if_followed": 0.214
-   },
-   "tree2": {
-    "picks_article": 7,
-    "picks_cpu": 0,
-    "mean": 0.284,
-    "corr_with_diff": 0.639,
-    "gain_if_followed": 0.214
-   },
-   "next": {
-    "picks_article": 7,
-    "picks_cpu": 0,
-    "mean": 0.259,
-    "corr_with_diff": 0.821,
-    "gain_if_followed": 0.214
-   },
-   "next_net": {
-    "picks_article": 7,
-    "picks_cpu": 0,
-    "mean": 0.228,
-    "corr_with_diff": 0.492,
-    "gain_if_followed": 0.214
-   },
-   "don1_net_next_head": 0.323,
-   "don1_ref_next_head": 0.388,
-   "don1_net_window_close": 0.16
-  },
-  "judged_kaido_use": {
-   "n": 6,
-   "diff_mean": -0.042,
-   "now": {
-    "picks_article": 0,
-    "picks_cpu": 6,
-    "mean": -0.088,
-    "corr_with_diff": -0.406,
-    "gain_if_followed": 0.0
-   },
-   "tree": {
-    "picks_article": 2,
-    "picks_cpu": 4,
-    "mean": -0.034,
-    "corr_with_diff": 0.604,
-    "gain_if_followed": 0.01
-   },
-   "tree2": {
-    "picks_article": 2,
-    "picks_cpu": 4,
-    "mean": -0.014,
-    "corr_with_diff": 0.394,
-    "gain_if_followed": 0.01
-   },
-   "next": {
-    "picks_article": 4,
-    "picks_cpu": 2,
-    "mean": -0.093,
-    "corr_with_diff": 0.861,
-    "gain_if_followed": 0.042
-   },
-   "next_net": {
-    "picks_article": 2,
-    "picks_cpu": 4,
-    "mean": -0.099,
-    "corr_with_diff": 0.832,
-    "gain_if_followed": 0.0
-   },
-   "don1_net_next_head": 0.063,
-   "don1_ref_next_head": 0.063,
-   "don1_net_window_close": 0.055
-  },
-  "judged_mihawk": {
-   "n": 8,
-   "diff_mean": 0.062,
-   "now": {
-    "picks_article": 1,
-    "picks_cpu": 7,
-    "mean": -0.146,
-    "corr_with_diff": -0.102,
-    "gain_if_followed": -0.008
-   },
-   "tree": {
-    "picks_article": 1,
-    "picks_cpu": 7,
-    "mean": -0.101,
-    "corr_with_diff": 0.859,
-    "gain_if_followed": 0.023
-   },
-   "tree2": {
-    "picks_article": 1,
-    "picks_cpu": 7,
-    "mean": -0.096,
-    "corr_with_diff": 0.693,
-    "gain_if_followed": 0.016
-   },
-   "next": {
-    "picks_article": 3,
-    "picks_cpu": 5,
-    "mean": 0.006,
-    "corr_with_diff": 0.283,
-    "gain_if_followed": 0.047
-   },
-   "next_net": {
-    "picks_article": 3,
-    "picks_cpu": 5,
-    "mean": 0.004,
-    "corr_with_diff": -0.106,
-    "gain_if_followed": 0.008
-   },
-   "don1_net_next_head": 0.133,
-   "don1_ref_next_head": 0.204,
-   "don1_net_window_close": 0.103
-  },
-  "extra_early": {
-   "n": 40,
-   "diff_mean": null,
-   "now": {
-    "picks_article": 0,
-    "picks_cpu": 40,
-    "mean": -0.036,
-    "corr_with_diff": null,
-    "gain_if_followed": null
-   },
-   "tree": {
-    "picks_article": 27,
-    "picks_cpu": 13,
-    "mean": 0.096,
-    "corr_with_diff": null,
-    "gain_if_followed": null
-   },
-   "tree2": {
-    "picks_article": 25,
-    "picks_cpu": 15,
-    "mean": 0.104,
-    "corr_with_diff": null,
-    "gain_if_followed": null
-   },
-   "next": {
-    "picks_article": 25,
-    "picks_cpu": 15,
-    "mean": 0.103,
-    "corr_with_diff": null,
-    "gain_if_followed": null
-   },
-   "next_net": {
-    "picks_article": 24,
-    "picks_cpu": 16,
-    "mean": 0.041,
-    "corr_with_diff": null,
-    "gain_if_followed": null
-   },
-   "don1_net_next_head": 0.172,
-   "don1_ref_next_head": 0.272,
-   "don1_net_window_close": 0.132
-  },
-  "early_all": {
-   "n": 47,
-   "diff_mean": 0.214,
-   "now": {
-    "picks_article": 0,
-    "picks_cpu": 47,
-    "mean": -0.039,
-    "corr_with_diff": -0.499,
-    "gain_if_followed": 0.0
-   },
-   "tree": {
-    "picks_article": 34,
-    "picks_cpu": 13,
-    "mean": 0.12,
-    "corr_with_diff": 0.62,
-    "gain_if_followed": 0.032
-   },
-   "tree2": {
-    "picks_article": 32,
-    "picks_cpu": 15,
-    "mean": 0.131,
-    "corr_with_diff": 0.639,
-    "gain_if_followed": 0.032
-   },
-   "next": {
-    "picks_article": 32,
-    "picks_cpu": 15,
-    "mean": 0.126,
-    "corr_with_diff": 0.821,
-    "gain_if_followed": 0.032
-   },
-   "next_net": {
-    "picks_article": 31,
-    "picks_cpu": 16,
-    "mean": 0.069,
-    "corr_with_diff": 0.492,
-    "gain_if_followed": 0.032
-   },
-   "don1_net_next_head": 0.194,
-   "don1_ref_next_head": 0.289,
-   "don1_net_window_close": 0.137
+  "total": 350,
+  "per_type": 50,
+  "eval_failures": 0,
+  "changed_640w2": 97,
+  "judged": 97,
+  "battle_life1_skipped": {
+   "counter": 12,
+   "blocker": 11,
+   "checked": 123
   }
  },
- "kaido_gain_per_point": {
-  "tree": 0.094,
-  "tree2": 0.086,
-  "next": 0.094,
-  "tree_own_turn_le3": 0.083
+ "offsets": {
+  "read": 10000,
+  "judge": 11000
+ },
+ "judge_k": 16,
+ "types": {
+  "counter": {
+   "n": 50,
+   "m_mean": 3.88,
+   "change_160w2": 0.24,
+   "change_160w4": 0.24,
+   "change_640w2": 0.36,
+   "change_640w4": 0.34,
+   "change_netw4": 0.08,
+   "judged": {
+    "n": 18,
+    "mean": 0.0208,
+    "ci": [
+     -0.0325,
+     0.0742
+    ]
+   },
+   "judged_sig_tree_better": 0,
+   "judged_sig_now_better": 0,
+   "gain_per_point": 0.007,
+   "corr_tree_vs_diff": 0.232,
+   "corr_next_vs_diff": 0.249,
+   "next_agrees_with_tree": 11,
+   "next_measured": 18,
+   "sec_tree_mean": 16.17,
+   "sec_tree_per_cand": 4.139,
+   "by_src": {
+    "hb": {
+     "n": 25,
+     "changed": 9,
+     "judged": {
+      "n": 9,
+      "mean": -0.0139,
+      "ci": [
+       -0.1,
+       0.0722
+      ]
+     }
+    },
+    "kr": {
+     "n": 4,
+     "changed": 2,
+     "judged": {
+      "n": 2,
+      "mean": 0.125,
+      "ci": [
+       -0.12,
+       0.37
+      ]
+     }
+    },
+    "m5": {
+     "n": 21,
+     "changed": 7,
+     "judged": {
+      "n": 7,
+      "mean": 0.0357,
+      "ci": [
+       -0.0095,
+       0.0809
+      ]
+     }
+    }
+   }
+  },
+  "blocker": {
+   "n": 50,
+   "m_mean": 2.1,
+   "change_160w2": 0.4,
+   "change_160w4": 0.44,
+   "change_640w2": 0.46,
+   "change_640w4": 0.48,
+   "change_netw4": 0.12,
+   "judged": {
+    "n": 23,
+    "mean": -0.0027,
+    "ci": [
+     -0.034,
+     0.0285
+    ]
+   },
+   "judged_sig_tree_better": 0,
+   "judged_sig_now_better": 0,
+   "gain_per_point": -0.001,
+   "corr_tree_vs_diff": 0.042,
+   "corr_next_vs_diff": 0.193,
+   "next_agrees_with_tree": 15,
+   "next_measured": 23,
+   "sec_tree_mean": 11.08,
+   "sec_tree_per_cand": 5.144,
+   "by_src": {
+    "hb": {
+     "n": 24,
+     "changed": 8,
+     "judged": {
+      "n": 8,
+      "mean": 0.0156,
+      "ci": [
+       -0.0399,
+       0.0711
+      ]
+     }
+    },
+    "kr": {
+     "n": 12,
+     "changed": 8,
+     "judged": {
+      "n": 8,
+      "mean": -0.0391,
+      "ci": [
+       -0.085,
+       0.0069
+      ]
+     }
+    },
+    "m5": {
+     "n": 14,
+     "changed": 7,
+     "judged": {
+      "n": 7,
+      "mean": 0.0179,
+      "ci": [
+       -0.0402,
+       0.0759
+      ]
+     }
+    }
+   }
+  },
+  "confirm_own": {
+   "n": 50,
+   "m_mean": 2.0,
+   "change_160w2": 0.1,
+   "change_160w4": 0.1,
+   "change_640w2": 0.08,
+   "change_640w4": 0.08,
+   "change_netw4": 0.02,
+   "judged": {
+    "n": 4,
+    "mean": 0.0156,
+    "ci": [
+     -0.1928,
+     0.2241
+    ]
+   },
+   "judged_sig_tree_better": 1,
+   "judged_sig_now_better": 0,
+   "gain_per_point": 0.001,
+   "corr_tree_vs_diff": -0.81,
+   "corr_next_vs_diff": 0.596,
+   "next_agrees_with_tree": 2,
+   "next_measured": 4,
+   "sec_tree_mean": 9.73,
+   "sec_tree_per_cand": 4.864,
+   "by_src": {
+    "hb": {
+     "n": 25,
+     "changed": 3,
+     "judged": {
+      "n": 3,
+      "mean": 0.0833,
+      "ci": [
+       -0.144,
+       0.3107
+      ]
+     }
+    },
+    "kr": {
+     "n": 9,
+     "changed": 0,
+     "judged": {
+      "n": 0,
+      "mean": null,
+      "ci": [
+       null,
+       null
+      ]
+     }
+    },
+    "m5": {
+     "n": 16,
+     "changed": 1,
+     "judged": {
+      "n": 1,
+      "mean": -0.1875,
+      "ci": [
+       null,
+       null
+      ]
+     }
+    }
+   }
+  },
+  "confirm_opp": {
+   "n": 50,
+   "m_mean": 2.0,
+   "change_160w2": 0.2,
+   "change_160w4": 0.14,
+   "change_640w2": 0.24,
+   "change_640w4": 0.22,
+   "change_netw4": 0.12,
+   "judged": {
+    "n": 12,
+    "mean": 0.0833,
+    "ci": [
+     -0.0268,
+     0.1935
+    ]
+   },
+   "judged_sig_tree_better": 2,
+   "judged_sig_now_better": 0,
+   "gain_per_point": 0.02,
+   "corr_tree_vs_diff": 0.34,
+   "corr_next_vs_diff": 0.347,
+   "next_agrees_with_tree": 5,
+   "next_measured": 12,
+   "sec_tree_mean": 12.16,
+   "sec_tree_per_cand": 6.082,
+   "by_src": {
+    "hb": {
+     "n": 25,
+     "changed": 6,
+     "judged": {
+      "n": 6,
+      "mean": 0.0729,
+      "ci": [
+       -0.1044,
+       0.2502
+      ]
+     }
+    },
+    "kr": {
+     "n": 8,
+     "changed": 5,
+     "judged": {
+      "n": 5,
+      "mean": 0.1125,
+      "ci": [
+       -0.0625,
+       0.2875
+      ]
+     }
+    },
+    "m5": {
+     "n": 17,
+     "changed": 1,
+     "judged": {
+      "n": 1,
+      "mean": 0.0,
+      "ci": [
+       null,
+       null
+      ]
+     }
+    }
+   }
+  },
+  "don_confirm": {
+   "n": 50,
+   "m_mean": 2.0,
+   "change_160w2": 0.04,
+   "change_160w4": 0.04,
+   "change_640w2": 0.1,
+   "change_640w4": 0.1,
+   "change_netw4": 0.06,
+   "judged": {
+    "n": 5,
+    "mean": -0.0375,
+    "ci": [
+     -0.2719,
+     0.1969
+    ]
+   },
+   "judged_sig_tree_better": 1,
+   "judged_sig_now_better": 1,
+   "gain_per_point": -0.004,
+   "corr_tree_vs_diff": 0.292,
+   "corr_next_vs_diff": 0.417,
+   "next_agrees_with_tree": 3,
+   "next_measured": 5,
+   "sec_tree_mean": 4.17,
+   "sec_tree_per_cand": 2.084,
+   "by_src": {
+    "hb": {
+     "n": 39,
+     "changed": 5,
+     "judged": {
+      "n": 5,
+      "mean": -0.0375,
+      "ci": [
+       -0.2719,
+       0.1969
+      ]
+     }
+    },
+    "kr": {
+     "n": 0,
+     "changed": 0,
+     "judged": {
+      "n": 0,
+      "mean": null,
+      "ci": [
+       null,
+       null
+      ]
+     }
+    },
+    "m5": {
+     "n": 11,
+     "changed": 0,
+     "judged": {
+      "n": 0,
+      "mean": null,
+      "ci": [
+       null,
+       null
+      ]
+     }
+    }
+   }
+  },
+  "select": {
+   "n": 50,
+   "m_mean": 4.8,
+   "change_160w2": 0.36,
+   "change_160w4": 0.34,
+   "change_640w2": 0.42,
+   "change_640w4": 0.48,
+   "change_netw4": 0.08,
+   "judged": {
+    "n": 21,
+    "mean": -0.0149,
+    "ci": [
+     -0.084,
+     0.0543
+    ]
+   },
+   "judged_sig_tree_better": 1,
+   "judged_sig_now_better": 2,
+   "gain_per_point": -0.006,
+   "corr_tree_vs_diff": 0.281,
+   "corr_next_vs_diff": -0.078,
+   "next_agrees_with_tree": 10,
+   "next_measured": 21,
+   "sec_tree_mean": 27.34,
+   "sec_tree_per_cand": 4.929,
+   "by_src": {
+    "hb": {
+     "n": 25,
+     "changed": 7,
+     "judged": {
+      "n": 7,
+      "mean": 0.0,
+      "ci": [
+       -0.0463,
+       0.0463
+      ]
+     }
+    },
+    "kr": {
+     "n": 5,
+     "changed": 4,
+     "judged": {
+      "n": 4,
+      "mean": -0.1562,
+      "ci": [
+       -0.4137,
+       0.1012
+      ]
+     }
+    },
+    "m5": {
+     "n": 20,
+     "changed": 10,
+     "judged": {
+      "n": 10,
+      "mean": 0.0312,
+      "ci": [
+       -0.0587,
+       0.1212
+      ]
+     }
+    }
+   }
+  },
+  "trigger": {
+   "n": 50,
+   "m_mean": 2.0,
+   "change_160w2": 0.24,
+   "change_160w4": 0.24,
+   "change_640w2": 0.28,
+   "change_640w4": 0.24,
+   "change_netw4": 0.04,
+   "judged": {
+    "n": 14,
+    "mean": -0.0625,
+    "ci": [
+     -0.2014,
+     0.0764
+    ]
+   },
+   "judged_sig_tree_better": 0,
+   "judged_sig_now_better": 1,
+   "gain_per_point": -0.018,
+   "corr_tree_vs_diff": 0.16,
+   "corr_next_vs_diff": 0.94,
+   "next_agrees_with_tree": 9,
+   "next_measured": 14,
+   "sec_tree_mean": 9.62,
+   "sec_tree_per_cand": 4.812,
+   "by_src": {
+    "hb": {
+     "n": 25,
+     "changed": 6,
+     "judged": {
+      "n": 6,
+      "mean": -0.1458,
+      "ci": [
+       -0.4663,
+       0.1746
+      ]
+     }
+    },
+    "kr": {
+     "n": 6,
+     "changed": 4,
+     "judged": {
+      "n": 4,
+      "mean": 0.0,
+      "ci": [
+       -0.05,
+       0.05
+      ]
+     }
+    },
+    "m5": {
+     "n": 19,
+     "changed": 4,
+     "judged": {
+      "n": 4,
+      "mean": 0.0,
+      "ci": [
+       -0.1,
+       0.1
+      ]
+     }
+    }
+   }
+  }
+ },
+ "overall_judged": {
+  "n": 97,
+  "mean": 0.0,
+  "ci": [
+   -0.034,
+   0.034
+  ]
+ },
+ "by_tree_margin": {
+  "lt0.05": {
+   "n": 53,
+   "mean": -0.024
+  },
+  "0.05-0.15": {
+   "n": 27,
+   "mean": 0.012
+  },
+  "ge0.15": {
+   "n": 17,
+   "mean": 0.055,
+   "ci": [
+    -0.027,
+    0.138
+   ]
+  },
+  "ge0.05": {
+   "n": 44,
+   "mean": 0.028,
+   "ci": [
+    -0.022,
+    0.079
+   ]
+  },
+  "ge0.1": {
+   "n": 28,
+   "mean": 0.031,
+   "ci": [
+    -0.026,
+    0.088
+   ]
+  }
+ },
+ "next_agrees": {
+  "agree": {
+   "n": 55,
+   "mean": 0.03
+  },
+  "disagree": {
+   "n": 42,
+   "mean": -0.039
+  },
+  "agree_and_margin_ge0.05": {
+   "n": 33,
+   "mean": 0.055,
+   "ci": [
+    -0.002,
+    0.112
+   ]
+  }
+ },
+ "cost": {
+  "now_window_sec": [
+   0.003,
+   0.012
+  ],
+  "tree_640x2worlds_sec_per_window": [
+   0.33,
+   2.83
+  ],
+  "windows_per_game_seat": 45.1,
+  "main_per_game_seat": 37.8,
+  "if_all_windows": "1 局の思考時間 2〜3 倍（見積もり）"
  },
  "conclusion": [
-  "今の読み（窓の根畳み）は紫カイドウの点の全部で使うを選ぶ（差は平均 0.05 前後）",
-  "窓を閉じた盤面から短い木（640 回）だと序盤 7 点の全部・記事が控える 18 点中 15 で控えるに変わる。次のターンの頭まで読むと 18 点中 16",
-  "読みの差と打ち比べの差の相関: 次のターンの頭 0.78・短い木 0.58・今の読み −0.12（32 点）",
-  "ネットはドン 1 枚を小さく見ていない（次のターンの頭で 0.18・序盤 0.32）が、窓を閉じた直後（相手のターンの途中）では半分ほど（0.11・0.16）",
-  "緑ミホーク（メインの木の選択）は短い木では変わらない＝段 2 の対象外を提案"
+  "窓全体に短い木を当てても平均は ±0.000（97 点・−0.034〜+0.034）。有意に良い種類は無い",
+  "手は 3〜5 割変わる（ブロック 46%・選択 42%・カウンター 36%）が、短い木の値の差が小さい所は損寄り（差 0.05 未満 −0.024）",
+  "良い向きは相手の手番の任意効果の確認だけ（12 点 +0.083・−0.027〜+0.194）。大きく勝ったのは代金を払って相手のアタックに応じる効果を控える点（§7.66 と同じ型）",
+  "費用は全部に当てると 1 局 2〜3 倍"
  ],
  "prediction_check": {
-  "next_turn_mostly_decline": "当たり（16/18）",
-  "short_tree_about_half": "外れ（もっと多い 15/18）",
-  "net_sees_don_small": "外れ（大きく見る・ただし相手のターンの途中では割り引く）"
+  "change_rate_don_max_60pct": "外れ（10%・紫カイドウは確認の分類に入った）",
+  "confirm_select_20_30pct": "相手の手番の確認 24% は当たり・自分の手番 8%・選択 42% は外れ",
+  "counter_block_10s_pct": "外れ（36%・46%）",
+  "short_tree_better_for_don_and_confirm": "外れ（有意なし・相手の手番の確認が向きだけ合う）",
+  "counter_block_no_diff": "当たり",
+  "time_1.3_1.5x": "外れ（全部に当てると 2〜3 倍）"
  },
- "proposal_stage2": "ドンを代金にする確認の窓だけ短い木（世界 2 本・640 回・§2.5.12 の 3 と同じ道具）＋序盤だけに限る旗・既定 off・符号化は変えない",
+ "decision_needed": "段 2 の対象: (a) 相手の手番の任意効果の確認だけ (b) 短い木の差が閾値以上のときだけ変える (c) §7.66 の紫カイドウ型（ドンを代金に相手のアタックに応じる確認の序盤）(d) やめる。推薦は (a) と (c) を別の旗で作り段 4 で比べ、どちらにも (b) の差 0.05 の決まりを足す",
  "notes": [
-  "試験台は CPU が記事と違う手を打った点なので、今の読みが CPU の手を選ぶのは選び方の結果。CPU が控えた序盤の点で短い木が逆に使うへ変えないかは未測定（段 3・4 で確かめる）",
-  "短い木は Python から同じ形を組んだもの（窓を閉じた盤面の値が今の読みと一致することは確認）。木の乱数の配り方はエンジンの実装と違う",
-  "記事が使う 6 点では短い木が 4 点で控えるを選ぶが、その 4 点は打ち比べでも控えるが良かった（−0.08）",
-  "作業セッション j3 は RESULT.json を上書きしていたので、読みのファイルだけ回収した",
-  "make test を回すため fastapi などを opcg_sim/requirements.txt から入れた（この環境の初期状態には無かった）"
+  "紫カイドウのリーダー効果は「使う」を当てた直後にはドンが減らない（対象選択の後に払う）ので、この WP の「ドンを代金にする確認」でなく任意効果の確認に分類された",
+  "短い木は Python から同じ形を組んだもの（窓を閉じた盤面の値は今の窓の値と一致を確認）",
+  "eval は当初作業セッションに分けるつもりだったが速かったので全部このセッションで回した（コーディネータに連絡済み）",
+  "打ち比べで 2 点に一部の世界の打ち切り（no_winner 等）があったが、対は決着した世界だけで取った"
  ]
 }
