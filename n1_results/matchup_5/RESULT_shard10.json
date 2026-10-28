@@ -1,0 +1,1 @@
+{"shard": 10, "branch": "claude/matchup-5-j10", "status": "done", "notes": "13/13 points judged (k=16, workers=4), all ok=True. Total ~2564s. Pool-wide pgrep self-matching made one wait loop spin; no effect on results."}
