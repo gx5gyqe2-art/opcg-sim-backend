@@ -1,10 +1,11 @@
 """対面記事 5 本でほかのデッキの進行も突き合わせる（WP `matchup-5`・`docs/search_efficiency_plan.md` §7.65・台帳 2+471）。
 
-`matchup_kr.py`（紫カイドウ対青ロックス・§7.63）を 5 つの対面に一般化したもの。読み取りだけの計測
+`matchup_kr.py`（紫カイドウ対青ロックス・§7.63）を 6 つの対面に一般化したもの（5 本の記事＋紫カイドウ対青ロックスの打ち直し）。
+デッキは記事のデッキ（`tests/fixtures/decks/article_decks_20261027.json`）。読み取りだけの計測
 （エンジン・ネット・既定の挙動は変えない）。1 回きりの計測＝テストは足さない（CLAUDE.md の理論の道具の規約）。
 
 対面（`docs/matchup_items/README.md` の表）。視点の側を常に **p1**。局の番号 i（0〜119）の seed は帯の先頭＋i、
-i < 60 は視点の側の先攻・i ≥ 60 は後攻。両席とも r27・出荷の設定（`blunder_audit.ship_spec`）。
+i < 60 は視点の側の先攻・i ≥ 60 は後攻（6 対面 × 120 局＝720 局）。両席とも r27・出荷の設定（`blunder_audit.ship_spec`）。
 
 1. ``play``: 局を打ち、全ての判断点で打った手・決め方・根の候補の上位 8 を記録する（`games_shard*.jsonl`）。
    シャードは「先攻の局と後攻の局の組」（同じ対面の i と i＋60）を単位に配る＝どのシャードも先攻と後攻が半々。
@@ -13,16 +14,15 @@ i < 60 は視点の側の先攻・i ≥ 60 は後攻。両席とも r27・出荷
 4. ``judge``: 比べる点を 1 点 16 通りで打ち比べる（`judge_points*.jsonl`・`--shard i/n`）。
 5. ``summary``: 対面ごとの集計と横断のまとめ（`summary.json`）。
 
-    python tests/scripts/matchup_5.py play --workers 4 --shard 0/16
+    python tests/scripts/matchup_5.py play --workers 4 --shard 0/18
     python tests/scripts/matchup_5.py trace
     python tests/scripts/matchup_5.py items
-    python tests/scripts/matchup_5.py judge --workers 4 --shard 0/16
+    python tests/scripts/matchup_5.py judge --workers 4 --shard 0/18
     python tests/scripts/matchup_5.py summary
 
 再開できる（終えた局・点は飛ばす）。
 """
 import argparse
-import glob
 import json
 import os
 import sys
@@ -39,17 +39,30 @@ from opcg_sim.loop import driver as DR, engine as E  # noqa: E402
 OUT_DIR = os.path.join("n1_results", "matchup_5")
 NET = KR.NET
 #: 対面 → (視点の側のデッキ, 相手のデッキ, seed の帯の先頭, 表の名前)
+#: 記事のデッキ（ユーザが送った画像から書き起こし・`docs/matchup_items/README.md` の末尾の表）
+DECKS = os.path.join("tests", "fixtures", "decks", "article_decks_20261027.json")
+#: 対面 → (視点の側のデッキ, 相手のデッキ, seed の帯の先頭, 表の名前)
 MU = {
-    "enel_rocks": ("deck_099", "deck_112", 4251000, "紫エネル 対 青ロックス"),
-    "bluffy_sabo": ("deck_114", "deck_086", 4252000, "黒ルフィ 対 赤黒サボ"),
-    "rocks_mirror": ("deck_112", "deck_112", 4253000, "青ロックス ミラー"),
-    "mihawk_sabo": ("deck_096", "deck_086", 4254000, "緑ミホーク 対 赤黒サボ"),
-    "rocks_sabo": ("deck_112", "deck_086", 4255000, "青ロックス 対 赤黒サボ"),
+    "enel_rocks": ("enel_1021", "rocks_enel_article_1021", 4251000, "紫エネル 対 青ロックス"),
+    "bluffy_sabo": ("bluffy_1024", "sabo_bluffy_article_1024", 4252000, "黒ルフィ 対 赤黒サボ"),
+    "rocks_mirror": ("rocks_fortress_1005", "rocks_fortress_1005", 4253000, "青ロックス ミラー"),
+    "mihawk_sabo": ("mihawk_0917", "sabo_mihawk_article_0917", 4254000, "緑ミホーク 対 赤黒サボ"),
+    "rocks_sabo": ("rocks_sabo_article_1015", "sabo_rocks_article_1015", 4255000, "青ロックス 対 赤黒サボ"),
+    "kaido_rocks": ("kaido_1027", "rocks_kaido_article_1027", 4256000, "紫カイドウ 対 青ロックス"),
 }
 N_GAMES = 120
 #: 判定の配り方の番号のずらし（blunder_audit 0〜2000 番台・hold_bias 3000・small_play 4000・matchup_kr 7000 と重ねない）。
 OFFSET = 8000
 _G = {}
+
+
+def deck(name):
+    x = json.load(open(DECKS, encoding="utf-8"))[name]
+    cs = []
+    for cid, n in x["cards"].items():
+        cs += [cid] * int(n)
+    assert len(cs) == 50, (name, len(cs))
+    return x["leader"], cs
 
 
 def game_setup(mu, idx):
@@ -59,7 +72,7 @@ def game_setup(mu, idx):
 
 def new_game(mu, idx):
     seed, first = game_setup(mu, idx)
-    return DR.new_game(seed, KR.deck(MU[mu][0]), KR.deck(MU[mu][1]), first)
+    return DR.new_game(seed, deck(MU[mu][0]), deck(MU[mu][1]), first)
 
 
 def replay(g, step):
@@ -107,7 +120,7 @@ def play_one(job):
 
     t0 = time.perf_counter()
     try:
-        r = DR.run_game(seed, {"p1": spec, "p2": spec}, KR.deck(MU[mu][0]), KR.deck(MU[mu][1]), first_player=first, observer=obs)
+        r = DR.run_game(seed, {"p1": spec, "p2": spec}, deck(MU[mu][0]), deck(MU[mu][1]), first_player=first, observer=obs)
         winner, turns, void = r["winner"], r["turns"], r["winner"] is None
     except DR.GameAborted as exc:
         winner, turns, void = None, None, str(exc)
@@ -192,23 +205,33 @@ def cmd_trace(a):
 
 # ---------------------------------------------------------------- 3. items
 
-#: 記事の愛称 → カード番号（カード DB の名前とコストで引き当て・報告の表と同じ）。構築例に無い札は持たない。
-# 紫エネル（deck_099）
-E6 = {"OP15-060", "OP15-118"}
-OHM, GEDATSU, SATORI, SHURA, SHINPEI, NORA = "OP15-061", "OP15-063", "OP15-066", "OP15-067", "OP15-068", "OP15-069"
+#: 記事の愛称 → カード番号（カード DB の名前とコストで引き当て・報告の表と同じ）。記事のデッキに無い札は持たない。
+# 紫エネル（enel_1021）
+E6 = {"OP15-118"}
+OHM, SATORI, SHURA, PURIN = "OP15-061", "OP15-066", "OP15-067", "OP12-071"
 HODEN, SABAKI, RAIJU, RAIRYU, BANRAI = "OP15-074", "OP15-075", "OP15-076", "OP15-077", "OP15-078"
-ENEL_ONE = {OHM, GEDATSU, SATORI, SHURA, SHINPEI, NORA}
-ENEL_REMOVAL = {SABAKI, RAIJU, RAIRYU, BANRAI}
-# 青ロックス（deck_112）
+LAW4, REIJU, PINK, GAMMA, GOMU_KAMINARI, KAMISAKE = "ST10-010", "OP12-063", "OP10-067", "OP05-077", "OP09-077", "OP13-076"
+ENEL_ONE = {OHM, SATORI, SHURA, PURIN}
+ENEL_REMOVAL = {SABAKI, RAIJU, RAIRYU, BANRAI, GAMMA, GOMU_KAMINARI, KAMISAKE}
+# 青ロックス（rocks_*）
 STROI, KYO, MARLON, STUSSY = "OP17-050", "OP17-045", "OP17-052", "OP17-054"
 KAIDO4, JOHN, GLORI, LINLIN, NEWGATE, SHIKI, ROCKS10 = ("OP17-042", "OP17-044", "OP17-046", "OP17-049", "OP17-040",
                                                         "OP17-048", "OP17-118")
-# 黒ルフィ（deck_114）
+GANZUI, DREAM, BUCKIN = "OP17-043", "EB02-030", "OP08-051"
+# 黒ルフィ（bluffy_1024）・赤黒サボ エルバフ型（sabo_*）
 USOPP, GERZ, SANJI, ROBIN, BROOK, ZORO = "OP17-080", "OP17-081", "OP17-082", "OP17-087", "OP17-091", "OP17-095"
-SAURO, LOKI, LUFFY8, CHOPPER = "OP17-089", "OP17-119", "OP17-093", "OP17-084"
-LUFFY_TWO = {USOPP, GERZ, SANJI, ROBIN, BROOK, ZORO}
-# 緑ミホーク（deck_096）
+SAURO, LOKI, LUFFY8, CHOPPER, DOCK6, SUNNY = "OP17-089", "OP17-119", "OP17-093", "OP17-084", "OP15-088", "ST14-017"
+LUFFY_TWO = {USOPP, GERZ, SANJI, ROBIN, BROOK, ZORO, "OP17-083", "ST31-003"}
+# 緑ミホーク（mihawk_0917）
 KANSEN, MIHAWK_L = "OP14-039", "OP14-020"
+KIN1, PERONA1, OTAMA, DECKEN = "ST32-001", "OP12-034", "OP07-022", "OP06-033"
+ODEN5, BONNEY5, KAWAMATSU, YASOPP5, LAW6, LAWBEPO, SHANKS10 = ("ST32-002", "OP12-118", "OP12-023", "OP17-031", "OP13-031",
+                                                              "ST24-004", "OP17-022")
+MH_ONE = {KIN1, PERONA1}
+MH_FIVE = {ODEN5, BONNEY5, KAWAMATSU, YASOPP5}
+# 紫カイドウ（kaido_1027・matchup_kr の番号を使う）
+K6, Q1, Y3, H3, BK, RK, OK, L10, HIHO = KR.K6, KR.Q1, KR.Y3, KR.H3, KR.BK, KR.RK, KR.OK, KR.L10, KR.HIHO
+ACCEL = [Q1, Y3, H3]
 
 #: 項目 → (表の名前, 型)。型: resource＝ドン・リソースの読み／order＝展開の順番／target＝除去・攻撃の対象／
 #: defense＝守り／lethal＝リーサル／mull＝マリガン・先後
@@ -227,6 +250,12 @@ ITEMS = {
     "shiki_keep": ("7シキを速攻で即レストにしない", "defense"),
     "shiki_rush": ("4 ターン目の 7シキは速攻でレストのキャラを取る", "target"),
     "mihawk_leader": ("リーダー効果はキャラを出してから使う", "resource"),
+    "perona_t1": ("1ペローナを先攻 1 ターン目に出さない", "order"),
+    "kr_leader": ("リーダー効果（ドンを戻して −2000）の時期", "resource"),
+    "kr_k6bounce": ("6キングが返された後の組み立て", "order"),
+    "kr_bk_keep": ("シキがいる局面でブロッカーカイドウを守りに残す", "defense"),
+    "kr_rk_john": ("除去カイドウの対象（キャプテン・ジョン）", "target"),
+    "kaido_banrai": ("万雷は序盤カウンターとして使う", "defense"),
 }
 
 
@@ -234,44 +263,123 @@ def S(*xs):
     return [set([x]) if isinstance(x, str) else set(x) for x in xs]
 
 
+def _hand(row):
+    return row["st"][row["seat"]]["hand"]
+
+
+def _opp_field(row):
+    return row["st"]["p2" if row["seat"] == "p1" else "p1"]["field"]
+
+
+def _my_field(row):
+    return row["st"][row["seat"]]["field"]
+
+
+def _enel_t1(row):
+    """先 1・後 1: プリン・シュラ・6エネルが揃うならプリンだけ（シュラは次へ）、揃わないならサトリ＞ほかの 1 コスト。"""
+    h = _hand(row)
+    if PURIN in h and SHURA in h and any(c in h for c in E6):
+        return S(PURIN)
+    return S(SATORI, ENEL_ONE - {SATORI})
+
+
 def _enel_t2(row):
-    """先 2・後 2: 手札にシュラと 6エネルがあればシュラ。"""
-    hand = row["st"]["p1"]["hand"]
-    return S(SHURA) if SHURA in hand and any(c in hand for c in E6) else []
+    """先 2・後 2: 手札にシュラと 6エネルがあればシュラ（後 2 はシュラが無ければロー／レイジュ）。"""
+    h = _hand(row)
+    return S(SHURA) if SHURA in h and any(c in h for c in E6) else []
+
+
+def _enel_s2(row):
+    return _enel_t2(row) or S({LAW4, REIJU})
 
 
 def _mirror_t3(row):
     """先 3: 相手が後 2 にキャプテン・ジョンを置いていたら 4カイドウ／グロリオーサ、でなければ 5リンリン。"""
-    opp = "p2" if row["seat"] == "p1" else "p1"
-    return S(KAIDO4, GLORI) if any(c[0] == JOHN for c in row["st"][opp]["field"]) else S(LINLIN)
+    return S(KAIDO4, GLORI) if any(c[0] == JOHN for c in _opp_field(row)) else S(LINLIN)
+
+
+def _luffy_f2(row):
+    """先 2: 2ウソップ（次点 2サンジ・無ければ別の 2 コスト）。両方あれば 2サンジでウソップを捨てる。"""
+    h = _hand(row)
+    return S(SANJI) if SANJI in h and USOPP in h else S(USOPP, SANJI, LUFFY_TWO)
+
+
+def _luffy_f3(row):
+    """先 3: サニー号が出ていればドッキング6、無ければ 4サウロ。"""
+    stage = row["st"][row["seat"]]["stage"]
+    return S(DOCK6) if SUNNY in stage else S(SAURO, DOCK6)
 
 
 def _luffy_s4(row):
     """後 4: 前のターンにロキが出ていれば 8ルフィ、でなければロキ。"""
-    return S(LUFFY8) if any(c[0] == LOKI for c in row["st"]["p1"]["field"]) else S(LOKI)
+    return S(LUFFY8) if any(c[0] == LOKI for c in _my_field(row)) else S(LOKI)
+
+
+def _mh_f1(row):
+    """先 1: 棺船か錦えもんがあるときだけ出す（ペローナは出さない）。"""
+    return S(KANSEN, KIN1)
+
+
+def _mh_s1(row):
+    """後 1: 1ペローナ（ペローナと錦えもんが両方あるなら錦えもんだけ）。"""
+    h = _hand(row)
+    return S(KIN1) if KIN1 in h and PERONA1 in h else S(PERONA1, KIN1)
+
+
+def _rs_f3(row):
+    """青ロックス対赤黒サボの先 3: 相手の 2 コストが 2 枚以上ならガンズイ、でなければ 5リンリン（無ければもう一方）。"""
+    n2 = sum(1 for c in _opp_field(row) if str(cname(c[0])[1]) == "2")
+    return S(GANZUI, LINLIN) if n2 >= 2 else S(LINLIN, GANZUI)
 
 
 ROCKS_MIRROR_IDEAL = {"first": {1: S(STROI), 2: S(KYO), 3: _mirror_t3, 4: S(SHIKI, NEWGATE), 5: S(SHIKI, STUSSY)},
                       "second": {1: S(KYO, STROI), 2: S(JOHN), 3: S(NEWGATE, LINLIN, GLORI), 4: S(SHIKI), 5: S(ROCKS10),
                                  6: S(ROCKS10, JOHN, STUSSY)},
                       "late": (6, S(ROCKS10))}
+#: 赤黒サボ（エルバフ型）の理想の展開（青ロックス対赤黒サボの記事 §4: 2 コスト → 2 コスト 2 枚か 4サウロ → ロキ → 8ルフィ）
+SABO_IDEAL = {"first": {1: S(LUFFY_TWO), 2: S(SAURO, LUFFY_TWO), 3: S(LOKI), 4: S(LUFFY8)},
+              "second": {1: S(LUFFY_TWO), 2: S(SAURO, LUFFY_TWO), 3: S(LOKI), 4: S(LUFFY8)}}
+#: 紫カイドウ（§7.63 の (3)・記事のデッキは 10リンリンを持つ）
+KAIDO_IDEAL = {"first": {1: S(*ACCEL), 2: S(*ACCEL), 3: S(K6), 4: S(BK), 5: S(BK, OK, RK, L10)},
+               "second": {1: S(*ACCEL), 2: S(*ACCEL), 3: S(K6), 4: S(BK), 5: S(BK, OK, RK, L10)},
+               "late": (6, S(L10, OK, RK))}
+#: 青ロックス側（紫カイドウの記事: 1〜2 シュトロイゼン・マーロン／ステューシー・凶、3 5リンリン・4 コスト 6000、5 シキ、6 10ロックス）
+ROCKS_VS_KAIDO = {"first": {1: S({STROI, MARLON, STUSSY, KYO}), 2: S({STROI, MARLON, STUSSY, KYO}), 3: S(LINLIN, {KAIDO4, JOHN}),
+                            5: S(SHIKI), 6: S(ROCKS10)},
+                  "second": {1: S({STROI, MARLON, STUSSY, KYO}), 2: S({STROI, MARLON, STUSSY, KYO}), 3: S(LINLIN, {KAIDO4, JOHN}),
+                             5: S(SHIKI), 6: S(ROCKS10)}}
+
+
+def _kaido_mull(hand, first):
+    nq = hand.count(Q1)
+    if first:
+        return (K6 in hand and (Q1 in hand or Y3 in hand)) or (HIHO in hand and any(x in hand for x in ACCEL)) or nq >= 2
+    return K6 in hand or nq >= 2 or HIHO in hand
+
+
+def _mh_mull(hand, first):
+    n1 = sum(1 for c in hand if c in MH_ONE)
+    big = MH_FIVE if first else MH_FIVE | {LAW6}
+    return n1 >= 2 or (n1 >= 1 and any(c in hand for c in big))
+
+
 #: 対面 → 設定。ideal は視点の側（p1）の理想の展開（自分の何ターン目 → 出す札の優先順。関数は盤面で決まる）・
 #: opp_ideal は相手側（記事に書いてあれば）・mull は (手札, 先攻か) → 基準の内か（None＝測れない）。
 CFG = {
     "enel_rocks": {
-        "ideal": {"first": {1: S(SATORI, ENEL_ONE - {SATORI}), 2: _enel_t2, 3: S(E6), 4: S(E6)},
-                  "second": {1: S(SATORI, ENEL_ONE - {SATORI}), 2: _enel_t2, 3: S(E6)}},
+        "ideal": {"first": {1: _enel_t1, 2: _enel_t2, 3: S(E6), 4: S(E6), 5: S(REIJU, LAW4)},
+                  "second": {1: _enel_t1, 2: _enel_s2, 3: S(E6), 4: S(REIJU, LAW4), 5: S(LAW4, REIJU)}},
         "opp_ideal": {"first": {1: S(KYO), 3: S(NEWGATE), 4: S(LINLIN, {MARLON, STUSSY}), 5: S(ROCKS10)},
                       "second": {1: S(KYO), 3: S(NEWGATE), 4: S(LINLIN, {MARLON, STUSSY}), 5: S(ROCKS10)}},
         "mull": lambda hand, first: any(c in hand for c in E6) and any(c in hand for c in ENEL_ONE),
         "items": ["mull", "ideal", "enel_kyo", "enel_shiki", "enel_hold", "enel_banrai"],
     },
     "bluffy_sabo": {
-        "ideal": {"first": {2: S(USOPP, SANJI, LUFFY_TWO), 3: S(SAURO), 4: S(LOKI), 5: S(LUFFY8)},
-                  "second": {1: S(USOPP, SANJI, LUFFY_TWO), 2: S(SAURO, ZORO), 3: S(LOKI), 4: _luffy_s4, 5: S(LUFFY8, LOKI)},
+        "ideal": {"first": {1: S(SUNNY), 2: _luffy_f2, 3: _luffy_f3, 4: S(LOKI, DOCK6), 5: S(LUFFY8)},
+                  "second": {1: S(USOPP, SANJI, LUFFY_TWO), 2: S(SAURO, ZORO), 3: S(LOKI, DOCK6), 4: _luffy_s4, 5: S(LUFFY8, LOKI)},
                   "late": (6, S(LUFFY8, LOKI))},
-        "opp_ideal": None,
-        "mull": lambda hand, first: USOPP in hand and (LOKI in hand if first else (SAURO in hand or LOKI in hand)),
+        "opp_ideal": SABO_IDEAL,
+        "mull": lambda hand, first: USOPP in hand and ((DOCK6 in hand or LOKI in hand) if first else (SAURO in hand or LOKI in hand)),
         "items": ["mull", "ideal", "atk_leader", "luffy8_pick", "loki_keep"],
     },
     "rocks_mirror": {
@@ -282,18 +390,27 @@ CFG = {
         "items": ["mull", "ideal", "shiki_keep"],
     },
     "mihawk_sabo": {
-        "ideal": {"first": {1: S(KANSEN)}, "second": {1: S(KANSEN)}},
-        "opp_ideal": None,
-        "mull": lambda hand, first: None,
-        "items": ["mull", "ideal", "atk_leader", "mihawk_leader"],
+        "ideal": {"first": {1: _mh_f1, 2: S(PERONA1), 3: S(YASOPP5, ODEN5, BONNEY5), 4: S(LAW6), 5: S(LAW6)},
+                  "second": {1: _mh_s1, 3: S(LAW6)},
+                  "late": (6, S(SHANKS10))},
+        "opp_ideal": SABO_IDEAL,
+        "mull": _mh_mull,
+        "items": ["mull", "ideal", "perona_t1", "atk_leader", "mihawk_leader"],
     },
     "rocks_sabo": {
-        "ideal": {"first": {2: S(KYO, MARLON), 3: S(LINLIN), 4: S(SHIKI), 5: S(SHIKI, STUSSY)},
-                  "second": {1: S(KYO), 2: S(GLORI), 3: S(NEWGATE), 4: S(SHIKI), 5: S(ROCKS10)},
+        "ideal": {"first": {2: S(KYO, MARLON), 3: _rs_f3, 4: S(SHIKI), 5: S(SHIKI, STUSSY)},
+                  "second": {1: S(KYO), 2: S(GLORI), 3: S(NEWGATE, GANZUI), 4: S(SHIKI), 5: S(ROCKS10)},
                   "late": (6, S(ROCKS10))},
-        "opp_ideal": None,
-        "mull": lambda hand, first: (LINLIN in hand and SHIKI in hand) if first else (GLORI in hand and NEWGATE in hand),
+        "opp_ideal": SABO_IDEAL,
+        "mull": lambda hand, first: ((LINLIN in hand or GANZUI in hand) and SHIKI in hand) if first
+        else (GLORI in hand and (NEWGATE in hand or GANZUI in hand)),
         "items": ["mull", "ideal", "shiki_rush"],
+    },
+    "kaido_rocks": {
+        "ideal": KAIDO_IDEAL,
+        "opp_ideal": ROCKS_VS_KAIDO,
+        "mull": _kaido_mull,
+        "items": ["mull", "ideal", "kr_leader", "kr_k6bounce", "kr_bk_keep", "kr_rk_john", "kaido_banrai"],
     },
 }
 DECIDED = 0.9
@@ -460,9 +577,10 @@ def analyse_game(g, t):
         for i, r in enumerate(rows):
             if r["seat"] != "p1" or not r["mv"]:
                 continue
-            if r["mv"]["at"] == "PLAY" and r["mv"].get("card") == SABAKI:
+            if r["mv"]["at"] == "PLAY" and r["mv"].get("card") in (SABAKI, GOMU_KAMINARI):
+                nm = cname(r["mv"]["card"])[0]
                 sel = next((x for x in rows[i + 1:i + 6] if x["seat"] == "p1" and x["act"] == "SEARCH_AND_SELECT"
-                            and "神の裁き" in x["msg"] and x["mv"].get("sel") and x["mv"]["sel"][0] != "?"
+                            and nm in x["msg"] and x["mv"].get("sel") and x["mv"]["sel"][0] != "?"
                             and x["mv"]["sel"][0] in [c[0] for c in x["st"]["p2"]["field"]]), None)
                 if sel:
                     kyo_on = any(c[0] == KYO for c in sel["st"]["p2"]["field"])
@@ -555,12 +673,10 @@ def analyse_game(g, t):
                 if ot != 4:
                     continue
                 # 速攻でレストのキャラを殴れた点（シキを出した後の最初のメイン）
-                k0 = rows.index(played[0])
                 m1 = next((r for r in rs if r["step"] > played[0]["step"] and r["seat"] == "p1" and r["act"] == "MAIN_ACTION"
                            and any(m.get("action_type") == "ATTACK" and (m.get("payload") or {}).get("uuid") == su
                                    and (m.get("payload") or {}).get("target_ids") != [opp_leader] for m in r.get("legal_raw") or [])),
                           None)
-                del k0
                 if m1 is None:
                     continue
                 hit = [r for r in att if (r["mv"].get("tgt") or [None])[0] != umap.get(opp_leader)]
@@ -583,6 +699,50 @@ def analyse_game(g, t):
             if plays and pts[r["step"]]["kind"] == "main":
                 best = max(plays, key=lambda m: int(cname(umap.get(m["payload"]["uuid"]))[1] or 0))
                 cand("mihawk_leader", r["step"], {"kind": "game", "action_type": "PLAY", "payload": best["payload"]}, "play_first", ot)
+    # 緑ミホーク（1ペローナを先攻 1 ターン目に出さない・2 枚以上なら出してもよい）
+    if mu == "mihawk_sabo" and mf:
+        rs = by_turn["p1"].get(1, [])
+        m0 = next((r for r in rs if r["seat"] == "p1" and r["act"] == "MAIN_ACTION"
+                   and any(m["at"] == "PLAY" and m.get("card") == PERONA1 for m in r.get("legal") or [])), None)
+        if m0 and _hand(m0).count(PERONA1) < 2:
+            pl = [r for r in rs if r["seat"] == "p1" and r["mv"] and r["mv"]["at"] == "PLAY" and r["mv"].get("card") == PERONA1]
+            scene("perona_t1", not pl, 1)
+            if pl:
+                pu = pl[0]["mv"]["uuid"]
+                sp = main_point_for(pl[0]["step"], lambda m: (m or {}).get("action_type") == "PLAY"
+                                    and (m.get("payload") or {}).get("uuid") == pu)
+                if sp is not None:
+                    alt = [x["mv"] for x in pts[sp]["top"] if (x["mv"].get("payload") or {}).get("uuid") != pu]
+                    if alt:
+                        cand("perona_t1", sp, alt[0], "perona_t1", 1)
+    # 紫カイドウ（§7.63 の道具の項目をそのまま使う）
+    if mu == "kaido_rocks":
+        gk = dict(g, kaido_first=mf, kaido_won=g["me_won"])
+        kr, kc = KR.analyse_game(gk, t)
+        for x in kr["leader"]:
+            if x["article"] is not None:
+                scene("kr_leader", x["used"] == x["article"], x["own_turn"], rule=x["rule"], used=x["used"])
+        for x in kr["k6_bounce"]:
+            if x.get("next_own_turn"):
+                scene("kr_k6bounce", x["agree"], x["next_own_turn"], replay_k6=x["replay_k6"])
+        for x in kr["bk_vs_shiki"]:
+            scene("kr_bk_keep", not x["attacked"], x["own_turn"])
+        for x in kr["rk"]:
+            if x["john"] and x["used"]:
+                scene("kr_rk_john", x["target"] == KR.JOHN, x["own_turn"], target=x["target"])
+        imap = {"5": "kr_leader", "6": "kr_k6bounce", "9": "kr_bk_keep", "10": "kr_rk_john"}
+        for c in kc:
+            if c["item"] in imap and c["b"] is not None:
+                cands.append(dict(c, mu=mu, item=imap[c["item"]]))
+        for r in rows:
+            if r["seat"] != "p1" or not r["mv"]:
+                continue
+            d = r["st"]["p1"]["don"]
+            early = d[0] + d[1] + d[2] <= 6
+            if r["mv"]["at"] == "SELECT_COUNTER" and r["mv"].get("card") == BANRAI and early:
+                scene("kaido_banrai", True, own_turn(r["turn"], "p1", mf), use="counter")
+            if r["mv"]["at"] == "PLAY" and r["mv"].get("card") == BANRAI and early:
+                scene("kaido_banrai", False, own_turn(r["turn"], "p1", mf), use="main")
     # 評価の推移と相手のターンの前後（厄介な札）
     res["values"] = [(p["step"], p["turn"], kv(p)) for p in pts if p["kind"] in ("main", "window") and kv(p) is not None]
     mains = [(p["step"], p["turn"], kv(p)) for p in pts if p["seat"] == "p1" and p["kind"] == "main"
@@ -733,12 +893,6 @@ def cmd_judge(a):
 # ---------------------------------------------------------------- 5. summary
 
 rate, mean_ci, top_counts = KR.rate, KR.mean_ci, KR.top_counts
-#: 紫カイドウ対青ロックス（§7.63）の項目 → 型（横断のまとめ用）
-KR_TYPES = {"2": ("マリガン", "mull"), "3": ("理想の展開", "order"), "5": ("リーダー効果（ドンを戻す）の時期", "resource"),
-            "6": ("6キングが返された後の組み立て", "order"), "9": ("ブロッカーカイドウを守りに残す", "defense"),
-            "10": ("除去カイドウの対象（キャプテン・ジョン）", "target")}
-
-
 def summarize_mu(a, mu, J):
     per = read_jsonl(os.path.join(a.out, f"items_{mu}.jsonl"))
     ok = [r for r in per if not r["void"] and r["won"] is not None]
@@ -853,18 +1007,6 @@ def cmd_summary(a):
             dis = (x["agree"]["n"] - x["agree"]["k"]) / max(1, S["games"] - S["void"]) if x["agree"]["n"] else 0.0
             rowsX.append({"mu": mu, "mu_name": S["name"], "item": it, "name": x["name"], "type": x["type"],
                           "scenes_per_game": x["per_game"], "agree": x["agree"]["rate"], "disagree_per_game": round(dis, 3),
-                          "judged": j.get("n", 0), "diff": j.get("mean"), "ci": j.get("ci"),
-                          "article_better": j.get("article_better", 0), "cpu_better": j.get("cpu_better", 0)})
-    krs = os.path.join("n1_results", "matchup_kr", "summary.json")
-    if os.path.exists(krs):
-        K = json.load(open(krs, encoding="utf-8"))
-        ng = K["games"] - K["void"]
-        kc = read_jsonl(os.path.join("n1_results", "matchup_kr", "cands_all.jsonl"))
-        for it, (nm, ty) in KR_TYPES.items():
-            j = K["judge"]["by_item"].get(it) or {}
-            nd = len([c for c in kc if c["item"] == it])
-            rowsX.append({"mu": "kaido_rocks", "mu_name": "紫カイドウ 対 青ロックス（§7.63）", "item": "kr" + it, "name": nm, "type": ty,
-                          "scenes_per_game": None, "agree": None, "disagree_per_game": round(nd / max(1, ng), 3),
                           "judged": j.get("n", 0), "diff": j.get("mean"), "ci": j.get("ci"),
                           "article_better": j.get("article_better", 0), "cpu_better": j.get("cpu_better", 0)})
     for r in rowsX:
