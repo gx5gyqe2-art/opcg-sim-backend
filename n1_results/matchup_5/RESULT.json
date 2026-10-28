@@ -1,0 +1,1 @@
+{"shard": 16, "branch": "claude/matchup-5-j16", "status": "done", "notes": "13/13 points judged (k=16, workers=4, shard 16/18); took ~63 min wall (about 5 min/point effective, longer than the 40-60 min guide estimate not by much). No issues."}
