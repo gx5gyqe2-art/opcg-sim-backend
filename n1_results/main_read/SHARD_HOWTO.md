@@ -24,7 +24,7 @@ git -c user.email=noreply@anthropic.com -c user.name=Claude commit -m "main-read
 git push -u origin claude/main-read-e$I
 ```
 
-## B. 打ち比べ（judge）——A を回収した後に、改めて知らせる
+## B. 打ち比べ（judge）——読みは 250 点全部済み・比べる点 99（1 シャード 9〜16 点・4 本並べで 1〜1.5 時間）
 
 ```bash
 I=1   # ← シャード番号（1〜7）
