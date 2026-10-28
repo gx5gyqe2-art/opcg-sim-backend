@@ -1,0 +1,1 @@
+{"shard": 2, "branch": "claude/matchup-5-j2", "status": "done", "notes": "14/14 points judged (k=16, workers=4). Took ~6270s, longer than the 40-60 min estimate. Code unchanged. RESULT.json path n1_results/matchup_5/RESULT.json may collide with other shards' files if they use the same path."}
