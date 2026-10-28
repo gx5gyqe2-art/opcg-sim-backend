@@ -1,0 +1,1 @@
+{"shard": 8, "branch": "claude/matchup-5-j8", "status": "done", "notes": "13/13 points judged (k=16, workers=4, shard 8/18); ~4900s wall. pgrep-based wait loops matched themselves so waits ran to their timeout; no effect on results."}
