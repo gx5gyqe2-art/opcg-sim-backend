@@ -1,0 +1,1 @@
+{"shard": 8, "games": 40, "branch": "claude/matchup-5-p8", "notes": "Ran per SHARD_HOWTO with I=8, workers 4. 40/40 games completed, no errors. RESULT.json placed in n1_results/matchup_5/."}
