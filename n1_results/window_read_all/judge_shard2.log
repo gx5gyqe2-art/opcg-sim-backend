@@ -1,0 +1,10 @@
+JUDGE shard=2/8 todo 9 (done 0) k=16 -> n1_results/window_read_all/judge_shard2.jsonl
+[1/9] pid=82 type=blocker ok=True diff=0.125 sec=38.4 (60s)
+[2/9] pid=74 type=blocker ok=True diff=0.0625 sec=144.1 (165s)
+[3/9] pid=114 type=select ok=True diff=0.0 sec=44.0 (209s)
+[4/9] pid=106 type=select ok=True diff=-0.0625 sec=280.6 (340s)
+[5/9] pid=258 type=don_confirm ok=True diff=-0.0625 sec=104.4 (445s)
+[6/9] pid=154 type=trigger ok=True diff=0.0 sec=286.7 (495s)
+[7/9] pid=346 type=confirm_opp ok=True diff=-0.125 sec=133.8 (579s)
+[8/9] pid=66 type=blocker ok=True diff=0.0 sec=562.5 (582s)
+[9/9] pid=50 type=blocker ok=True diff=-0.0625 sec=711.8 (730s)
