@@ -1,0 +1,7399 @@
+{
+ "types": {
+  "play": {
+   "n": 50,
+   "a_uses": 25,
+   "big_changes": 0.18,
+   "big_to_b": 6,
+   "big_to_other": 3,
+   "next_prefers_b": 13,
+   "next_prefers_b_rate": 0.26,
+   "next_prefers_saving": 28,
+   "judged_big": {
+    "n": 9,
+    "mean": -0.0069,
+    "ci": [
+     -0.0922,
+     0.0783
+    ]
+   },
+   "judged_next": {
+    "n": 14,
+    "mean": -0.0045,
+    "ci": [
+     -0.0667,
+     0.0577
+    ]
+   },
+   "gain_big_per_point": -0.001,
+   "gain_next_per_point": -0.001,
+   "corr_next_vs_diff": 0.535,
+   "corr_big_vs_diff": -0.78,
+   "sec_big_mean": 13.09,
+   "sec_next_mean": 478.9,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    0
+   ]
+  },
+  "don": {
+   "n": 50,
+   "a_uses": 30,
+   "big_changes": 0.18,
+   "big_to_b": 6,
+   "big_to_other": 3,
+   "next_prefers_b": 18,
+   "next_prefers_b_rate": 0.36,
+   "next_prefers_saving": 22,
+   "judged_big": {
+    "n": 9,
+    "mean": 0.0903,
+    "ci": [
+     -0.0199,
+     0.2004
+    ]
+   },
+   "judged_next": {
+    "n": 18,
+    "mean": 0.0938,
+    "ci": [
+     0.0102,
+     0.1773
+    ]
+   },
+   "gain_big_per_point": 0.016,
+   "gain_next_per_point": 0.034,
+   "corr_next_vs_diff": 0.234,
+   "corr_big_vs_diff": -0.262,
+   "sec_big_mean": 13.14,
+   "sec_next_mean": 554.2,
+   "sig_big": [
+    1,
+    0
+   ],
+   "sig_next": [
+    3,
+    0
+   ]
+  },
+  "activate": {
+   "n": 50,
+   "a_uses": 20,
+   "big_changes": 0.14,
+   "big_to_b": 6,
+   "big_to_other": 1,
+   "next_prefers_b": 14,
+   "next_prefers_b_rate": 0.28,
+   "next_prefers_saving": 32,
+   "judged_big": {
+    "n": 7,
+    "mean": -0.0256,
+    "ci": [
+     -0.115,
+     0.0638
+    ]
+   },
+   "judged_next": {
+    "n": 14,
+    "mean": 0.0095,
+    "ci": [
+     -0.0313,
+     0.0504
+    ]
+   },
+   "gain_big_per_point": -0.004,
+   "gain_next_per_point": 0.003,
+   "corr_next_vs_diff": 0.043,
+   "corr_big_vs_diff": -0.761,
+   "sec_big_mean": 8.9,
+   "sec_next_mean": 350.9,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    0
+   ]
+  },
+  "discard": {
+   "n": 50,
+   "a_uses": 28,
+   "big_changes": 0.14,
+   "big_to_b": 6,
+   "big_to_other": 1,
+   "next_prefers_b": 19,
+   "next_prefers_b_rate": 0.38,
+   "next_prefers_saving": 21,
+   "judged_big": {
+    "n": 7,
+    "mean": 0.1046,
+    "ci": [
+     0.0063,
+     0.2029
+    ]
+   },
+   "judged_next": {
+    "n": 19,
+    "mean": 0.0132,
+    "ci": [
+     -0.0548,
+     0.0811
+    ]
+   },
+   "gain_big_per_point": 0.015,
+   "gain_next_per_point": 0.005,
+   "corr_next_vs_diff": -0.194,
+   "corr_big_vs_diff": 0.255,
+   "sec_big_mean": 21.45,
+   "sec_next_mean": 835.7,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    1,
+    0
+   ]
+  },
+  "event": {
+   "n": 50,
+   "a_uses": 9,
+   "big_changes": 0.06,
+   "big_to_b": 2,
+   "big_to_other": 1,
+   "next_prefers_b": 15,
+   "next_prefers_b_rate": 0.3,
+   "next_prefers_saving": 32,
+   "judged_big": {
+    "n": 3,
+    "mean": -0.0625,
+    "ci": [
+     -0.1332,
+     0.0082
+    ]
+   },
+   "judged_next": {
+    "n": 15,
+    "mean": -0.0292,
+    "ci": [
+     -0.072,
+     0.0137
+    ]
+   },
+   "gain_big_per_point": -0.004,
+   "gain_next_per_point": -0.009,
+   "corr_next_vs_diff": -0.276,
+   "corr_big_vs_diff": -0.871,
+   "sec_big_mean": 13.3,
+   "sec_next_mean": 558.1,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    1
+   ]
+  }
+ },
+ "all": {
+  "judged_big": {
+   "n": 35,
+   "mean": 0.0319,
+   "ci": [
+    -0.0155,
+    0.0793
+   ]
+  },
+  "judged_next": {
+   "n": 80,
+   "mean": 0.0196,
+   "ci": [
+    -0.0103,
+    0.0496
+   ]
+  }
+ },
+ "rows": [
+  {
+   "pid": 0,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0344,
+   "big": "a",
+   "d_big": -0.0588,
+   "d_next": -0.1349,
+   "d_next_net": -0.1129,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-052"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 16.3,
+   "sec_next": 307.08
+  },
+  {
+   "pid": 1,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.2268,
+   "big": "a",
+   "d_big": -0.2245,
+   "d_next": 0.2226,
+   "d_next_net": 0.0086,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.1875,
+   "ci_next": [
+    -0.454,
+    0.079
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "ST08-001"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "ST08-001",
+    "targets": [
+     "OP12-061"
+    ]
+   },
+   "sec_big": 10.27,
+   "sec_next": 421.45
+  },
+  {
+   "pid": 2,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0186,
+   "big": "a",
+   "d_big": -0.0547,
+   "d_next": 0.0191,
+   "d_next_net": -0.0303,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.1789,
+    0.1789
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-020",
+    "targets": [
+     "OP09-081"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP12-020"
+   },
+   "sec_big": 5.21,
+   "sec_next": 125.58
+  },
+  {
+   "pid": 3,
+   "type": "event",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.1129,
+   "big": "a",
+   "d_big": -0.1333,
+   "d_next": 0.0892,
+   "d_next_net": 0.2359,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-042",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 41.13,
+   "sec_next": 896.24
+  },
+  {
+   "pid": 4,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.2076,
+   "big": "a",
+   "d_big": -0.1242,
+   "d_next": -0.8419,
+   "d_next_net": -0.7075,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP06-033"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP06-035"
+   },
+   "sec_big": 9.04,
+   "sec_next": 281.92
+  },
+  {
+   "pid": 5,
+   "type": "don",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0353,
+   "big": "a",
+   "d_big": 0.034,
+   "d_next": -0.0204,
+   "d_next_net": -0.0183,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-039"
+   },
+   "sec_big": 17.49,
+   "sec_next": 385.68
+  },
+  {
+   "pid": 6,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0069,
+   "big": "a",
+   "d_big": -0.0026,
+   "d_next": -0.0119,
+   "d_next_net": -0.0078,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-032"
+   },
+   "sec_big": 37.56,
+   "sec_next": 591.65
+  },
+  {
+   "pid": 7,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.1603,
+   "big": "a",
+   "d_big": -0.2404,
+   "d_next": -0.2179,
+   "d_next_net": -0.2079,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP11-107",
+    "targets": [
+     "OP15-022"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "ST16-004",
+    "targets": [
+     "OP15-088"
+    ]
+   },
+   "sec_big": 15.65,
+   "sec_next": 554.95
+  },
+  {
+   "pid": 8,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0191,
+   "big": "other",
+   "d_big": 0.0202,
+   "d_next": -0.0082,
+   "d_next_net": 0.0077,
+   "diff_big": -0.125,
+   "ci_big": [
+    -0.2924,
+    0.0424
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP08-051"
+   },
+   "sec_big": 23.25,
+   "sec_next": 509.35
+  },
+  {
+   "pid": 9,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0177,
+   "big": "a",
+   "d_big": 0.075,
+   "d_next": -0.003,
+   "d_next_net": -0.0538,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP06-086"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP04-083",
+    "targets": [
+     "OP02-071"
+    ]
+   },
+   "sec_big": 5.89,
+   "sec_next": 370.42
+  },
+  {
+   "pid": 10,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0552,
+   "big": "a",
+   "d_big": -0.0143,
+   "d_next": 0.039,
+   "d_next_net": -0.1074,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.3436,
+    0.2186
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-119"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "sec_big": 8.91,
+   "sec_next": 388.09
+  },
+  {
+   "pid": 11,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0037,
+   "big": "a",
+   "d_big": -0.0658,
+   "d_next": -0.1304,
+   "d_next_net": -0.1617,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP11-071"
+   },
+   "sec_big": 9.75,
+   "sec_next": 179.36
+  },
+  {
+   "pid": 12,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0351,
+   "big": "a",
+   "d_big": -0.0644,
+   "d_next": -0.0099,
+   "d_next_net": -0.0038,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-040"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-039"
+   },
+   "sec_big": 9.5,
+   "sec_next": 243.9
+  },
+  {
+   "pid": 13,
+   "type": "play",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0929,
+   "big": "other",
+   "d_big": -0.0552,
+   "d_next": 0.0606,
+   "d_next_net": -0.0676,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": -0.125,
+   "ci_next": [
+    -0.2924,
+    0.0424
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-065"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-060",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 19.19,
+   "sec_next": 529.23
+  },
+  {
+   "pid": 14,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0936,
+   "big": "a",
+   "d_big": 0.1033,
+   "d_next": -0.0423,
+   "d_next_net": -0.0636,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "EB02-010",
+    "targets": [
+     "OP09-027"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB02-041"
+   },
+   "sec_big": 4.58,
+   "sec_next": 154.44
+  },
+  {
+   "pid": 15,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0151,
+   "big": "a",
+   "d_big": 0.0396,
+   "d_next": -0.0098,
+   "d_next_net": 0.0106,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP05-106"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP05-098",
+    "targets": [
+     "OP08-002"
+    ]
+   },
+   "sec_big": 6.11,
+   "sec_next": 100.16
+  },
+  {
+   "pid": 16,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0099,
+   "big": "b",
+   "d_big": 0.0139,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.0424,
+    0.2924
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-061",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-061"
+   },
+   "sec_big": 33.0,
+   "sec_next": 720.75
+  },
+  {
+   "pid": 17,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.005,
+   "big": "a",
+   "d_big": -0.038,
+   "d_next": 0.0136,
+   "d_next_net": 0.0008,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 30.85,
+   "sec_next": 1461.0
+  },
+  {
+   "pid": 18,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1308,
+   "big": "a",
+   "d_big": -0.2038,
+   "d_next": 0.4155,
+   "d_next_net": 0.3651,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.3436,
+    0.2186
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP05-060",
+    "targets": [
+     "OP14-040"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP05-064"
+   },
+   "sec_big": 7.02,
+   "sec_next": 627.39
+  },
+  {
+   "pid": 19,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0117,
+   "big": "a",
+   "d_big": -0.011,
+   "d_next": -0.2081,
+   "d_next_net": -0.2715,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-007"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP09-001",
+    "targets": [
+     "EB02-035"
+    ]
+   },
+   "sec_big": 11.02,
+   "sec_next": 401.92
+  },
+  {
+   "pid": 20,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1178,
+   "big": "a",
+   "d_big": -0.1951,
+   "d_next": -0.7578,
+   "d_next_net": -0.2384,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-074"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 35.63,
+   "sec_next": 928.45
+  },
+  {
+   "pid": 21,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0224,
+   "big": "b",
+   "d_big": -0.1029,
+   "d_next": -0.035,
+   "d_next_net": -0.0911,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.12,
+    0.37
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-118",
+    "targets": [
+     "OP05-098"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP08-002",
+    "targets": [
+     "OP05-098"
+    ]
+   },
+   "sec_big": 6.19,
+   "sec_next": 294.79
+  },
+  {
+   "pid": 22,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0158,
+   "big": "a",
+   "d_big": -0.0298,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-004",
+    "targets": [
+     "OP15-088"
+    ]
+   },
+   "sec_big": 14.6,
+   "sec_next": 270.47
+  },
+  {
+   "pid": 23,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0082,
+   "big": "b",
+   "d_big": -0.0013,
+   "d_next": -0.0193,
+   "d_next_net": -0.02,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.1543,
+    0.2793
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP07-029"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP07-019",
+    "targets": [
+     "OP05-061"
+    ]
+   },
+   "sec_big": 17.52,
+   "sec_next": 447.55
+  },
+  {
+   "pid": 24,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0743,
+   "big": "a",
+   "d_big": 0.0249,
+   "d_next": -0.2013,
+   "d_next_net": -0.3074,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-044"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-044"
+    ]
+   },
+   "sec_big": 36.3,
+   "sec_next": 1022.98
+  },
+  {
+   "pid": 25,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0618,
+   "big": "a",
+   "d_big": 0.1364,
+   "d_next": -0.1586,
+   "d_next_net": -0.1371,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP01-060"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP01-060",
+    "targets": [
+     "OP09-023"
+    ]
+   },
+   "sec_big": 5.42,
+   "sec_next": 138.62
+  },
+  {
+   "pid": 26,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1133,
+   "big": "b",
+   "d_big": 0.0453,
+   "d_next": 0.013,
+   "d_next_net": 0.1221,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.2793,
+    0.1543
+   ],
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-080"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-004",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 10.0,
+   "sec_next": 356.97
+  },
+  {
+   "pid": 27,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0235,
+   "big": "a",
+   "d_big": 0.0194,
+   "d_next": -0.3222,
+   "d_next_net": -0.3541,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP02-096"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP02-096",
+    "targets": [
+     "OP07-059"
+    ]
+   },
+   "sec_big": 7.47,
+   "sec_next": 346.86
+  },
+  {
+   "pid": 28,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.5762,
+   "big": "a",
+   "d_big": -0.5818,
+   "d_next": -0.1892,
+   "d_next_net": -0.2499,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-046"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-039",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "sec_big": 13.55,
+   "sec_next": 691.22
+  },
+  {
+   "pid": 29,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0013,
+   "big": "a",
+   "d_big": 0.015,
+   "d_next": -0.2523,
+   "d_next_net": -0.0195,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP04-089"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP04-089"
+   },
+   "sec_big": 10.74,
+   "sec_next": 1201.25
+  },
+  {
+   "pid": 30,
+   "type": "don",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0096,
+   "big": "b",
+   "d_big": -0.0264,
+   "d_next": -0.0872,
+   "d_next_net": -0.0638,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.1543,
+    0.2793
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-063",
+    "targets": [
+     "OP17-040"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 5,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-040"
+    ]
+   },
+   "sec_big": 23.71,
+   "sec_next": 1255.21
+  },
+  {
+   "pid": 31,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0274,
+   "big": "a",
+   "d_big": -0.0222,
+   "d_next": -0.1387,
+   "d_next_net": -0.1238,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-093",
+    "targets": [
+     "OP17-040"
+    ]
+   },
+   "sec_big": 14.67,
+   "sec_next": 418.45
+  },
+  {
+   "pid": 32,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.1343,
+   "big": "a",
+   "d_big": 0.0205,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 3,
+    "card": "OP07-093"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-093"
+   },
+   "sec_big": 6.55,
+   "sec_next": 107.14
+  },
+  {
+   "pid": 33,
+   "type": "don",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0517,
+   "big": "a",
+   "d_big": -0.0544,
+   "d_next": -0.0286,
+   "d_next_net": -0.0407,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 10.29,
+   "sec_next": 300.09
+  },
+  {
+   "pid": 34,
+   "type": "event",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0077,
+   "big": "a",
+   "d_big": -0.0389,
+   "d_next": -0.0278,
+   "d_next_net": 0.0324,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP10-059"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 4.33,
+   "sec_next": 84.0
+  },
+  {
+   "pid": 35,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0339,
+   "big": "a",
+   "d_big": 0.0403,
+   "d_next": -0.138,
+   "d_next_net": -0.0882,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP14-020",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP14-020",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "sec_big": 43.79,
+   "sec_next": 1325.38
+  },
+  {
+   "pid": 36,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1021,
+   "big": "a",
+   "d_big": -0.1109,
+   "d_next": -0.1729,
+   "d_next_net": -0.1663,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP12-016"
+   },
+   "sec_big": 5.61,
+   "sec_next": 84.61
+  },
+  {
+   "pid": 37,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.4506,
+   "big": "a",
+   "d_big": -0.4583,
+   "d_next": -0.1375,
+   "d_next_net": -0.0399,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-004",
+    "targets": [
+     "OP14-020"
+    ]
+   },
+   "sec_big": 15.83,
+   "sec_next": 277.6
+  },
+  {
+   "pid": 38,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0144,
+   "big": "other",
+   "d_big": -0.0074,
+   "d_next": 0.0201,
+   "d_next_net": 0.0076,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.2793,
+    0.1543
+   ],
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP03-077",
+    "targets": [
+     "OP10-101"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP03-077"
+   },
+   "sec_big": 6.37,
+   "sec_next": 397.76
+  },
+  {
+   "pid": 39,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0085,
+   "big": "a",
+   "d_big": -0.0749,
+   "d_next": -0.1427,
+   "d_next_net": -0.1472,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "ST31-003"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 8.58,
+   "sec_next": 122.17
+  },
+  {
+   "pid": 40,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0034,
+   "big": "a",
+   "d_big": -0.0198,
+   "d_next": -0.063,
+   "d_next_net": -0.0396,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP06-104",
+    "targets": [
+     "OP07-019"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP06-022"
+   },
+   "sec_big": 6.85,
+   "sec_next": 332.22
+  },
+  {
+   "pid": 41,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2859,
+   "big": "a",
+   "d_big": -0.3191,
+   "d_next": -0.1022,
+   "d_next_net": -0.1324,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-098"
+   },
+   "sec_big": 8.55,
+   "sec_next": 197.37
+  },
+  {
+   "pid": 42,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0261,
+   "big": "a",
+   "d_big": 0.017,
+   "d_next": 0.0054,
+   "d_next_net": 0.002,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "ST02-007"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP07-019",
+    "targets": [
+     "OP04-019"
+    ]
+   },
+   "sec_big": 5.35,
+   "sec_next": 239.7
+  },
+  {
+   "pid": 43,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.1383,
+   "big": "a",
+   "d_big": -0.1849,
+   "d_next": -0.0441,
+   "d_next_net": -0.0087,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP03-030",
+    "targets": [
+     "PRB02-014"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP03-030"
+   },
+   "sec_big": 13.21,
+   "sec_next": 509.38
+  },
+  {
+   "pid": 44,
+   "type": "play",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.1845,
+   "big": "a",
+   "d_big": -0.0641,
+   "d_next": 0.0368,
+   "d_next_net": 0.0809,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.12,
+    0.37
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-118"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-118",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 11.04,
+   "sec_next": 855.47
+  },
+  {
+   "pid": 45,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0668,
+   "big": "a",
+   "d_big": -0.0829,
+   "d_next": -0.0171,
+   "d_next_net": 0.0502,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP03-013"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "ST01-012"
+   },
+   "sec_big": 5.3,
+   "sec_next": 144.94
+  },
+  {
+   "pid": 46,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0949,
+   "big": "a",
+   "d_big": -0.1074,
+   "d_next": -0.1112,
+   "d_next_net": -0.089,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-050"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 80.02,
+   "sec_next": 1718.45
+  },
+  {
+   "pid": 47,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0521,
+   "big": "a",
+   "d_big": -0.0844,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP02-096"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP03-077",
+    "targets": [
+     "OP07-059"
+    ]
+   },
+   "sec_big": 3.76,
+   "sec_next": 138.25
+  },
+  {
+   "pid": 48,
+   "type": "event",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0103,
+   "big": "a",
+   "d_big": 0.0065,
+   "d_next": -0.0525,
+   "d_next_net": -0.0905,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 22.39,
+   "sec_next": 602.36
+  },
+  {
+   "pid": 49,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.2354,
+   "big": "a",
+   "d_big": -0.0367,
+   "d_next": 0.6179,
+   "d_next_net": 0.937,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.25,
+   "ci_next": [
+    -0.5329,
+    0.0329
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP14-094"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP14-120",
+    "targets": [
+     "OP16-022"
+    ]
+   },
+   "sec_big": 11.47,
+   "sec_next": 780.73
+  },
+  {
+   "pid": 50,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1893,
+   "big": "a",
+   "d_big": -0.2505,
+   "d_next": 0.0063,
+   "d_next_net": -0.0364,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-089"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-079",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "sec_big": 13.64,
+   "sec_next": 274.77
+  },
+  {
+   "pid": 51,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0191,
+   "big": "a",
+   "d_big": -0.0604,
+   "d_next": -0.0177,
+   "d_next_net": -0.0285,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP16-065"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP16-060"
+   },
+   "sec_big": 5.31,
+   "sec_next": 266.12
+  },
+  {
+   "pid": 52,
+   "type": "event",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1858,
+   "big": "a",
+   "d_big": -0.2373,
+   "d_next": 0.0184,
+   "d_next_net": 0.0129,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.3436,
+    0.2186
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-077"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "sec_big": 28.06,
+   "sec_next": 1165.55
+  },
+  {
+   "pid": 53,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.3097,
+   "big": "a",
+   "d_big": -0.3706,
+   "d_next": 0.2755,
+   "d_next_net": 0.3045,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.1335,
+    0.5085
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP05-005"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP05-005"
+   },
+   "sec_big": 4.7,
+   "sec_next": 220.22
+  },
+  {
+   "pid": 54,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.1057,
+   "big": "a",
+   "d_big": 0.0897,
+   "d_next": -0.5264,
+   "d_next_net": -0.5773,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-082"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 14.05,
+   "sec_next": 404.11
+  },
+  {
+   "pid": 55,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0109,
+   "big": "a",
+   "d_big": 0.0108,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-059"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP07-071"
+   },
+   "sec_big": 3.65,
+   "sec_next": 292.84
+  },
+  {
+   "pid": 56,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1283,
+   "big": "a",
+   "d_big": -0.2911,
+   "d_next": 0.0487,
+   "d_next_net": -0.0289,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.2186,
+    0.3436
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-048",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-039",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "sec_big": 52.3,
+   "sec_next": 2646.22
+  },
+  {
+   "pid": 57,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2015,
+   "big": "a",
+   "d_big": -0.2109,
+   "d_next": -0.1792,
+   "d_next_net": -0.1317,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 17.36,
+   "sec_next": 557.85
+  },
+  {
+   "pid": 58,
+   "type": "activate",
+   "src": "kr",
+   "user": "b",
+   "d_now": 0.0307,
+   "big": "a",
+   "d_big": 0.009,
+   "d_next": -0.0044,
+   "d_next_net": -0.0278,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-061"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-063"
+   },
+   "sec_big": 13.96,
+   "sec_next": 578.26
+  },
+  {
+   "pid": 59,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1469,
+   "big": "a",
+   "d_big": -0.1824,
+   "d_next": -0.5016,
+   "d_next_net": -0.3499,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP04-083"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP04-093"
+   },
+   "sec_big": 8.52,
+   "sec_next": 377.99
+  },
+  {
+   "pid": 60,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -1.111,
+   "big": "a",
+   "d_big": -1.077,
+   "d_next": -0.4998,
+   "d_next_net": -0.4957,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP08-051"
+   },
+   "sec_big": 59.88,
+   "sec_next": 1413.57
+  },
+  {
+   "pid": 61,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.02,
+   "big": "a",
+   "d_big": -0.0073,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP08-012"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP08-012"
+   },
+   "sec_big": 1.84,
+   "sec_next": 151.3
+  },
+  {
+   "pid": 62,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0163,
+   "big": "b",
+   "d_big": 0.0495,
+   "d_next": -0.099,
+   "d_next_net": -0.0429,
+   "diff_big": 0.3571,
+   "ci_big": [
+    -0.0331,
+    0.7474
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 12.57,
+   "sec_next": 689.39
+  },
+  {
+   "pid": 63,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.023,
+   "big": "a",
+   "d_big": -0.0227,
+   "d_next": -0.0119,
+   "d_next_net": 0.0079,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-046"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-048",
+    "targets": [
+     "OP11-001"
+    ]
+   },
+   "sec_big": 10.25,
+   "sec_next": 598.54
+  },
+  {
+   "pid": 64,
+   "type": "don",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0035,
+   "big": "b",
+   "d_big": 0.0056,
+   "d_next": 0.084,
+   "d_next_net": 0.0782,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.2793,
+    0.1543
+   ],
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-045"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-045"
+    ]
+   },
+   "sec_big": 12.77,
+   "sec_next": 296.04
+  },
+  {
+   "pid": 65,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0053,
+   "big": "b",
+   "d_big": 0.0124,
+   "d_next": 0.0011,
+   "d_next_net": -0.0126,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.185,
+    0.06
+   ],
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-014"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-014",
+    "targets": [
+     "OP03-076"
+    ]
+   },
+   "sec_big": 6.63,
+   "sec_next": 368.19
+  },
+  {
+   "pid": 66,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1151,
+   "big": "b",
+   "d_big": -0.0794,
+   "d_next": 0.0905,
+   "d_next_net": 0.2156,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.3157,
+    0.4407
+   ],
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.3157,
+    0.4407
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-080"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-086"
+   },
+   "sec_big": 6.33,
+   "sec_next": 138.89
+  },
+  {
+   "pid": 67,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1045,
+   "big": "a",
+   "d_big": -0.1479,
+   "d_next": -0.1049,
+   "d_next_net": -0.099,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP01-006"
+   },
+   "sec_big": 11.46,
+   "sec_next": 92.75
+  },
+  {
+   "pid": 68,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1898,
+   "big": "a",
+   "d_big": -0.1282,
+   "d_next": -0.1547,
+   "d_next_net": -0.0882,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-079",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-080"
+   },
+   "sec_big": 6.98,
+   "sec_next": 248.63
+  },
+  {
+   "pid": 69,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0456,
+   "big": "a",
+   "d_big": -0.107,
+   "d_next": 0.0192,
+   "d_next_net": -0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.125,
+   "ci_next": [
+    -0.2924,
+    0.0424
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP05-106"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-098",
+    "targets": [
+     "OP09-001"
+    ]
+   },
+   "sec_big": 8.13,
+   "sec_next": 176.25
+  },
+  {
+   "pid": 70,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0417,
+   "big": "a",
+   "d_big": -0.0248,
+   "d_next": -0.0242,
+   "d_next_net": -0.0054,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP08-030"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-021"
+   },
+   "sec_big": 4.51,
+   "sec_next": 541.64
+  },
+  {
+   "pid": 71,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0033,
+   "big": "a",
+   "d_big": 0.0023,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-118",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP12-063"
+   },
+   "sec_big": 14.77,
+   "sec_next": 1852.03
+  },
+  {
+   "pid": 72,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0114,
+   "big": "a",
+   "d_big": -0.0675,
+   "d_next": -0.0862,
+   "d_next_net": 0.0073,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP14-040"
+   },
+   "sec_big": 3.82,
+   "sec_next": 280.89
+  },
+  {
+   "pid": 73,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0148,
+   "big": "a",
+   "d_big": 0.0791,
+   "d_next": -0.0039,
+   "d_next_net": -0.0156,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "ST32-001"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "ST32-001"
+   },
+   "sec_big": 6.0,
+   "sec_next": 233.24
+  },
+  {
+   "pid": 74,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1214,
+   "big": "other",
+   "d_big": 0.034,
+   "d_next": 0.3083,
+   "d_next_net": 0.2832,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.06,
+    0.185
+   ],
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.01,
+    0.385
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP02-083"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP02-083"
+   },
+   "sec_big": 7.12,
+   "sec_next": 294.13
+  },
+  {
+   "pid": 75,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2991,
+   "big": "a",
+   "d_big": -0.3721,
+   "d_next": -0.1257,
+   "d_next_net": -0.3228,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP08-051"
+   },
+   "sec_big": 14.46,
+   "sec_next": 305.96
+  },
+  {
+   "pid": 76,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0091,
+   "big": "other",
+   "d_big": 0.0126,
+   "d_next": 0.0491,
+   "d_next_net": 0.092,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.2793,
+    0.1543
+   ],
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-001"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "EB01-006"
+   },
+   "sec_big": 9.11,
+   "sec_next": 256.11
+  },
+  {
+   "pid": 77,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0055,
+   "big": "a",
+   "d_big": -0.0107,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-088",
+    "targets": [
+     "OP14-020"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-095"
+   },
+   "sec_big": 4.57,
+   "sec_next": 97.74
+  },
+  {
+   "pid": 78,
+   "type": "don",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0181,
+   "big": "a",
+   "d_big": -0.0053,
+   "d_next": 0.0067,
+   "d_next_net": -0.0003,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-045",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 6.2,
+   "sec_next": 1412.3
+  },
+  {
+   "pid": 79,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0086,
+   "big": "b",
+   "d_big": -0.0529,
+   "d_next": 0.0651,
+   "d_next_net": 0.0478,
+   "diff_big": 0.1875,
+   "ci_big": [
+    -0.1335,
+    0.5085
+   ],
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.1335,
+    0.5085
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP05-117"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB01-054"
+   },
+   "sec_big": 3.07,
+   "sec_next": 145.87
+  },
+  {
+   "pid": 80,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1227,
+   "big": "a",
+   "d_big": -0.0917,
+   "d_next": -0.0898,
+   "d_next_net": -0.1156,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 9.74,
+   "sec_next": 239.41
+  },
+  {
+   "pid": 81,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0309,
+   "big": "a",
+   "d_big": -0.0931,
+   "d_next": -0.0616,
+   "d_next_net": -0.0213,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP16-055"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP16-034"
+   },
+   "sec_big": 6.13,
+   "sec_next": 220.59
+  },
+  {
+   "pid": 82,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0142,
+   "big": "b",
+   "d_big": -0.0144,
+   "d_next": -0.0342,
+   "d_next_net": -0.155,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.3157,
+    0.4407
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP12-047"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 3.68,
+   "sec_next": 235.08
+  },
+  {
+   "pid": 83,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0873,
+   "big": "b",
+   "d_big": 0.1283,
+   "d_next": -0.1109,
+   "d_next_net": -0.0044,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.2793,
+    0.1543
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-015",
+    "targets": [
+     "OP03-003"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-001"
+   },
+   "sec_big": 5.41,
+   "sec_next": 286.67
+  },
+  {
+   "pid": 84,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0454,
+   "big": "a",
+   "d_big": -0.0272,
+   "d_next": -0.0226,
+   "d_next_net": -0.0126,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-079",
+    "targets": [
+     "OP04-085"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP07-079",
+    "targets": [
+     "OP04-085"
+    ]
+   },
+   "sec_big": 3.21,
+   "sec_next": 206.84
+  },
+  {
+   "pid": 85,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0693,
+   "big": "a",
+   "d_big": 0.0805,
+   "d_next": 0.1043,
+   "d_next_net": 0.0355,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.3125,
+   "ci_next": [
+    0.0779,
+    0.5471
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-048"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 55.87,
+   "sec_next": 1920.67
+  },
+  {
+   "pid": 86,
+   "type": "discard",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.1262,
+   "big": "a",
+   "d_big": -0.2439,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-032"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 16.08,
+   "sec_next": 326.65
+  },
+  {
+   "pid": 87,
+   "type": "don",
+   "src": "kr",
+   "user": "b",
+   "d_now": 0.0069,
+   "big": "a",
+   "d_big": 0.0898,
+   "d_next": -0.1166,
+   "d_next_net": -0.1033,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-044",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP17-044"
+   },
+   "sec_big": 9.92,
+   "sec_next": 383.04
+  },
+  {
+   "pid": 88,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.2626,
+   "big": "a",
+   "d_big": -0.2864,
+   "d_next": -0.4016,
+   "d_next_net": -0.0828,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP02-013"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP02-022"
+   },
+   "sec_big": 2.52,
+   "sec_next": 198.03
+  },
+  {
+   "pid": 89,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0027,
+   "big": "a",
+   "d_big": -0.0096,
+   "d_next": 0.222,
+   "d_next_net": 0.2588,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.375,
+   "ci_next": [
+    0.13,
+    0.62
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-045",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 73.21,
+   "sec_next": 1103.35
+  },
+  {
+   "pid": 90,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0047,
+   "big": "a",
+   "d_big": 0.0029,
+   "d_next": -0.2136,
+   "d_next_net": -0.2264,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP03-112"
+   },
+   "sec_big": 3.79,
+   "sec_next": 105.28
+  },
+  {
+   "pid": 91,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0289,
+   "big": "a",
+   "d_big": -0.0161,
+   "d_next": 0.0007,
+   "d_next_net": 0.0005,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB02-041"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 3.72,
+   "sec_next": 385.56
+  },
+  {
+   "pid": 92,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.016,
+   "big": "a",
+   "d_big": -0.025,
+   "d_next": -0.2063,
+   "d_next_net": -0.2053,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-061"
+   },
+   "sec_big": 12.08,
+   "sec_next": 636.57
+  },
+  {
+   "pid": 93,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0199,
+   "big": "a",
+   "d_big": 0.0109,
+   "d_next": 0.0002,
+   "d_next_net": -0.0104,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-079"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP03-094"
+   },
+   "sec_big": 4.21,
+   "sec_next": 289.26
+  },
+  {
+   "pid": 94,
+   "type": "event",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1377,
+   "big": "a",
+   "d_big": -0.139,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 9.9,
+   "sec_next": 470.55
+  },
+  {
+   "pid": 95,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.1388,
+   "big": "b",
+   "d_big": 0.1156,
+   "d_next": -0.2093,
+   "d_next_net": -0.0744,
+   "diff_big": -0.25,
+   "ci_big": [
+    -0.5329,
+    0.0329
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP10-105"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP10-111"
+   },
+   "sec_big": 2.38,
+   "sec_next": 174.36
+  },
+  {
+   "pid": 96,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0524,
+   "big": "b",
+   "d_big": 0.0198,
+   "d_next": 0.0018,
+   "d_next_net": -0.001,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP04-019",
+    "targets": [
+     "OP14-051"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP04-031"
+   },
+   "sec_big": 13.86,
+   "sec_next": 599.31
+  },
+  {
+   "pid": 97,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.054,
+   "big": "a",
+   "d_big": -0.0225,
+   "d_next": -0.3027,
+   "d_next_net": -0.4309,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-119"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-080"
+   },
+   "sec_big": 5.3,
+   "sec_next": 356.62
+  },
+  {
+   "pid": 98,
+   "type": "play",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0107,
+   "big": "a",
+   "d_big": 0.0327,
+   "d_next": -0.0221,
+   "d_next_net": -0.0116,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-040",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-054"
+   },
+   "sec_big": 5.62,
+   "sec_next": 589.9
+  },
+  {
+   "pid": 99,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0356,
+   "big": "a",
+   "d_big": 0.0127,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP09-037"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "ST18-001"
+   },
+   "sec_big": 1.85,
+   "sec_next": 148.32
+  },
+  {
+   "pid": 100,
+   "type": "play",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0572,
+   "big": "a",
+   "d_big": -0.0588,
+   "d_next": -0.0064,
+   "d_next_net": -0.0146,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-042"
+   },
+   "sec_big": 27.43,
+   "sec_next": 523.7
+  },
+  {
+   "pid": 101,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.3297,
+   "big": "a",
+   "d_big": 0.3035,
+   "d_next": -0.0445,
+   "d_next_net": -0.0549,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-036",
+    "targets": [
+     "OP09-081"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP12-036",
+    "targets": [
+     "OP09-081"
+    ]
+   },
+   "sec_big": 4.38,
+   "sec_next": 299.77
+  },
+  {
+   "pid": 102,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.2264,
+   "big": "a",
+   "d_big": -0.2602,
+   "d_next": 0.0004,
+   "d_next_net": 0.1676,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.01,
+    0.385
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-118",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 14.07,
+   "sec_next": 670.55
+  },
+  {
+   "pid": 103,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0563,
+   "big": "other",
+   "d_big": -0.0394,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP03-089"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP11-092",
+    "targets": [
+     "OP07-029"
+    ]
+   },
+   "sec_big": 4.26,
+   "sec_next": 253.7
+  },
+  {
+   "pid": 104,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.5323,
+   "big": "a",
+   "d_big": -0.5949,
+   "d_next": -1.1965,
+   "d_next_net": -1.138,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-061"
+   },
+   "sec_big": 11.92,
+   "sec_next": 469.19
+  },
+  {
+   "pid": 105,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0665,
+   "big": "a",
+   "d_big": -0.0504,
+   "d_next": 0.0109,
+   "d_next_net": -0.0411,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.253,
+    0.253
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP14-079"
+   },
+   "sec_big": 7.84,
+   "sec_next": 688.57
+  },
+  {
+   "pid": 106,
+   "type": "activate",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.2305,
+   "big": "a",
+   "d_big": -0.2315,
+   "d_next": -0.1735,
+   "d_next_net": -0.0775,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-031"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 14.15,
+   "sec_next": 384.44
+  },
+  {
+   "pid": 107,
+   "type": "don",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0135,
+   "big": "a",
+   "d_big": -0.0017,
+   "d_next": 0.0343,
+   "d_next_net": 0.0245,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.3157,
+    0.4407
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 10.31,
+   "sec_next": 332.25
+  },
+  {
+   "pid": 108,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0046,
+   "big": "a",
+   "d_big": -0.0359,
+   "d_next": -0.1173,
+   "d_next_net": -0.0004,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP10-002"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-069"
+   },
+   "sec_big": 5.5,
+   "sec_next": 274.05
+  },
+  {
+   "pid": 109,
+   "type": "discard",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.1159,
+   "big": "a",
+   "d_big": -0.2337,
+   "d_next": -0.0163,
+   "d_next_net": -0.0092,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB04-032"
+   },
+   "sec_big": 12.33,
+   "sec_next": 264.77
+  },
+  {
+   "pid": 110,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0967,
+   "big": "a",
+   "d_big": -0.238,
+   "d_next": -0.0608,
+   "d_next_net": -0.0322,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP15-061",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP15-061"
+   },
+   "sec_big": 16.17,
+   "sec_next": 515.79
+  },
+  {
+   "pid": 111,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0715,
+   "big": "a",
+   "d_big": -0.1008,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP05-106"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB01-057"
+   },
+   "sec_big": 1.78,
+   "sec_next": 46.5
+  },
+  {
+   "pid": 112,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1501,
+   "big": "a",
+   "d_big": -0.2185,
+   "d_next": -0.1054,
+   "d_next_net": -0.0442,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP12-118"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP13-031"
+   },
+   "sec_big": 16.82,
+   "sec_next": 1094.48
+  },
+  {
+   "pid": 113,
+   "type": "don",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0058,
+   "big": "a",
+   "d_big": 0.0052,
+   "d_next": -0.0111,
+   "d_next_net": 0.0051,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-001",
+    "targets": [
+     "OP16-022"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP08-001"
+   },
+   "sec_big": 5.85,
+   "sec_next": 228.36
+  },
+  {
+   "pid": 114,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0417,
+   "big": "a",
+   "d_big": -0.4645,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP09-002"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "ST23-001"
+   },
+   "sec_big": 2.16,
+   "sec_next": 88.59
+  },
+  {
+   "pid": 115,
+   "type": "discard",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0698,
+   "big": "a",
+   "d_big": 0.0235,
+   "d_next": 0.0751,
+   "d_next_net": 0.0695,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.125,
+   "ci_next": [
+    -0.4284,
+    0.1784
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-060",
+    "targets": [
+     "OP17-052"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB04-032"
+   },
+   "sec_big": 39.51,
+   "sec_next": 1088.72
+  },
+  {
+   "pid": 116,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0242,
+   "big": "a",
+   "d_big": 0.0279,
+   "d_next": -0.0532,
+   "d_next_net": -0.0336,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-002"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-002",
+    "targets": [
+     "OP07-097"
+    ]
+   },
+   "sec_big": 7.7,
+   "sec_next": 185.52
+  },
+  {
+   "pid": 117,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0416,
+   "big": "a",
+   "d_big": -0.0775,
+   "d_next": 0.1926,
+   "d_next_net": 0.1532,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.1789,
+    0.1789
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "sec_big": 24.27,
+   "sec_next": 4544.52
+  },
+  {
+   "pid": 118,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0309,
+   "big": "a",
+   "d_big": -0.0688,
+   "d_next": -0.0073,
+   "d_next_net": 0.0253,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP15-098"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-098",
+    "targets": [
+     "OP09-001"
+    ]
+   },
+   "sec_big": 6.69,
+   "sec_next": 197.73
+  },
+  {
+   "pid": 119,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0953,
+   "big": "a",
+   "d_big": 0.0407,
+   "d_next": -0.1127,
+   "d_next_net": -0.0309,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-119"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-089",
+    "targets": [
+     "OP17-079"
+    ]
+   },
+   "sec_big": 5.72,
+   "sec_next": 219.42
+  },
+  {
+   "pid": 120,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0158,
+   "big": "a",
+   "d_big": 0.0181,
+   "d_next": -0.1092,
+   "d_next_net": -0.0915,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP02-013"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP03-001",
+    "targets": [
+     "OP08-001"
+    ]
+   },
+   "sec_big": 3.98,
+   "sec_next": 261.97
+  },
+  {
+   "pid": 121,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.1214,
+   "big": "a",
+   "d_big": 0.0446,
+   "d_next": 0.0414,
+   "d_next_net": 0.0148,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-031",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP14-020",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "sec_big": 8.91,
+   "sec_next": 372.64
+  },
+  {
+   "pid": 122,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1087,
+   "big": "b",
+   "d_big": 0.0106,
+   "d_next": -0.0556,
+   "d_next_net": -0.1763,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.1784,
+    0.4284
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "ST32-001"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 16.25,
+   "sec_next": 355.22
+  },
+  {
+   "pid": 123,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0033,
+   "big": "other",
+   "d_big": -0.0014,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-119",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-087"
+   },
+   "sec_big": 18.11,
+   "sec_next": 328.21
+  },
+  {
+   "pid": 124,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0485,
+   "big": "a",
+   "d_big": -0.0726,
+   "d_next": 0.022,
+   "d_next_net": 0.1181,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.0424,
+    0.2924
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-047",
+    "targets": [
+     "OP11-062"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB01-006"
+   },
+   "sec_big": 4.85,
+   "sec_next": 315.93
+  },
+  {
+   "pid": 125,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1576,
+   "big": "a",
+   "d_big": 0.0163,
+   "d_next": 0.0079,
+   "d_next_net": -0.1667,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP15-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 24.89,
+   "sec_next": 1567.71
+  },
+  {
+   "pid": 126,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.2029,
+   "big": "a",
+   "d_big": 0.2243,
+   "d_next": -0.9097,
+   "d_next_net": -0.7381,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-099",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP05-115"
+   },
+   "sec_big": 15.38,
+   "sec_next": 1753.65
+  },
+  {
+   "pid": 127,
+   "type": "discard",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0291,
+   "big": "a",
+   "d_big": 0.1281,
+   "d_next": 0.0893,
+   "d_next_net": 0.104,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.0424,
+    0.2924
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-042"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-040"
+   },
+   "sec_big": 34.48,
+   "sec_next": 1073.4
+  },
+  {
+   "pid": 128,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0726,
+   "big": "a",
+   "d_big": -0.0622,
+   "d_next": 0.0064,
+   "d_next_net": 0.0047,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-084"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "ST04-017"
+   },
+   "sec_big": 4.26,
+   "sec_next": 139.14
+  },
+  {
+   "pid": 129,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0079,
+   "big": "a",
+   "d_big": -0.1798,
+   "d_next": -0.1092,
+   "d_next_net": -0.1117,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058"
+   },
+   "sec_big": 8.26,
+   "sec_next": 184.53
+  },
+  {
+   "pid": 130,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0689,
+   "big": "a",
+   "d_big": -0.0182,
+   "d_next": 0.0373,
+   "d_next_net": -0.0221,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.1789,
+    0.1789
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-001"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-015",
+    "targets": [
+     "OP03-001"
+    ]
+   },
+   "sec_big": 2.61,
+   "sec_next": 103.05
+  },
+  {
+   "pid": 131,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1503,
+   "big": "a",
+   "d_big": -0.0671,
+   "d_next": -0.3058,
+   "d_next_net": -0.4274,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 11.97,
+   "sec_next": 1473.83
+  },
+  {
+   "pid": 132,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -1.3868,
+   "big": "a",
+   "d_big": -1.403,
+   "d_next": -1.0,
+   "d_next_net": -1.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "EB03-001",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB03-001"
+   },
+   "sec_big": 3.14,
+   "sec_next": 80.8
+  },
+  {
+   "pid": 133,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0387,
+   "big": "a",
+   "d_big": -0.1482,
+   "d_next": 0.6375,
+   "d_next_net": 0.3975,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.01,
+    0.385
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-048",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 11.77,
+   "sec_next": 553.16
+  },
+  {
+   "pid": 134,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.055,
+   "big": "a",
+   "d_big": -0.1227,
+   "d_next": 0.0073,
+   "d_next_net": -0.0009,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP03-077"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP03-113",
+    "targets": [
+     "OP03-022"
+    ]
+   },
+   "sec_big": 2.13,
+   "sec_next": 104.65
+  },
+  {
+   "pid": 135,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0451,
+   "big": "a",
+   "d_big": 0.0168,
+   "d_next": -0.211,
+   "d_next_net": -0.1936,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 8.47,
+   "sec_next": 198.9
+  },
+  {
+   "pid": 136,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0385,
+   "big": "a",
+   "d_big": 0.0043,
+   "d_next": 0.1421,
+   "d_next_net": 0.0958,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.253,
+    0.253
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP10-030",
+    "targets": [
+     "OP15-022"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP10-030"
+   },
+   "sec_big": 7.68,
+   "sec_next": 603.95
+  },
+  {
+   "pid": 137,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0645,
+   "big": "a",
+   "d_big": -0.0396,
+   "d_next": -0.3236,
+   "d_next_net": -0.4166,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-113"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-108",
+    "targets": [
+     "ST04-005"
+    ]
+   },
+   "sec_big": 2.72,
+   "sec_next": 77.82
+  },
+  {
+   "pid": 138,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2933,
+   "big": "a",
+   "d_big": -0.3222,
+   "d_next": 0.0711,
+   "d_next_net": 0.012,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "sec_big": 11.42,
+   "sec_next": 601.13
+  },
+  {
+   "pid": 139,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.3625,
+   "big": "a",
+   "d_big": -0.4359,
+   "d_next": -0.4491,
+   "d_next_net": -0.258,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP06-068"
+   },
+   "sec_big": 3.6,
+   "sec_next": 58.87
+  },
+  {
+   "pid": 140,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1761,
+   "big": "a",
+   "d_big": -0.048,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "ST34-004"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-061"
+   },
+   "sec_big": 49.81,
+   "sec_next": 1484.63
+  },
+  {
+   "pid": 141,
+   "type": "discard",
+   "src": "kr",
+   "user": "a",
+   "d_now": 0.0004,
+   "big": "a",
+   "d_big": -0.0479,
+   "d_next": -0.0337,
+   "d_next_net": -0.1253,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-044"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-046"
+   },
+   "sec_big": 24.84,
+   "sec_next": 786.23
+  },
+  {
+   "pid": 142,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.016,
+   "big": "a",
+   "d_big": -0.0129,
+   "d_next": 0.006,
+   "d_next_net": -0.0042,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.1875,
+   "ci_next": [
+    -0.385,
+    0.01
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP16-110"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 4.05,
+   "sec_next": 55.97
+  },
+  {
+   "pid": 143,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0297,
+   "big": "a",
+   "d_big": 0.0073,
+   "d_next": -0.2724,
+   "d_next_net": -0.1817,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 22.44,
+   "sec_next": 488.01
+  },
+  {
+   "pid": 144,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.2358,
+   "big": "a",
+   "d_big": -0.1541,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-071",
+    "targets": [
+     "OP06-020"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP12-041"
+   },
+   "sec_big": 1.48,
+   "sec_next": 13.38
+  },
+  {
+   "pid": 145,
+   "type": "don",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.3123,
+   "big": "a",
+   "d_big": -0.3958,
+   "d_next": 0.0407,
+   "d_next_net": -0.0311,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.375,
+   "ci_next": [
+    0.13,
+    0.62
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-058"
+   },
+   "sec_big": 9.19,
+   "sec_next": 224.98
+  },
+  {
+   "pid": 146,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.2819,
+   "big": "a",
+   "d_big": -0.2753,
+   "d_next": -0.1354,
+   "d_next_net": 0.0991,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP01-040"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "EB01-001"
+   },
+   "sec_big": 5.07,
+   "sec_next": 492.33
+  },
+  {
+   "pid": 147,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0017,
+   "big": "a",
+   "d_big": -0.0844,
+   "d_next": -0.7357,
+   "d_next_net": -0.6905,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-004",
+    "targets": [
+     "OP17-079"
+    ]
+   },
+   "sec_big": 7.04,
+   "sec_next": 571.46
+  },
+  {
+   "pid": 148,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0216,
+   "big": "a",
+   "d_big": -0.0409,
+   "d_next": -0.8547,
+   "d_next_net": -0.4649,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP01-064"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP01-077"
+   },
+   "sec_big": 6.78,
+   "sec_next": 455.26
+  },
+  {
+   "pid": 149,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0445,
+   "big": "b",
+   "d_big": 0.0621,
+   "d_next": 0.208,
+   "d_next_net": 0.2171,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.0424,
+    0.2924
+   ],
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.0424,
+    0.2924
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-081"
+   },
+   "sec_big": 2.51,
+   "sec_next": 98.76
+  },
+  {
+   "pid": 150,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0181,
+   "big": "a",
+   "d_big": 0.0087,
+   "d_next": 0.0359,
+   "d_next_net": 0.1122,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.12,
+    0.37
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-040"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 83.7,
+   "sec_next": 773.75
+  },
+  {
+   "pid": 151,
+   "type": "don",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0454,
+   "big": "a",
+   "d_big": -0.1483,
+   "d_next": -0.4736,
+   "d_next_net": -0.3947,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP12-071"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-071",
+    "targets": [
+     "OP06-024"
+    ]
+   },
+   "sec_big": 15.07,
+   "sec_next": 787.9
+  },
+  {
+   "pid": 152,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.1248,
+   "big": "a",
+   "d_big": 0.2329,
+   "d_next": -0.0524,
+   "d_next_net": -0.0515,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP11-092",
+    "targets": [
+     "OP07-019"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP11-099"
+   },
+   "sec_big": 4.58,
+   "sec_next": 131.66
+  },
+  {
+   "pid": 153,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1824,
+   "big": "a",
+   "d_big": -0.1809,
+   "d_next": -0.0894,
+   "d_next_net": -0.0914,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-081"
+   },
+   "sec_big": 9.72,
+   "sec_next": 302.94
+  },
+  {
+   "pid": 154,
+   "type": "event",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.028,
+   "big": "a",
+   "d_big": -0.0243,
+   "d_next": 0.0303,
+   "d_next_net": 0.0766,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-078"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "sec_big": 7.64,
+   "sec_next": 955.31
+  },
+  {
+   "pid": 155,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0218,
+   "big": "b",
+   "d_big": -0.0357,
+   "d_next": 0.2835,
+   "d_next_net": 0.16,
+   "diff_big": 0.5,
+   "ci_big": [
+    0.247,
+    0.753
+   ],
+   "diff_next": 0.5,
+   "ci_next": [
+    0.247,
+    0.753
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP17-118",
+    "targets": [
+     "OP17-062"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-118",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 22.55,
+   "sec_next": 2217.53
+  },
+  {
+   "pid": 156,
+   "type": "play",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0057,
+   "big": "a",
+   "d_big": 0.0027,
+   "d_next": 0.0052,
+   "d_next_net": -0.0008,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-040"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP10-054",
+    "targets": [
+     "EB01-021"
+    ]
+   },
+   "sec_big": 3.88,
+   "sec_next": 209.21
+  },
+  {
+   "pid": 157,
+   "type": "don",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1366,
+   "big": "a",
+   "d_big": -0.0783,
+   "d_next": 0.167,
+   "d_next_net": 0.1452,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.2707,
+    0.3957
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-063",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP15-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 20.74,
+   "sec_next": 2515.68
+  },
+  {
+   "pid": 158,
+   "type": "don",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0208,
+   "big": "a",
+   "d_big": -0.0035,
+   "d_next": 0.4125,
+   "d_next_net": 0.2397,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.12,
+    0.37
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-054"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-054",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 18.77,
+   "sec_next": 810.8
+  },
+  {
+   "pid": 159,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.7397,
+   "big": "a",
+   "d_big": -0.168,
+   "d_next": -0.2175,
+   "d_next_net": -0.1924,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP13-098"
+   },
+   "sec_big": 7.13,
+   "sec_next": 145.09
+  },
+  {
+   "pid": 160,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0511,
+   "big": "a",
+   "d_big": -0.0647,
+   "d_next": 0.0235,
+   "d_next_net": -0.0218,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.25,
+   "ci_next": [
+    -0.5329,
+    0.0329
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-032"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-074"
+   },
+   "sec_big": 7.19,
+   "sec_next": 306.94
+  },
+  {
+   "pid": 161,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0174,
+   "big": "a",
+   "d_big": -0.0897,
+   "d_next": -0.0477,
+   "d_next_net": -0.0795,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP09-081",
+    "targets": [
+     "OP09-042"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP09-083"
+   },
+   "sec_big": 5.26,
+   "sec_next": 156.77
+  },
+  {
+   "pid": 162,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0553,
+   "big": "a",
+   "d_big": 0.0248,
+   "d_next": 0.0972,
+   "d_next_net": 0.1369,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.1543,
+    0.2793
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "ST08-002"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "ST08-015"
+   },
+   "sec_big": 3.39,
+   "sec_next": 122.69
+  },
+  {
+   "pid": 163,
+   "type": "play",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.048,
+   "big": "a",
+   "d_big": -0.0359,
+   "d_next": -0.0406,
+   "d_next_net": -0.062,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-052"
+   },
+   "sec_big": 10.16,
+   "sec_next": 618.5
+  },
+  {
+   "pid": 164,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0366,
+   "big": "a",
+   "d_big": 0.1327,
+   "d_next": -0.1051,
+   "d_next_net": -0.1038,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-088"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-004",
+    "targets": [
+     "OP17-045"
+    ]
+   },
+   "sec_big": 13.49,
+   "sec_next": 544.26
+  },
+  {
+   "pid": 165,
+   "type": "event",
+   "src": "kr",
+   "user": "b",
+   "d_now": 0.0272,
+   "big": "a",
+   "d_big": 0.0148,
+   "d_next": 0.0157,
+   "d_next_net": 0.045,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 28.21,
+   "sec_next": 814.18
+  },
+  {
+   "pid": 166,
+   "type": "activate",
+   "src": "kr",
+   "user": "b",
+   "d_now": 0.4317,
+   "big": "b",
+   "d_big": 0.5862,
+   "d_next": -0.1195,
+   "d_next_net": 0.0382,
+   "diff_big": -0.25,
+   "ci_big": [
+    -0.5329,
+    0.0329
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "EB04-031",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-063"
+   },
+   "sec_big": 31.49,
+   "sec_next": 1835.33
+  },
+  {
+   "pid": 167,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0504,
+   "big": "a",
+   "d_big": -0.0612,
+   "d_next": -0.0291,
+   "d_next_net": -0.034,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-111"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP07-097"
+   },
+   "sec_big": 7.26,
+   "sec_next": 281.56
+  },
+  {
+   "pid": 168,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0299,
+   "big": "a",
+   "d_big": -0.0793,
+   "d_next": -0.1886,
+   "d_next_net": -0.1919,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP01-016"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 20.7,
+   "sec_next": 902.86
+  },
+  {
+   "pid": 169,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0222,
+   "big": "a",
+   "d_big": -0.005,
+   "d_next": -0.017,
+   "d_next_net": -0.0162,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP13-043"
+   },
+   "sec_big": 52.3,
+   "sec_next": 1835.61
+  },
+  {
+   "pid": 170,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.006,
+   "big": "a",
+   "d_big": -0.0966,
+   "d_next": -0.001,
+   "d_next_net": 0.0737,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-086"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-004"
+   },
+   "sec_big": 7.6,
+   "sec_next": 385.62
+  },
+  {
+   "pid": 171,
+   "type": "play",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0256,
+   "big": "a",
+   "d_big": -0.0266,
+   "d_next": 0.0,
+   "d_next_net": 0.0004,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP12-023"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP12-034"
+   },
+   "sec_big": 22.91,
+   "sec_next": 1361.95
+  },
+  {
+   "pid": 172,
+   "type": "play",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0407,
+   "big": "a",
+   "d_big": -0.1114,
+   "d_next": 0.0082,
+   "d_next_net": -0.0567,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.1789,
+    0.1789
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP09-086",
+    "targets": [
+     "OP10-022"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP09-086"
+   },
+   "sec_big": 7.12,
+   "sec_next": 442.44
+  },
+  {
+   "pid": 173,
+   "type": "discard",
+   "src": "kr",
+   "user": "b",
+   "d_now": 0.0228,
+   "big": "a",
+   "d_big": -0.0208,
+   "d_next": -0.0115,
+   "d_next_net": 0.0649,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-118"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-040"
+   },
+   "sec_big": 16.16,
+   "sec_next": 484.95
+  },
+  {
+   "pid": 174,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0003,
+   "big": "a",
+   "d_big": -0.0014,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-001"
+   },
+   "sec_big": 7.02,
+   "sec_next": 87.9
+  },
+  {
+   "pid": 175,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0275,
+   "big": "a",
+   "d_big": -0.0313,
+   "d_next": -0.0,
+   "d_next_net": -0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-052"
+   },
+   "sec_big": 10.02,
+   "sec_next": 471.44
+  },
+  {
+   "pid": 176,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2812,
+   "big": "a",
+   "d_big": -0.2714,
+   "d_next": -0.106,
+   "d_next_net": -0.1114,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 18.42,
+   "sec_next": 278.63
+  },
+  {
+   "pid": 177,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.1254,
+   "big": "b",
+   "d_big": 0.2705,
+   "d_next": 0.1461,
+   "d_next_net": -0.0183,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.12,
+    0.37
+   ],
+   "diff_next": 0.125,
+   "ci_next": [
+    -0.12,
+    0.37
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-044"
+   },
+   "sec_big": 46.83,
+   "sec_next": 948.21
+  },
+  {
+   "pid": 178,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0807,
+   "big": "a",
+   "d_big": 0.145,
+   "d_next": -0.637,
+   "d_next_net": -0.6067,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-118"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-118",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 22.84,
+   "sec_next": 2084.91
+  },
+  {
+   "pid": 179,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.115,
+   "big": "a",
+   "d_big": -0.0783,
+   "d_next": 0.1394,
+   "d_next_net": 0.1379,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.1875,
+   "ci_next": [
+    -0.18,
+    0.555
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-054",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-044"
+   },
+   "sec_big": 38.65,
+   "sec_next": 1306.49
+  },
+  {
+   "pid": 180,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.4187,
+   "big": "a",
+   "d_big": -0.6216,
+   "d_next": 0.2062,
+   "d_next_net": 0.2315,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP05-034"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP08-039"
+   },
+   "sec_big": 2.26,
+   "sec_next": 82.75
+  },
+  {
+   "pid": 181,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2145,
+   "big": "a",
+   "d_big": -0.2762,
+   "d_next": -0.1895,
+   "d_next_net": -0.2886,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP14-020"
+   },
+   "sec_big": 8.38,
+   "sec_next": 176.84
+  },
+  {
+   "pid": 182,
+   "type": "event",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0001,
+   "big": "other",
+   "d_big": -0.054,
+   "d_next": -0.0529,
+   "d_next_net": -0.0692,
+   "diff_big": 0.0,
+   "ci_big": [
+    -0.1789,
+    0.1789
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP09-020"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP09-008"
+   },
+   "sec_big": 2.75,
+   "sec_next": 146.6
+  },
+  {
+   "pid": 183,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0275,
+   "big": "a",
+   "d_big": -0.002,
+   "d_next": 0.4417,
+   "d_next_net": 0.4529,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    -0.1789,
+    0.1789
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-118"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-061",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 33.04,
+   "sec_next": 1943.99
+  },
+  {
+   "pid": 184,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.201,
+   "big": "a",
+   "d_big": -0.323,
+   "d_next": -0.1569,
+   "d_next_net": -0.1389,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP09-083"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-095"
+   },
+   "sec_big": 5.4,
+   "sec_next": 173.47
+  },
+  {
+   "pid": 185,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0321,
+   "big": "b",
+   "d_big": 0.0188,
+   "d_next": 0.1925,
+   "d_next_net": 0.0982,
+   "diff_big": -0.125,
+   "ci_big": [
+    -0.2924,
+    0.0424
+   ],
+   "diff_next": -0.125,
+   "ci_next": [
+    -0.2924,
+    0.0424
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-061",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-076"
+   },
+   "sec_big": 6.8,
+   "sec_next": 385.51
+  },
+  {
+   "pid": 186,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0691,
+   "big": "a",
+   "d_big": -0.0811,
+   "d_next": 0.1079,
+   "d_next_net": 0.0731,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP16-060"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP16-064",
+    "targets": [
+     "OP12-034"
+    ]
+   },
+   "sec_big": 5.29,
+   "sec_next": 233.42
+  },
+  {
+   "pid": 187,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0029,
+   "big": "a",
+   "d_big": 0.0018,
+   "d_next": -0.0033,
+   "d_next_net": 0.003,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-090"
+   },
+   "sec_big": 3.64,
+   "sec_next": 103.6
+  },
+  {
+   "pid": 188,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.173,
+   "big": "a",
+   "d_big": -0.1288,
+   "d_next": -0.0075,
+   "d_next_net": -0.0333,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-074"
+   },
+   "sec_big": 33.49,
+   "sec_next": 1261.89
+  },
+  {
+   "pid": 189,
+   "type": "event",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.0219,
+   "big": "a",
+   "d_big": -0.0099,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-075"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP10-067",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 9.84,
+   "sec_next": 235.72
+  },
+  {
+   "pid": 190,
+   "type": "event",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0081,
+   "big": "a",
+   "d_big": -0.0006,
+   "d_next": -0.012,
+   "d_next_net": -0.0615,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP11-060"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP03-123"
+   },
+   "sec_big": 10.11,
+   "sec_next": 503.97
+  },
+  {
+   "pid": 191,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.05,
+   "big": "a",
+   "d_big": 0.0218,
+   "d_next": -0.2872,
+   "d_next_net": -0.3814,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-003"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-026"
+   },
+   "sec_big": 1.52,
+   "sec_next": 156.26
+  },
+  {
+   "pid": 192,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0082,
+   "big": "a",
+   "d_big": -0.0074,
+   "d_next": 0.1447,
+   "d_next_net": 0.1633,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.1875,
+   "ci_next": [
+    -0.385,
+    0.01
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP08-001"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP08-001"
+   },
+   "sec_big": 6.09,
+   "sec_next": 283.39
+  },
+  {
+   "pid": 193,
+   "type": "discard",
+   "src": "kr",
+   "user": "a",
+   "d_now": 0.0244,
+   "big": "a",
+   "d_big": -0.0239,
+   "d_next": 0.0479,
+   "d_next_net": 0.0544,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.25,
+   "ci_next": [
+    -0.5329,
+    0.0329
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-048",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "sec_big": 16.15,
+   "sec_next": 1055.61
+  },
+  {
+   "pid": 194,
+   "type": "discard",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0302,
+   "big": "a",
+   "d_big": -0.0608,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-032"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "EB04-031",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 18.2,
+   "sec_next": 772.51
+  },
+  {
+   "pid": 195,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0062,
+   "big": "other",
+   "d_big": 0.0035,
+   "d_next": -0.0936,
+   "d_next_net": -0.0619,
+   "diff_big": 0.0,
+   "ci_big": [
+    -0.3578,
+    0.3578
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-040"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-040",
+    "targets": [
+     "OP17-054"
+    ]
+   },
+   "sec_big": 90.42,
+   "sec_next": 2701.26
+  },
+  {
+   "pid": 196,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0072,
+   "big": "a",
+   "d_big": 0.0077,
+   "d_next": 0.0697,
+   "d_next_net": 0.0417,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.1543,
+    0.2793
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-081"
+   },
+   "sec_big": 7.75,
+   "sec_next": 287.55
+  },
+  {
+   "pid": 197,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.5403,
+   "big": "a",
+   "d_big": -0.2647,
+   "d_next": -0.5246,
+   "d_next_net": -0.3943,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "ST34-004"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-062"
+   },
+   "sec_big": 22.96,
+   "sec_next": 839.98
+  },
+  {
+   "pid": 198,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0658,
+   "big": "a",
+   "d_big": -0.1387,
+   "d_next": -0.0876,
+   "d_next_net": -0.1243,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 22.47,
+   "sec_next": 888.51
+  },
+  {
+   "pid": 199,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0142,
+   "big": "a",
+   "d_big": 0.0084,
+   "d_next": -0.041,
+   "d_next_net": -0.0387,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP09-002"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP09-020"
+   },
+   "sec_big": 3.18,
+   "sec_next": 275.59
+  },
+  {
+   "pid": 200,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0007,
+   "big": "a",
+   "d_big": -0.0309,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "EB04-001",
+    "targets": [
+     "OP06-022"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-001"
+   },
+   "sec_big": 2.41,
+   "sec_next": 141.84
+  },
+  {
+   "pid": 201,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0154,
+   "big": "a",
+   "d_big": 0.0135,
+   "d_next": -0.0109,
+   "d_next_net": -0.0202,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP17-058"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 5.58,
+   "sec_next": 158.86
+  },
+  {
+   "pid": 202,
+   "type": "discard",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.051,
+   "big": "a",
+   "d_big": -0.0943,
+   "d_next": -0.0051,
+   "d_next_net": -0.0966,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-081"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP09-090"
+   },
+   "sec_big": 11.24,
+   "sec_next": 373.1
+  },
+  {
+   "pid": 203,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0097,
+   "big": "a",
+   "d_big": 0.0117,
+   "d_next": 0.0108,
+   "d_next_net": -0.0062,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-040"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP15-058"
+    ]
+   },
+   "sec_big": 19.23,
+   "sec_next": 1454.11
+  },
+  {
+   "pid": 204,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0053,
+   "big": "a",
+   "d_big": -0.012,
+   "d_next": -0.078,
+   "d_next_net": -0.0429,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-054"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "sec_big": 19.46,
+   "sec_next": 1299.59
+  },
+  {
+   "pid": 205,
+   "type": "discard",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0068,
+   "big": "a",
+   "d_big": -0.0138,
+   "d_next": -0.4997,
+   "d_next_net": -0.5,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP05-106"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP05-104"
+   },
+   "sec_big": 2.36,
+   "sec_next": 122.82
+  },
+  {
+   "pid": 206,
+   "type": "event",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0272,
+   "big": "a",
+   "d_big": -0.0161,
+   "d_next": 0.0127,
+   "d_next_net": 0.0137,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP12-079"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP12-066"
+   },
+   "sec_big": 6.15,
+   "sec_next": 221.54
+  },
+  {
+   "pid": 207,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.3244,
+   "big": "a",
+   "d_big": -0.4978,
+   "d_next": -0.182,
+   "d_next_net": -0.2995,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 12.87,
+   "sec_next": 1875.19
+  },
+  {
+   "pid": 208,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1421,
+   "big": "a",
+   "d_big": -0.154,
+   "d_next": 0.0012,
+   "d_next_net": 0.0167,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.2793,
+    0.1543
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP09-013"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP09-020"
+   },
+   "sec_big": 4.08,
+   "sec_next": 308.16
+  },
+  {
+   "pid": 209,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.2754,
+   "big": "a",
+   "d_big": -0.3464,
+   "d_next": -0.7154,
+   "d_next_net": -0.698,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP06-022"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP08-023",
+    "targets": [
+     "EB04-001"
+    ]
+   },
+   "sec_big": 2.01,
+   "sec_next": 129.89
+  },
+  {
+   "pid": 210,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.1536,
+   "big": "b",
+   "d_big": 0.0813,
+   "d_next": -0.0164,
+   "d_next_net": -0.0569,
+   "diff_big": 0.125,
+   "ci_big": [
+    -0.2272,
+    0.4772
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-086"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-080"
+   },
+   "sec_big": 44.53,
+   "sec_next": 1387.57
+  },
+  {
+   "pid": 211,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0134,
+   "big": "a",
+   "d_big": -0.0234,
+   "d_next": 0.0063,
+   "d_next_net": -0.0028,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-040"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-039"
+   },
+   "sec_big": 7.82,
+   "sec_next": 163.01
+  },
+  {
+   "pid": 212,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": 0.0414,
+   "big": "a",
+   "d_big": -0.0213,
+   "d_next": -0.012,
+   "d_next_net": -0.0396,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 9.33,
+   "sec_next": 443.87
+  },
+  {
+   "pid": 213,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0299,
+   "big": "a",
+   "d_big": -0.0213,
+   "d_next": 0.0109,
+   "d_next_net": 0.0199,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.1543,
+    0.2793
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP13-079"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP13-079"
+   },
+   "sec_big": 4.14,
+   "sec_next": 397.02
+  },
+  {
+   "pid": 214,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0859,
+   "big": "a",
+   "d_big": -0.0419,
+   "d_next": 0.0334,
+   "d_next_net": 0.0146,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-045",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-044"
+   },
+   "sec_big": 17.33,
+   "sec_next": 515.82
+  },
+  {
+   "pid": 215,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.3631,
+   "big": "a",
+   "d_big": -0.2925,
+   "d_next": -0.1748,
+   "d_next_net": -0.0737,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-080"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-081"
+   },
+   "sec_big": 10.03,
+   "sec_next": 196.46
+  },
+  {
+   "pid": 216,
+   "type": "activate",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.1288,
+   "big": "a",
+   "d_big": -0.1358,
+   "d_next": -0.0583,
+   "d_next_net": -0.1052,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP14-020"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP14-020",
+    "targets": [
+     "OP17-086"
+    ]
+   },
+   "sec_big": 15.04,
+   "sec_next": 649.23
+  },
+  {
+   "pid": 217,
+   "type": "discard",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0255,
+   "big": "a",
+   "d_big": -0.0696,
+   "d_next": -0.0,
+   "d_next_net": 0.0363,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "ST34-004"
+   },
+   "sec_big": 28.54,
+   "sec_next": 1057.08
+  },
+  {
+   "pid": 218,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": -0.3682,
+   "big": "a",
+   "d_big": -0.2819,
+   "d_next": -0.0932,
+   "d_next_net": -0.2738,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-052"
+   },
+   "sec_big": 13.24,
+   "sec_next": 206.65
+  },
+  {
+   "pid": 219,
+   "type": "event",
+   "src": "kr",
+   "user": "b",
+   "d_now": -0.0507,
+   "big": "a",
+   "d_big": -0.0287,
+   "d_next": -0.785,
+   "d_next_net": -0.5202,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 21.69,
+   "sec_next": 933.75
+  },
+  {
+   "pid": 220,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.0125,
+   "big": "a",
+   "d_big": 0.0275,
+   "d_next": -0.2549,
+   "d_next_net": -0.2174,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP11-030"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 2,
+    "card": "OP11-108",
+    "targets": [
+     "OP15-088"
+    ]
+   },
+   "sec_big": 3.16,
+   "sec_next": 402.07
+  },
+  {
+   "pid": 221,
+   "type": "discard",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.2471,
+   "big": "a",
+   "d_big": 0.2664,
+   "d_next": -0.0037,
+   "d_next_net": -0.0274,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP17-045"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-045",
+    "targets": [
+     "OP15-061"
+    ]
+   },
+   "sec_big": 9.56,
+   "sec_next": 1151.45
+  },
+  {
+   "pid": 222,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.1674,
+   "big": "a",
+   "d_big": -0.1939,
+   "d_next": -0.1487,
+   "d_next_net": -0.2146,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP04-039"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 5.5,
+   "sec_next": 50.07
+  },
+  {
+   "pid": 223,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.6562,
+   "big": "b",
+   "d_big": -0.153,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-082",
+    "targets": [
+     "OP14-020"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-007"
+   },
+   "sec_big": 1.55,
+   "sec_next": 311.88
+  },
+  {
+   "pid": 224,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0375,
+   "big": "a",
+   "d_big": -0.0347,
+   "d_next": -0.0482,
+   "d_next_net": -0.0842,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP05-060"
+   },
+   "sec_big": 4.9,
+   "sec_next": 240.48
+  },
+  {
+   "pid": 225,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1427,
+   "big": "a",
+   "d_big": -0.1558,
+   "d_next": -0.1206,
+   "d_next_net": -0.3012,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP02-013"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP08-055"
+   },
+   "sec_big": 5.28,
+   "sec_next": 529.49
+  },
+  {
+   "pid": 226,
+   "type": "activate",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.0142,
+   "big": "a",
+   "d_big": -0.0673,
+   "d_next": -0.0051,
+   "d_next_net": 0.0074,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-031"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-058",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 23.52,
+   "sec_next": 930.35
+  },
+  {
+   "pid": 227,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": 0.024,
+   "big": "b",
+   "d_big": 0.0752,
+   "d_next": -0.043,
+   "d_next_net": -0.039,
+   "diff_big": 0.0625,
+   "ci_big": [
+    -0.06,
+    0.185
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP13-120"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP12-095",
+    "targets": [
+     "EB03-001"
+    ]
+   },
+   "sec_big": 8.22,
+   "sec_next": 300.0
+  },
+  {
+   "pid": 228,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0039,
+   "big": "b",
+   "d_big": 0.031,
+   "d_next": 0.1139,
+   "d_next_net": 0.1478,
+   "diff_big": 0.1333,
+   "ci_big": [
+    -0.1905,
+    0.4572
+   ],
+   "diff_next": 0.1333,
+   "ci_next": [
+    -0.1905,
+    0.4572
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP04-039"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP04-081",
+    "targets": [
+     "OP07-097"
+    ]
+   },
+   "sec_big": 9.57,
+   "sec_next": 290.5
+  },
+  {
+   "pid": 229,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.06,
+   "big": "b",
+   "d_big": -0.0467,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": 0.0,
+   "ci_big": [
+    0.0,
+    0.0
+   ],
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "EB04-031",
+    "targets": [
+     "OP17-054"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "EB04-031"
+   },
+   "sec_big": 26.24,
+   "sec_next": 938.32
+  },
+  {
+   "pid": 230,
+   "type": "activate",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0081,
+   "big": "a",
+   "d_big": -0.0498,
+   "d_next": -0.1118,
+   "d_next_net": -0.1347,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-067"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "sec_big": 12.77,
+   "sec_next": 571.69
+  },
+  {
+   "pid": 231,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1036,
+   "big": "a",
+   "d_big": -0.1191,
+   "d_next": -0.0349,
+   "d_next_net": 0.0001,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-077"
+   },
+   "sec_big": 18.16,
+   "sec_next": 450.56
+  },
+  {
+   "pid": 232,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2255,
+   "big": "a",
+   "d_big": -0.2073,
+   "d_next": -0.2889,
+   "d_next_net": -0.2639,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "EB04-040"
+   },
+   "sec_big": 16.02,
+   "sec_next": 595.67
+  },
+  {
+   "pid": 233,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0268,
+   "big": "a",
+   "d_big": 0.0347,
+   "d_next": 0.006,
+   "d_next_net": -0.0033,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.06,
+    0.185
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP05-006"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP07-001"
+   },
+   "sec_big": 1.59,
+   "sec_next": 132.49
+  },
+  {
+   "pid": 234,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0725,
+   "big": "a",
+   "d_big": -0.0279,
+   "d_next": -0.0256,
+   "d_next_net": -0.1238,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP13-113"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP07-114"
+   },
+   "sec_big": 3.54,
+   "sec_next": 91.43
+  },
+  {
+   "pid": 235,
+   "type": "activate",
+   "src": "kr",
+   "user": "a",
+   "d_now": -0.156,
+   "big": "a",
+   "d_big": -0.1194,
+   "d_next": -0.2589,
+   "d_next_net": -0.2313,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP17-063"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-060",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 43.42,
+   "sec_next": 828.65
+  },
+  {
+   "pid": 236,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": 0.0147,
+   "big": "a",
+   "d_big": 0.0077,
+   "d_next": 0.0179,
+   "d_next_net": 0.0232,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0,
+   "ci_next": [
+    0.0,
+    0.0
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP07-079"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP03-094"
+   },
+   "sec_big": 4.97,
+   "sec_next": 251.92
+  },
+  {
+   "pid": 237,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.3439,
+   "big": "a",
+   "d_big": -0.392,
+   "d_next": -0.081,
+   "d_next_net": -0.0918,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP17-039",
+    "targets": [
+     "OP13-004"
+    ]
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-055"
+   },
+   "sec_big": 36.65,
+   "sec_next": 601.16
+  },
+  {
+   "pid": 238,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0816,
+   "big": "a",
+   "d_big": -0.0731,
+   "d_next": -0.0335,
+   "d_next_net": -0.0053,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP07-111"
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP07-097"
+   },
+   "sec_big": 2.96,
+   "sec_next": 80.18
+  },
+  {
+   "pid": 239,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0446,
+   "big": "a",
+   "d_big": 0.0106,
+   "d_next": 0.0685,
+   "d_next_net": 0.0399,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.25,
+   "ci_next": [
+    -0.4691,
+    -0.0309
+   ],
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-061"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-076"
+   },
+   "sec_big": 12.32,
+   "sec_next": 711.78
+  },
+  {
+   "pid": 240,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1025,
+   "big": "a",
+   "d_big": -0.1141,
+   "d_next": -0.2602,
+   "d_next_net": -0.2136,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP06-020",
+    "targets": [
+     "OP12-041"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP06-020"
+   },
+   "sec_big": 6.39,
+   "sec_next": 112.37
+  },
+  {
+   "pid": 241,
+   "type": "event",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.017,
+   "big": "a",
+   "d_big": 0.0002,
+   "d_next": -0.0513,
+   "d_next_net": -0.01,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "PLAY",
+    "card": "OP15-077"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-118",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 11.52,
+   "sec_next": 818.73
+  },
+  {
+   "pid": 242,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.1805,
+   "big": "a",
+   "d_big": -0.1207,
+   "d_next": -0.0488,
+   "d_next_net": -0.0252,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP15-078"
+   },
+   "sec_big": 29.9,
+   "sec_next": 517.81
+  },
+  {
+   "pid": 243,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0707,
+   "big": "a",
+   "d_big": -0.085,
+   "d_next": -0.0574,
+   "d_next_net": -0.0398,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP13-097"
+   },
+   "sec_big": 5.02,
+   "sec_next": 172.38
+  },
+  {
+   "pid": 244,
+   "type": "activate",
+   "src": "m5",
+   "user": "a",
+   "d_now": 0.0086,
+   "big": "a",
+   "d_big": 0.0064,
+   "d_next": 0.2366,
+   "d_next_net": 0.1878,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": 0.0625,
+   "ci_next": [
+    -0.1543,
+    0.2793
+   ],
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP15-058"
+   },
+   "b": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP15-061",
+    "targets": [
+     "OP17-039"
+    ]
+   },
+   "sec_big": 36.83,
+   "sec_next": 467.18
+  },
+  {
+   "pid": 245,
+   "type": "activate",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.1839,
+   "big": "a",
+   "d_big": -0.3978,
+   "d_next": -0.4279,
+   "d_next_net": -0.355,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 0,
+    "card": "OP13-083",
+    "targets": [
+     "OP16-001"
+    ]
+   },
+   "b": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP13-099"
+   },
+   "sec_big": 3.6,
+   "sec_next": 238.7
+  },
+  {
+   "pid": 246,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.2586,
+   "big": "a",
+   "d_big": -0.1851,
+   "d_next": -0.2805,
+   "d_next_net": -0.0553,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 10.42,
+   "sec_next": 434.06
+  },
+  {
+   "pid": 247,
+   "type": "event",
+   "src": "hb",
+   "user": "b",
+   "d_now": -0.0167,
+   "big": "b",
+   "d_big": -0.0531,
+   "d_next": 0.1374,
+   "d_next_net": 0.0924,
+   "diff_big": -0.0625,
+   "ci_big": [
+    -0.3436,
+    0.2186
+   ],
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.3436,
+    0.2186
+   ],
+   "a": {
+    "action_type": "DON_BOX",
+    "don_k": 1,
+    "card": "OP02-013"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP02-022"
+   },
+   "sec_big": 4.46,
+   "sec_next": 203.47
+  },
+  {
+   "pid": 248,
+   "type": "event",
+   "src": "m5",
+   "user": "b",
+   "d_now": -0.0514,
+   "big": "a",
+   "d_big": -0.0763,
+   "d_next": 0.0347,
+   "d_next_net": -0.027,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": -0.0625,
+   "ci_next": [
+    -0.185,
+    0.06
+   ],
+   "a": {
+    "action_type": "TURN_END"
+   },
+   "b": {
+    "action_type": "PLAY",
+    "card": "OP17-056"
+   },
+   "sec_big": 12.84,
+   "sec_next": 334.55
+  },
+  {
+   "pid": 249,
+   "type": "activate",
+   "src": "hb",
+   "user": "a",
+   "d_now": -0.0141,
+   "big": "a",
+   "d_big": -0.0847,
+   "d_next": 0.0,
+   "d_next_net": 0.0,
+   "diff_big": null,
+   "ci_big": null,
+   "diff_next": null,
+   "ci_next": null,
+   "a": {
+    "action_type": "ACTIVATE_MAIN",
+    "card": "OP05-004"
+   },
+   "b": {
+    "action_type": "TURN_END"
+   },
+   "sec_big": 1.59,
+   "sec_next": 119.24
+  }
+ ]
+}

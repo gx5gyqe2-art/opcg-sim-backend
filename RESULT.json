@@ -1,572 +1,291 @@
 {
- "wp": "window-read-all",
- "stage": 1,
- "status": "stage1_done_waiting_decision",
- "branch": "claude/window-read-all",
- "spec": "docs/search_efficiency_plan.md §7.67（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+477）",
- "report": "docs/reports/2026-10-28_window_read_all_stage1.md",
- "results_dir": "n1_results/window_read_all/",
- "tool": "tests/scripts/window_read_all.py",
+ "wp": "main-read",
+ "status": "done",
+ "branch": "claude/main-read",
+ "spec": "docs/search_efficiency_plan.md §7.68（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+479）",
+ "report": "docs/reports/2026-10-28_main_read.md",
+ "results_dir": "n1_results/main_read/",
+ "tool": "tests/scripts/main_read.py",
  "engine_changed": false,
  "points": {
-  "total": 350,
+  "total": 250,
   "per_type": 50,
   "eval_failures": 0,
-  "changed_640w2": 97,
-  "judged": 97,
-  "battle_life1_skipped": {
-   "counter": 12,
-   "blocker": 11,
-   "checked": 123
-  }
+  "judged": 99,
+  "judged_big": 35,
+  "judged_next": 80
  },
  "offsets": {
-  "read": 10000,
-  "judge": 11000
+  "next": 12000,
+  "judge": 13000
  },
+ "big_sims": 5120,
+ "next_worlds": 8,
  "judge_k": 16,
  "types": {
-  "counter": {
+  "play": {
    "n": 50,
-   "m_mean": 3.88,
-   "change_160w2": 0.24,
-   "change_160w4": 0.24,
-   "change_640w2": 0.36,
-   "change_640w4": 0.34,
-   "change_netw4": 0.08,
-   "judged": {
-    "n": 18,
-    "mean": 0.0208,
+   "a_uses": 25,
+   "big_changes": 0.18,
+   "big_to_b": 6,
+   "big_to_other": 3,
+   "next_prefers_b": 13,
+   "next_prefers_b_rate": 0.26,
+   "next_prefers_saving": 28,
+   "judged_big": {
+    "n": 9,
+    "mean": -0.0069,
     "ci": [
-     -0.0325,
-     0.0742
+     -0.0922,
+     0.0783
     ]
    },
-   "judged_sig_tree_better": 0,
-   "judged_sig_now_better": 0,
-   "gain_per_point": 0.007,
-   "corr_tree_vs_diff": 0.232,
-   "corr_next_vs_diff": 0.249,
-   "next_agrees_with_tree": 11,
-   "next_measured": 18,
-   "sec_tree_mean": 16.17,
-   "sec_tree_per_cand": 4.139,
-   "by_src": {
-    "hb": {
-     "n": 25,
-     "changed": 9,
-     "judged": {
-      "n": 9,
-      "mean": -0.0139,
-      "ci": [
-       -0.1,
-       0.0722
-      ]
-     }
-    },
-    "kr": {
-     "n": 4,
-     "changed": 2,
-     "judged": {
-      "n": 2,
-      "mean": 0.125,
-      "ci": [
-       -0.12,
-       0.37
-      ]
-     }
-    },
-    "m5": {
-     "n": 21,
-     "changed": 7,
-     "judged": {
-      "n": 7,
-      "mean": 0.0357,
-      "ci": [
-       -0.0095,
-       0.0809
-      ]
-     }
-    }
-   }
-  },
-  "blocker": {
-   "n": 50,
-   "m_mean": 2.1,
-   "change_160w2": 0.4,
-   "change_160w4": 0.44,
-   "change_640w2": 0.46,
-   "change_640w4": 0.48,
-   "change_netw4": 0.12,
-   "judged": {
-    "n": 23,
-    "mean": -0.0027,
-    "ci": [
-     -0.034,
-     0.0285
-    ]
-   },
-   "judged_sig_tree_better": 0,
-   "judged_sig_now_better": 0,
-   "gain_per_point": -0.001,
-   "corr_tree_vs_diff": 0.042,
-   "corr_next_vs_diff": 0.193,
-   "next_agrees_with_tree": 15,
-   "next_measured": 23,
-   "sec_tree_mean": 11.08,
-   "sec_tree_per_cand": 5.144,
-   "by_src": {
-    "hb": {
-     "n": 24,
-     "changed": 8,
-     "judged": {
-      "n": 8,
-      "mean": 0.0156,
-      "ci": [
-       -0.0399,
-       0.0711
-      ]
-     }
-    },
-    "kr": {
-     "n": 12,
-     "changed": 8,
-     "judged": {
-      "n": 8,
-      "mean": -0.0391,
-      "ci": [
-       -0.085,
-       0.0069
-      ]
-     }
-    },
-    "m5": {
-     "n": 14,
-     "changed": 7,
-     "judged": {
-      "n": 7,
-      "mean": 0.0179,
-      "ci": [
-       -0.0402,
-       0.0759
-      ]
-     }
-    }
-   }
-  },
-  "confirm_own": {
-   "n": 50,
-   "m_mean": 2.0,
-   "change_160w2": 0.1,
-   "change_160w4": 0.1,
-   "change_640w2": 0.08,
-   "change_640w4": 0.08,
-   "change_netw4": 0.02,
-   "judged": {
-    "n": 4,
-    "mean": 0.0156,
-    "ci": [
-     -0.1928,
-     0.2241
-    ]
-   },
-   "judged_sig_tree_better": 1,
-   "judged_sig_now_better": 0,
-   "gain_per_point": 0.001,
-   "corr_tree_vs_diff": -0.81,
-   "corr_next_vs_diff": 0.596,
-   "next_agrees_with_tree": 2,
-   "next_measured": 4,
-   "sec_tree_mean": 9.73,
-   "sec_tree_per_cand": 4.864,
-   "by_src": {
-    "hb": {
-     "n": 25,
-     "changed": 3,
-     "judged": {
-      "n": 3,
-      "mean": 0.0833,
-      "ci": [
-       -0.144,
-       0.3107
-      ]
-     }
-    },
-    "kr": {
-     "n": 9,
-     "changed": 0,
-     "judged": {
-      "n": 0,
-      "mean": null,
-      "ci": [
-       null,
-       null
-      ]
-     }
-    },
-    "m5": {
-     "n": 16,
-     "changed": 1,
-     "judged": {
-      "n": 1,
-      "mean": -0.1875,
-      "ci": [
-       null,
-       null
-      ]
-     }
-    }
-   }
-  },
-  "confirm_opp": {
-   "n": 50,
-   "m_mean": 2.0,
-   "change_160w2": 0.2,
-   "change_160w4": 0.14,
-   "change_640w2": 0.24,
-   "change_640w4": 0.22,
-   "change_netw4": 0.12,
-   "judged": {
-    "n": 12,
-    "mean": 0.0833,
-    "ci": [
-     -0.0268,
-     0.1935
-    ]
-   },
-   "judged_sig_tree_better": 2,
-   "judged_sig_now_better": 0,
-   "gain_per_point": 0.02,
-   "corr_tree_vs_diff": 0.34,
-   "corr_next_vs_diff": 0.347,
-   "next_agrees_with_tree": 5,
-   "next_measured": 12,
-   "sec_tree_mean": 12.16,
-   "sec_tree_per_cand": 6.082,
-   "by_src": {
-    "hb": {
-     "n": 25,
-     "changed": 6,
-     "judged": {
-      "n": 6,
-      "mean": 0.0729,
-      "ci": [
-       -0.1044,
-       0.2502
-      ]
-     }
-    },
-    "kr": {
-     "n": 8,
-     "changed": 5,
-     "judged": {
-      "n": 5,
-      "mean": 0.1125,
-      "ci": [
-       -0.0625,
-       0.2875
-      ]
-     }
-    },
-    "m5": {
-     "n": 17,
-     "changed": 1,
-     "judged": {
-      "n": 1,
-      "mean": 0.0,
-      "ci": [
-       null,
-       null
-      ]
-     }
-    }
-   }
-  },
-  "don_confirm": {
-   "n": 50,
-   "m_mean": 2.0,
-   "change_160w2": 0.04,
-   "change_160w4": 0.04,
-   "change_640w2": 0.1,
-   "change_640w4": 0.1,
-   "change_netw4": 0.06,
-   "judged": {
-    "n": 5,
-    "mean": -0.0375,
-    "ci": [
-     -0.2719,
-     0.1969
-    ]
-   },
-   "judged_sig_tree_better": 1,
-   "judged_sig_now_better": 1,
-   "gain_per_point": -0.004,
-   "corr_tree_vs_diff": 0.292,
-   "corr_next_vs_diff": 0.417,
-   "next_agrees_with_tree": 3,
-   "next_measured": 5,
-   "sec_tree_mean": 4.17,
-   "sec_tree_per_cand": 2.084,
-   "by_src": {
-    "hb": {
-     "n": 39,
-     "changed": 5,
-     "judged": {
-      "n": 5,
-      "mean": -0.0375,
-      "ci": [
-       -0.2719,
-       0.1969
-      ]
-     }
-    },
-    "kr": {
-     "n": 0,
-     "changed": 0,
-     "judged": {
-      "n": 0,
-      "mean": null,
-      "ci": [
-       null,
-       null
-      ]
-     }
-    },
-    "m5": {
-     "n": 11,
-     "changed": 0,
-     "judged": {
-      "n": 0,
-      "mean": null,
-      "ci": [
-       null,
-       null
-      ]
-     }
-    }
-   }
-  },
-  "select": {
-   "n": 50,
-   "m_mean": 4.8,
-   "change_160w2": 0.36,
-   "change_160w4": 0.34,
-   "change_640w2": 0.42,
-   "change_640w4": 0.48,
-   "change_netw4": 0.08,
-   "judged": {
-    "n": 21,
-    "mean": -0.0149,
-    "ci": [
-     -0.084,
-     0.0543
-    ]
-   },
-   "judged_sig_tree_better": 1,
-   "judged_sig_now_better": 2,
-   "gain_per_point": -0.006,
-   "corr_tree_vs_diff": 0.281,
-   "corr_next_vs_diff": -0.078,
-   "next_agrees_with_tree": 10,
-   "next_measured": 21,
-   "sec_tree_mean": 27.34,
-   "sec_tree_per_cand": 4.929,
-   "by_src": {
-    "hb": {
-     "n": 25,
-     "changed": 7,
-     "judged": {
-      "n": 7,
-      "mean": 0.0,
-      "ci": [
-       -0.0463,
-       0.0463
-      ]
-     }
-    },
-    "kr": {
-     "n": 5,
-     "changed": 4,
-     "judged": {
-      "n": 4,
-      "mean": -0.1562,
-      "ci": [
-       -0.4137,
-       0.1012
-      ]
-     }
-    },
-    "m5": {
-     "n": 20,
-     "changed": 10,
-     "judged": {
-      "n": 10,
-      "mean": 0.0312,
-      "ci": [
-       -0.0587,
-       0.1212
-      ]
-     }
-    }
-   }
-  },
-  "trigger": {
-   "n": 50,
-   "m_mean": 2.0,
-   "change_160w2": 0.24,
-   "change_160w4": 0.24,
-   "change_640w2": 0.28,
-   "change_640w4": 0.24,
-   "change_netw4": 0.04,
-   "judged": {
+   "judged_next": {
     "n": 14,
+    "mean": -0.0045,
+    "ci": [
+     -0.0667,
+     0.0577
+    ]
+   },
+   "gain_big_per_point": -0.001,
+   "gain_next_per_point": -0.001,
+   "corr_next_vs_diff": 0.535,
+   "corr_big_vs_diff": -0.78,
+   "sec_big_mean": 13.09,
+   "sec_next_mean": 478.9,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    0
+   ]
+  },
+  "don": {
+   "n": 50,
+   "a_uses": 30,
+   "big_changes": 0.18,
+   "big_to_b": 6,
+   "big_to_other": 3,
+   "next_prefers_b": 18,
+   "next_prefers_b_rate": 0.36,
+   "next_prefers_saving": 22,
+   "judged_big": {
+    "n": 9,
+    "mean": 0.0903,
+    "ci": [
+     -0.0199,
+     0.2004
+    ]
+   },
+   "judged_next": {
+    "n": 18,
+    "mean": 0.0938,
+    "ci": [
+     0.0102,
+     0.1773
+    ]
+   },
+   "gain_big_per_point": 0.016,
+   "gain_next_per_point": 0.034,
+   "corr_next_vs_diff": 0.234,
+   "corr_big_vs_diff": -0.262,
+   "sec_big_mean": 13.14,
+   "sec_next_mean": 554.2,
+   "sig_big": [
+    1,
+    0
+   ],
+   "sig_next": [
+    3,
+    0
+   ]
+  },
+  "activate": {
+   "n": 50,
+   "a_uses": 20,
+   "big_changes": 0.14,
+   "big_to_b": 6,
+   "big_to_other": 1,
+   "next_prefers_b": 14,
+   "next_prefers_b_rate": 0.28,
+   "next_prefers_saving": 32,
+   "judged_big": {
+    "n": 7,
+    "mean": -0.0256,
+    "ci": [
+     -0.115,
+     0.0638
+    ]
+   },
+   "judged_next": {
+    "n": 14,
+    "mean": 0.0095,
+    "ci": [
+     -0.0313,
+     0.0504
+    ]
+   },
+   "gain_big_per_point": -0.004,
+   "gain_next_per_point": 0.003,
+   "corr_next_vs_diff": 0.043,
+   "corr_big_vs_diff": -0.761,
+   "sec_big_mean": 8.9,
+   "sec_next_mean": 350.9,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    0
+   ]
+  },
+  "discard": {
+   "n": 50,
+   "a_uses": 28,
+   "big_changes": 0.14,
+   "big_to_b": 6,
+   "big_to_other": 1,
+   "next_prefers_b": 19,
+   "next_prefers_b_rate": 0.38,
+   "next_prefers_saving": 21,
+   "judged_big": {
+    "n": 7,
+    "mean": 0.1046,
+    "ci": [
+     0.0063,
+     0.2029
+    ]
+   },
+   "judged_next": {
+    "n": 19,
+    "mean": 0.0132,
+    "ci": [
+     -0.0548,
+     0.0811
+    ]
+   },
+   "gain_big_per_point": 0.015,
+   "gain_next_per_point": 0.005,
+   "corr_next_vs_diff": -0.194,
+   "corr_big_vs_diff": 0.255,
+   "sec_big_mean": 21.45,
+   "sec_next_mean": 835.7,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    1,
+    0
+   ]
+  },
+  "event": {
+   "n": 50,
+   "a_uses": 9,
+   "big_changes": 0.06,
+   "big_to_b": 2,
+   "big_to_other": 1,
+   "next_prefers_b": 15,
+   "next_prefers_b_rate": 0.3,
+   "next_prefers_saving": 32,
+   "judged_big": {
+    "n": 3,
     "mean": -0.0625,
     "ci": [
-     -0.2014,
-     0.0764
+     -0.1332,
+     0.0082
     ]
    },
-   "judged_sig_tree_better": 0,
-   "judged_sig_now_better": 1,
-   "gain_per_point": -0.018,
-   "corr_tree_vs_diff": 0.16,
-   "corr_next_vs_diff": 0.94,
-   "next_agrees_with_tree": 9,
-   "next_measured": 14,
-   "sec_tree_mean": 9.62,
-   "sec_tree_per_cand": 4.812,
-   "by_src": {
-    "hb": {
-     "n": 25,
-     "changed": 6,
-     "judged": {
-      "n": 6,
-      "mean": -0.1458,
-      "ci": [
-       -0.4663,
-       0.1746
-      ]
-     }
-    },
-    "kr": {
-     "n": 6,
-     "changed": 4,
-     "judged": {
-      "n": 4,
-      "mean": 0.0,
-      "ci": [
-       -0.05,
-       0.05
-      ]
-     }
-    },
-    "m5": {
-     "n": 19,
-     "changed": 4,
-     "judged": {
-      "n": 4,
-      "mean": 0.0,
-      "ci": [
-       -0.1,
-       0.1
-      ]
-     }
-    }
-   }
+   "judged_next": {
+    "n": 15,
+    "mean": -0.0292,
+    "ci": [
+     -0.072,
+     0.0137
+    ]
+   },
+   "gain_big_per_point": -0.004,
+   "gain_next_per_point": -0.009,
+   "corr_next_vs_diff": -0.276,
+   "corr_big_vs_diff": -0.871,
+   "sec_big_mean": 13.3,
+   "sec_next_mean": 558.1,
+   "sig_big": [
+    0,
+    0
+   ],
+   "sig_next": [
+    0,
+    1
+   ]
   }
  },
- "overall_judged": {
-  "n": 97,
-  "mean": 0.0,
-  "ci": [
-   -0.034,
-   0.034
-  ]
+ "all": {
+  "judged_big": {
+   "n": 35,
+   "mean": 0.0319,
+   "ci": [
+    -0.0155,
+    0.0793
+   ]
+  },
+  "judged_next": {
+   "n": 80,
+   "mean": 0.0196,
+   "ci": [
+    -0.0103,
+    0.0496
+   ]
+  }
  },
- "by_tree_margin": {
-  "lt0.05": {
-   "n": 53,
-   "mean": -0.024
-  },
-  "0.05-0.15": {
-   "n": 27,
-   "mean": 0.012
-  },
-  "ge0.15": {
-   "n": 17,
-   "mean": 0.055,
-   "ci": [
-    -0.027,
-    0.138
-   ]
-  },
-  "ge0.05": {
-   "n": 44,
-   "mean": 0.028,
-   "ci": [
-    -0.022,
-    0.079
-   ]
-  },
+ "next_by_margin": {
   "ge0.1": {
-   "n": 28,
-   "mean": 0.031,
+   "n": 24,
+   "mean": 0.073,
    "ci": [
-    -0.026,
-    0.088
+    0.002,
+    0.145
+   ]
+  },
+  "ge0.2": {
+   "n": 13,
+   "mean": 0.101,
+   "ci": [
+    -0.011,
+    0.212
    ]
   }
  },
- "next_agrees": {
-  "agree": {
-   "n": 55,
-   "mean": 0.03
+ "next_by_side": {
+  "saving": {
+   "n": 38,
+   "mean": 0.008
   },
-  "disagree": {
+  "using": {
    "n": 42,
-   "mean": -0.039
-  },
-  "agree_and_margin_ge0.05": {
-   "n": 33,
-   "mean": 0.055,
-   "ci": [
-    -0.002,
-    0.112
-   ]
+   "mean": 0.03
   }
- },
- "cost": {
-  "now_window_sec": [
-   0.003,
-   0.012
-  ],
-  "tree_640x2worlds_sec_per_window": [
-   0.33,
-   2.83
-  ],
-  "windows_per_game_seat": 45.1,
-  "main_per_game_seat": 37.8,
-  "if_all_windows": "1 局の思考時間 2〜3 倍（見積もり）"
  },
  "conclusion": [
-  "窓全体に短い木を当てても平均は ±0.000（97 点・−0.034〜+0.034）。有意に良い種類は無い",
-  "手は 3〜5 割変わる（ブロック 46%・選択 42%・カウンター 36%）が、短い木の値の差が小さい所は損寄り（差 0.05 未満 −0.024）",
-  "良い向きは相手の手番の任意効果の確認だけ（12 点 +0.083・−0.027〜+0.194）。大きく勝ったのは代金を払って相手のアタックに応じる効果を控える点（§7.66 と同じ型）",
-  "費用は全部に当てると 1 局 2〜3 倍"
+  "メインの手全体では別の読みに替えても有意に強くならない（4 倍の木 +0.032・35 点／次のターンの頭 +0.020・80 点・どちらも 0 をまたぐ）",
+  "4 倍の木で手が変わる割合は 6〜18%",
+  "ドンを付ける 対 付けない の組で次のターンの頭の手が +0.094（+0.010〜+0.177・18 点）。中身は攻撃の割り振りで温存ではない。10 通りの比べの 1 つ",
+  "窓のような「資源を使わない側が勝つ」型は見えない（使わない側 +0.008・使う側 +0.030）"
  ],
  "prediction_check": {
-  "change_rate_don_max_60pct": "外れ（10%・紫カイドウは確認の分類に入った）",
-  "confirm_select_20_30pct": "相手の手番の確認 24% は当たり・自分の手番 8%・選択 42% は外れ",
-  "counter_block_10s_pct": "外れ（36%・46%）",
-  "short_tree_better_for_don_and_confirm": "外れ（有意なし・相手の手番の確認が向きだけ合う）",
-  "counter_block_no_diff": "当たり",
-  "time_1.3_1.5x": "外れ（全部に当てると 2〜3 倍）"
+  "big_tree_change_15_25pct": "やや低い（6〜18%）",
+  "big_tree_no_diff": "当たり",
+  "next_gain_0_to_0.02_ns": "平均は当たり（+0.020）・ドンの組だけ有意で外れ",
+  "next_flips_to_saving": "外れ（使う・使わないが半々）"
  },
- "decision_needed": "段 2 の対象: (a) 相手の手番の任意効果の確認だけ (b) 短い木の差が閾値以上のときだけ変える (c) §7.66 の紫カイドウ型（ドンを代金に相手のアタックに応じる確認の序盤）(d) やめる。推薦は (a) と (c) を別の旗で作り段 4 で比べ、どちらにも (b) の差 0.05 の決まりを足す",
  "notes": [
-  "紫カイドウのリーダー効果は「使う」を当てた直後にはドンが減らない（対象選択の後に払う）ので、この WP の「ドンを代金にする確認」でなく任意効果の確認に分類された",
-  "短い木は Python から同じ形を組んだもの（窓を閉じた盤面の値は今の窓の値と一致を確認）",
-  "eval は当初作業セッションに分けるつもりだったが速かったので全部このセッションで回した（コーディネータに連絡済み）",
-  "打ち比べで 2 点に一部の世界の打ち切り（no_winner 等）があったが、対は決着した世界だけで取った"
+  "種類の分け方は機械の決まりで、ドンの組には攻撃先の違いも含まれる",
+  "シャード 5 の打ち比べが遅れたためこのセッションでも回し始め、届いた作業セッションの結果を使った",
+  "make test の 1 回目で rust-test が失敗したが、2 回目以降は green（Rust のコードは触っていない・負荷の下での一時的な失敗と見た）",
+  "窓の段 2（§7.67）はユーザの判断待ちのまま"
  ]
 }

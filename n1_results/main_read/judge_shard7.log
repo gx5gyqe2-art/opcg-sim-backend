@@ -1,0 +1,10 @@
+JUDGE shard=7/8 todo 9 (done 0) k=16 -> n1_results/main_read/judge_shard7.jsonl
+[1/9] pid=95 type=play ok=True big=-0.25 sec=109.7 (143s)
+[2/9] pid=79 type=play ok=True big=0.1875 next=0.1875 sec=222.8 (257s)
+[3/9] pid=103 type=don ok=True big=0.0 sec=303.4 (337s)
+[4/9] pid=223 type=activate ok=True big=0.0 sec=199.7 (537s)
+[5/9] pid=23 type=play ok=True big=0.0625 sec=549.5 (583s)
+[6/9] pid=247 type=event ok=True big=-0.0625 next=-0.0625 sec=191.7 (775s)
+[7/9] pid=127 type=discard ok=True next=0.125 sec=1155.3 (1299s)
+[8/9] pid=239 type=event ok=True next=-0.25 sec=1218.1 (1755s)
+[9/9] pid=183 type=discard ok=True next=0.0 sec=2136.9 (2393s)
