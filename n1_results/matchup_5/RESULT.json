@@ -1,0 +1,1 @@
+{"shard": 17, "games": 40, "branch": "claude/matchup-5-p17", "notes": "Worker restart killed the game processes at 34/40; relaunched the same command twice (resume). One game (kaido_rocks idx=119) was written twice by overlapping runs; the duplicate line was removed, leaving 40 unique games. play_shard17.log has the three PLAY header lines."}
