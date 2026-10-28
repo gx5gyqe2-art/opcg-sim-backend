@@ -1,0 +1,1 @@
+{"shard": 1, "branch": "claude/don-read-j1", "status": "done", "notes": "18/18 points (pid mod 4 == 1) ok. The start log said 'todo 18 (done 2)' but the run covered all 18 pids; reads_shard1.jsonl holds 18 lines, 0 failures."}
