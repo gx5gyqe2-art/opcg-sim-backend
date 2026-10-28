@@ -23,17 +23,17 @@ git push -u origin claude/window-read-all-e$I
 
 - push 先は **`claude/window-read-all-e$I`**。コードと `RESULT.json` は変えない。
 
-## B. 打ち比べ（judge）——A を回収した後に、別に知らせる
+## B. 打ち比べ（judge）——読みは全部済み（350 点・手が変わった点 97）
 
 
 仕様: `docs/search_efficiency_plan.md` §7.67 の段 1（本線 `claude/cpu-spec-improvements-yw91jd`）。道具: `tests/scripts/window_read_all.py`（`judge --shard i/8`）。
 読み取りだけ（エンジン・ネットは変えない）＝**ゲートは不要**。
 
 ## 分け方
-- 比べる点は、`n1_results/window_read_all/evals.jsonl` で「短い木（640 回・世界 2 本）の手が今の手と違う」点（`claude/window-read-all` に push 済み）。
+- 比べる点は、`n1_results/window_read_all/evals*.jsonl` で「短い木（640 回・世界 2 本）の手が今の手と違う」点（`claude/window-read-all` に push 済み）。
 - **点の番号（pid）mod 8 == i** の点がシャード i。シャード 0 は `claude/window-read-all` のセッションが回す。
 - 1 点 16 通り（公平な配り直し・今の手と短い木の手の対・今のターンの残りは両席とも出荷の設定、その先は審判 r27・160 回）。
-- 所要の目安: 4 本並べで 1 シャード（15〜20 点）**1〜1.5 時間**。
+- 所要の目安: 1 シャード 9〜16 点・4 本並べで **40〜70 分**。
 
 ## 手順（シャード i ＝ 1〜7 のどれか。下の `I` を置き換える）
 
@@ -51,7 +51,7 @@ OPCG_LOG_SILENT=1 nohup python tests/scripts/window_read_all.py judge --k 16 --w
   > n1_results/window_read_all/judge_shard$I.log 2>&1 &
 ```
 
-- 1 行目に `JUDGE shard=I/8 todo 15〜20 ...` が出れば正しく始まっている（0 ならブランチの取り方が違う）。
+- 1 行目に `JUDGE shard=I/8 todo 9〜16 ...` が出れば正しく始まっている（0 ならブランチの取り方が違う）。
 - 点ごとに `[k/n] pid=... type=... diff=...` の行が増える。9 分以内の待ちを繰り返して見張る。止まっても同じコマンドで再開できる。
 
 ## 終わったら
