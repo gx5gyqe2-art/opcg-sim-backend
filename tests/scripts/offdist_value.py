@@ -214,6 +214,69 @@ def cmd_nn(a):
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 
+def _load_rows(paths, kinds=None, my=None, n=None, seed=0):
+    """dump の (scalars, card_idx 22 枠, tokens) を集める（`_load_sc` と同じ絞り方）。"""
+    S, C, T = [], [], []
+    for f in paths:
+        z = np.load(f, allow_pickle=True)
+        sc = z["scalars"].astype(np.float32)
+        keep = np.ones(len(sc), bool)
+        if kinds is not None:
+            keep &= np.isin(z["kind"], kinds)
+        if my is not None:
+            keep &= (sc[:, IS_MY_TURN] > 0.5) == my
+        S.append(sc[keep])
+        C.append(z["card_idx"][keep][:, :22].astype(np.int64))
+        T.append(z["tokens"][keep].astype(np.float32))
+    S, C, T = np.concatenate(S), np.concatenate(C), np.concatenate(T)
+    if n is not None and len(S) > n:
+        i = np.random.default_rng(seed).choice(len(S), n, replace=False)
+        S, C, T = S[i], C[i], T[i]
+    return S, C, T
+
+
+def cmd_nn_embed(a):
+    """ネット（r27）の共有表現（価値の頭の手前のベクトル）で同じ最近傍の距離を見る（`nn` の併記）。"""
+    from opcg_sim.learned import n_rel as NL
+    from opcg_sim.learned import n_rel_feat as NR
+    from opcg_sim.learned.train.n_eff_feat import build_eff_tables
+    from opcg_sim.learned.vocab import load_db
+    stats, ab, abm, pwr, isl, vocab = build_eff_tables()
+    net = NL.NRelNet.load(NET, tables=(stats, ab, abm, pwr, isl))
+    rt = NR.RelTable(NR.profile_table(load_db(), vocab))
+
+    def emb(S, C, T, bs=512):
+        out = []
+        tab = net.card_table()
+        for s0 in range(0, len(S), bs):
+            sc, ci, tok = S[s0:s0 + bs], C[s0:s0 + bs], T[s0:s0 + bs]
+            rom, roo = NR.relations_batch(ci, tok, rt)
+            h, present = net.tokens_forward(ci, tok, rom, roo, tab)
+            out.append(net.body(sc, h, present))
+        return np.concatenate(out)
+
+    w60 = sorted(glob.glob(os.path.expanduser("~/w60/n_records/*_p*/n_record_*.npz")))
+    w61 = sorted(glob.glob(os.path.expanduser("~/w61/n_records/*_p*/n_record_*.npz")))
+    ref = emb(*_load_rows(w60, n=a.nn_ref, seed=1))
+    mu, sd = ref.mean(0), ref.std(0) + 1e-3
+    refz = (ref - mu) / sd
+    folds = sorted(glob.glob(os.path.join(os.path.expanduser(a.gen_out), "fold_s*", "n_record_*.npz")))
+    groups = {
+        "fold_after_window（窓を閉じた直後）": _load_rows(folds, n=a.nn_q, seed=2),
+        "main（自分の手番の判断点・別の波）": _load_rows(w61[:32], kinds=[0], n=a.nn_q, seed=3),
+        "window_opp（相手の手番の窓の判断点・別の波）": _load_rows(w61[:32], kinds=[1], my=False, n=a.nn_q, seed=4),
+        "window_own（自分の手番の窓の判断点・別の波）": _load_rows(w61[:32], kinds=[1], my=True, n=a.nn_q, seed=5),
+    }
+    out = {"net": NET, "ref_rows": len(ref), "dim": int(ref.shape[1]), "groups": {}}
+    for name, (S, C, T) in groups.items():
+        e = emb(S, C, T)
+        d = _nn_dist((e - mu) / sd, refz)
+        out["groups"][name] = {"n": len(e), "median": round(float(np.median(d)), 3), "mean": round(float(d.mean()), 3),
+                               "p90": round(float(np.percentile(d, 90)), 3)}
+    json.dump(out, open(os.path.join(a.out, "nn_embed.json"), "w"), ensure_ascii=False, indent=1)
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+
+
 # ---------------------------------------------------------------- 3. timeval
 
 def _init_tv():
@@ -548,7 +611,7 @@ def cmd_evalnet(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["count", "nn", "timeval", "gen", "evalnet"])
+    ap.add_argument("cmd", choices=["count", "nn", "nn_embed", "timeval", "gen", "evalnet"])
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--waves", nargs="*", default=["~/w60", "~/w61"])
     ap.add_argument("--workers", type=int, default=4)
@@ -564,7 +627,7 @@ def main(argv=None):
     ap.add_argument("--shard", default=None)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args(argv)
-    {"count": cmd_count, "nn": cmd_nn, "timeval": cmd_timeval, "gen": cmd_gen, "evalnet": cmd_evalnet}[a.cmd](a)
+    {"count": cmd_count, "nn": cmd_nn, "nn_embed": cmd_nn_embed, "timeval": cmd_timeval, "gen": cmd_gen, "evalnet": cmd_evalnet}[a.cmd](a)
 
 
 if __name__ == "__main__":
