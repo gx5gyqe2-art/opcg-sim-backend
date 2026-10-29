@@ -149,6 +149,71 @@ def don_minus_one(g, seat, prefer):
     return base, less
 
 
+# ---------------------------------------------------------------- 2. nn（分布の外か）
+
+def _load_sc(paths, kinds=None, my=None, n=None, seed=0):
+    """dump の scalars（float32）を集める。`kinds`／`my`（手番フラグ）で行を絞り、`n` 行を無作為に取る。"""
+    xs = []
+    for f in paths:
+        z = np.load(f, allow_pickle=True)
+        sc = z["scalars"].astype(np.float32)
+        keep = np.ones(len(sc), bool)
+        if kinds is not None:
+            keep &= np.isin(z["kind"], kinds)
+        if my is not None:
+            keep &= (sc[:, IS_MY_TURN] > 0.5) == my
+        xs.append(sc[keep])
+    x = np.concatenate(xs) if xs else np.zeros((0, 127), np.float32)
+    if n is not None and len(x) > n:
+        x = x[np.random.default_rng(seed).choice(len(x), n, replace=False)]
+    return x
+
+
+def _nn_dist(q, ref, chunk=512):
+    rr = (ref ** 2).sum(1)
+    out = np.empty(len(q), np.float32)
+    for s in range(0, len(q), chunk):
+        qq = q[s:s + chunk]
+        d2 = (qq ** 2).sum(1)[:, None] + rr[None, :] - 2.0 * qq @ ref.T
+        out[s:s + chunk] = np.sqrt(np.maximum(d2.min(1), 0.0))
+    return out
+
+
+def cmd_nn(a):
+    """盤面の数の列（127）を標準化し、波の行の無作為 20 万行への最近傍の距離を、問いの群ごとに比べる。"""
+    w60 = sorted(glob.glob(os.path.expanduser("~/w60/n_records/*_p*/n_record_*.npz")))
+    w61 = sorted(glob.glob(os.path.expanduser("~/w61/n_records/*_p*/n_record_*.npz")))
+    ref = _load_sc(w60, n=a.nn_ref, seed=1)
+    mu, sd = ref.mean(0), ref.std(0) + 1e-3
+    refz = (ref - mu) / sd
+    folds = sorted(glob.glob(os.path.join(os.path.expanduser(a.gen_out), "fold_s*", "n_record_*.npz")))
+    groups = {
+        "fold_after_window（窓を閉じた直後）": _load_sc(folds, n=a.nn_q, seed=2),
+        "main（自分の手番の判断点・別の波）": _load_sc(w61[:32], kinds=[0], n=a.nn_q, seed=3),
+        "window_opp（相手の手番の窓の判断点・別の波）": _load_sc(w61[:32], kinds=[1], my=False, n=a.nn_q, seed=4),
+        "window_own（自分の手番の窓の判断点・別の波）": _load_sc(w61[:32], kinds=[1], my=True, n=a.nn_q, seed=5),
+    }
+    out = {"ref_rows": len(ref), "groups": {}}
+    for name, x in groups.items():
+        if not len(x):
+            continue
+        d = _nn_dist((x - mu) / sd, refz)
+        out["groups"][name] = {"n": len(x), "median": round(float(np.median(d)), 3), "mean": round(float(d.mean()), 3),
+                               "p90": round(float(np.percentile(d, 90)), 3),
+                               "my_turn_share": round(float((x[:, IS_MY_TURN] > 0.5).mean()), 3),
+                               "my_don_active_mean": round(float(x[:, 2].mean()), 3),
+                               "my_don_rested_mean": round(float(x[:, 3].mean()), 3)}
+    # 波の中で「相手の手番」かつ「自分のドンが全部レスト」の行の割合（窓を閉じた直後の典型の形）
+    allx = _load_sc(w60)
+    opp = allx[:, IS_MY_TURN] < 0.5
+    out["wave60_rows"] = int(len(allx))
+    out["wave60_opp_turn_share"] = round(float(opp.mean()), 4)
+    fx = groups["fold_after_window（窓を閉じた直後）"]
+    out["fold_opp_turn_share"] = round(float((fx[:, IS_MY_TURN] < 0.5).mean()), 4) if len(fx) else None
+    json.dump(out, open(os.path.join(a.out, "nn.json"), "w"), ensure_ascii=False, indent=1)
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+
+
 # ---------------------------------------------------------------- 3. timeval
 
 def _init_tv():
@@ -306,7 +371,7 @@ def cmd_timeval(a):
     jobs = [p for n, p in enumerate(pts) if n % sn == si]
     pre = "timeval" if not a.tv_net else "timeval_" + a.tag
     rpath = os.path.join(a.out, f"{pre}_shard{si}.jsonl" if a.shard else f"{pre}.jsonl")
-    done = W._done(a.out, pre + ("_shard" if a.shard else ""))
+    done = W._done(a.out, pre)
     jobs = [p for p in jobs if p["pid"] not in done]
     if a.limit:
         jobs = jobs[:a.limit]
@@ -483,7 +548,7 @@ def cmd_evalnet(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["count", "timeval", "gen", "evalnet"])
+    ap.add_argument("cmd", choices=["count", "nn", "timeval", "gen", "evalnet"])
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--waves", nargs="*", default=["~/w60", "~/w61"])
     ap.add_argument("--workers", type=int, default=4)
@@ -492,12 +557,14 @@ def main(argv=None):
     ap.add_argument("--games", type=int, default=GEN_GAMES_PER_SHARD)
     ap.add_argument("--gen-out", default="~/fold_rows")
     ap.add_argument("--nets", nargs="*", default=[NET])
+    ap.add_argument("--nn-ref", dest="nn_ref", type=int, default=200000)
+    ap.add_argument("--nn-q", dest="nn_q", type=int, default=2000)
     ap.add_argument("--tag", default="r27")
     ap.add_argument("--tv-net", dest="tv_net", default=None, help="timeval のネットの値に使うネット（既定 r27・打ち続けは常に r27）")
     ap.add_argument("--shard", default=None)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args(argv)
-    {"count": cmd_count, "timeval": cmd_timeval, "gen": cmd_gen, "evalnet": cmd_evalnet}[a.cmd](a)
+    {"count": cmd_count, "nn": cmd_nn, "timeval": cmd_timeval, "gen": cmd_gen, "evalnet": cmd_evalnet}[a.cmd](a)
 
 
 if __name__ == "__main__":
