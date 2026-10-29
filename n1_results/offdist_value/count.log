@@ -1,0 +1,25 @@
+{
+ "rows": 5300099,
+ "counts": {
+  "commit|paid_don": 586867,
+  "main": 1954081,
+  "main|paid_don": 395140,
+  "window_opp_battle": 1338587,
+  "window_opp_battle|paid_don": 3127,
+  "window_opp_effect": 335129,
+  "window_opp_effect|paid_don": 10584,
+  "window_own_effect": 645729,
+  "window_own_effect|paid_don": 30855
+ },
+ "share": {
+  "commit|paid_don": 0.11073,
+  "main": 0.36869,
+  "main|paid_don": 0.07455,
+  "window_opp_battle": 0.25256,
+  "window_opp_battle|paid_don": 0.00059,
+  "window_opp_effect": 0.06323,
+  "window_opp_effect|paid_don": 0.002,
+  "window_own_effect": 0.12183,
+  "window_own_effect|paid_don": 0.00582
+ }
+}

@@ -1,291 +1,175 @@
 {
- "wp": "main-read",
+ "wp": "offdist-value",
  "status": "done",
- "branch": "claude/main-read",
- "spec": "docs/search_efficiency_plan.md §7.68（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+479）",
- "report": "docs/reports/2026-10-28_main_read.md",
- "results_dir": "n1_results/main_read/",
- "tool": "tests/scripts/main_read.py",
+ "branch": "claude/offdist-value",
+ "spec": "docs/search_efficiency_plan.md §7.69（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+481）",
+ "report": "docs/reports/2026-10-29_offdist_value.md",
+ "results_dir": "n1_results/offdist_value/",
+ "tool": "tests/scripts/offdist_value.py",
  "engine_changed": false,
- "points": {
-  "total": 250,
-  "per_type": 50,
-  "eval_failures": 0,
-  "judged": 99,
-  "judged_big": 35,
-  "judged_next": 80
- },
- "offsets": {
-  "next": 12000,
-  "judge": 13000
- },
- "big_sims": 5120,
- "next_worlds": 8,
- "judge_k": 16,
- "types": {
-  "play": {
-   "n": 50,
-   "a_uses": 25,
-   "big_changes": 0.18,
-   "big_to_b": 6,
-   "big_to_other": 3,
-   "next_prefers_b": 13,
-   "next_prefers_b_rate": 0.26,
-   "next_prefers_saving": 28,
-   "judged_big": {
-    "n": 9,
-    "mean": -0.0069,
-    "ci": [
-     -0.0922,
-     0.0783
-    ]
-   },
-   "judged_next": {
-    "n": 14,
-    "mean": -0.0045,
-    "ci": [
-     -0.0667,
-     0.0577
-    ]
-   },
-   "gain_big_per_point": -0.001,
-   "gain_next_per_point": -0.001,
-   "corr_next_vs_diff": 0.535,
-   "corr_big_vs_diff": -0.78,
-   "sec_big_mean": 13.09,
-   "sec_next_mean": 478.9,
-   "sig_big": [
-    0,
-    0
-   ],
-   "sig_next": [
-    0,
-    0
-   ]
+ "shipping_changed": false,
+ "check1_counts": {
+  "rows": 5300099,
+  "counts": {
+   "commit|paid_don": 586867,
+   "main": 1954081,
+   "main|paid_don": 395140,
+   "window_opp_battle": 1338587,
+   "window_opp_battle|paid_don": 3127,
+   "window_opp_effect": 335129,
+   "window_opp_effect|paid_don": 10584,
+   "window_own_effect": 645729,
+   "window_own_effect|paid_don": 30855
   },
-  "don": {
-   "n": 50,
-   "a_uses": 30,
-   "big_changes": 0.18,
-   "big_to_b": 6,
-   "big_to_other": 3,
-   "next_prefers_b": 18,
-   "next_prefers_b_rate": 0.36,
-   "next_prefers_saving": 22,
-   "judged_big": {
-    "n": 9,
-    "mean": 0.0903,
-    "ci": [
-     -0.0199,
-     0.2004
-    ]
-   },
-   "judged_next": {
-    "n": 18,
-    "mean": 0.0938,
-    "ci": [
-     0.0102,
-     0.1773
-    ]
-   },
-   "gain_big_per_point": 0.016,
-   "gain_next_per_point": 0.034,
-   "corr_next_vs_diff": 0.234,
-   "corr_big_vs_diff": -0.262,
-   "sec_big_mean": 13.14,
-   "sec_next_mean": 554.2,
-   "sig_big": [
-    1,
-    0
-   ],
-   "sig_next": [
-    3,
-    0
-   ]
-  },
-  "activate": {
-   "n": 50,
-   "a_uses": 20,
-   "big_changes": 0.14,
-   "big_to_b": 6,
-   "big_to_other": 1,
-   "next_prefers_b": 14,
-   "next_prefers_b_rate": 0.28,
-   "next_prefers_saving": 32,
-   "judged_big": {
-    "n": 7,
-    "mean": -0.0256,
-    "ci": [
-     -0.115,
-     0.0638
-    ]
-   },
-   "judged_next": {
-    "n": 14,
-    "mean": 0.0095,
-    "ci": [
-     -0.0313,
-     0.0504
-    ]
-   },
-   "gain_big_per_point": -0.004,
-   "gain_next_per_point": 0.003,
-   "corr_next_vs_diff": 0.043,
-   "corr_big_vs_diff": -0.761,
-   "sec_big_mean": 8.9,
-   "sec_next_mean": 350.9,
-   "sig_big": [
-    0,
-    0
-   ],
-   "sig_next": [
-    0,
-    0
-   ]
-  },
-  "discard": {
-   "n": 50,
-   "a_uses": 28,
-   "big_changes": 0.14,
-   "big_to_b": 6,
-   "big_to_other": 1,
-   "next_prefers_b": 19,
-   "next_prefers_b_rate": 0.38,
-   "next_prefers_saving": 21,
-   "judged_big": {
-    "n": 7,
-    "mean": 0.1046,
-    "ci": [
-     0.0063,
-     0.2029
-    ]
-   },
-   "judged_next": {
-    "n": 19,
-    "mean": 0.0132,
-    "ci": [
-     -0.0548,
-     0.0811
-    ]
-   },
-   "gain_big_per_point": 0.015,
-   "gain_next_per_point": 0.005,
-   "corr_next_vs_diff": -0.194,
-   "corr_big_vs_diff": 0.255,
-   "sec_big_mean": 21.45,
-   "sec_next_mean": 835.7,
-   "sig_big": [
-    0,
-    0
-   ],
-   "sig_next": [
-    1,
-    0
-   ]
-  },
-  "event": {
-   "n": 50,
-   "a_uses": 9,
-   "big_changes": 0.06,
-   "big_to_b": 2,
-   "big_to_other": 1,
-   "next_prefers_b": 15,
-   "next_prefers_b_rate": 0.3,
-   "next_prefers_saving": 32,
-   "judged_big": {
-    "n": 3,
-    "mean": -0.0625,
-    "ci": [
-     -0.1332,
-     0.0082
-    ]
-   },
-   "judged_next": {
-    "n": 15,
-    "mean": -0.0292,
-    "ci": [
-     -0.072,
-     0.0137
-    ]
-   },
-   "gain_big_per_point": -0.004,
-   "gain_next_per_point": -0.009,
-   "corr_next_vs_diff": -0.276,
-   "corr_big_vs_diff": -0.871,
-   "sec_big_mean": 13.3,
-   "sec_next_mean": 558.1,
-   "sig_big": [
-    0,
-    0
-   ],
-   "sig_next": [
-    0,
-    1
-   ]
+  "share": {
+   "commit|paid_don": 0.11073,
+   "main": 0.36869,
+   "main|paid_don": 0.07455,
+   "window_opp_battle": 0.25256,
+   "window_opp_battle|paid_don": 0.00059,
+   "window_opp_effect": 0.06323,
+   "window_opp_effect|paid_don": 0.002,
+   "window_own_effect": 0.12183,
+   "window_own_effect|paid_don": 0.00582
   }
  },
- "all": {
-  "judged_big": {
-   "n": 35,
-   "mean": 0.0319,
-   "ci": [
-    -0.0155,
-    0.0793
-   ]
+ "check1_nn": {
+  "ref_rows": 200000,
+  "groups": {
+   "fold_after_window（窓を閉じた直後）": {
+    "n": 2000,
+    "median": 6.433,
+    "mean": 6.539,
+    "p90": 8.425,
+    "my_turn_share": 0.0,
+    "my_don_active_mean": 0.569,
+    "my_don_rested_mean": 4.984
+   },
+   "main（自分の手番の判断点・別の波）": {
+    "n": 2000,
+    "median": 6.294,
+    "mean": 6.337,
+    "p90": 8.134,
+    "my_turn_share": 0.983,
+    "my_don_active_mean": 3.326,
+    "my_don_rested_mean": 2.572
+   },
+   "window_opp（相手の手番の窓の判断点・別の波）": {
+    "n": 2000,
+    "median": 6.46,
+    "mean": 6.576,
+    "p90": 8.43,
+    "my_turn_share": 0.0,
+    "my_don_active_mean": 0.534,
+    "my_don_rested_mean": 5.018
+   },
+   "window_own（自分の手番の窓の判断点・別の波）": {
+    "n": 2000,
+    "median": 6.392,
+    "mean": 6.475,
+    "p90": 8.244,
+    "my_turn_share": 1.0,
+    "my_don_active_mean": 2.068,
+    "my_don_rested_mean": 4.422
+   }
   },
-  "judged_next": {
-   "n": 80,
-   "mean": 0.0196,
+  "wave60_rows": 2652064,
+  "wave60_opp_turn_share": 0.3256,
+  "fold_opp_turn_share": 1.0
+ },
+ "check2_don_value": {
+  "points": 24,
+  "worlds": 16,
+  "true_value_diff_b": {
+   "mean": 0.338,
    "ci": [
-    -0.0103,
-    0.0496
-   ]
+    0.13,
+    0.545
+   ],
+   "early_mean": 0.617
+  },
+  "net_diff": {
+   "r27": {
+    "a_head": 0.164,
+    "b_close": 0.115,
+    "c_oppend": 0.128,
+    "d_next": 0.192
+   },
+   "ctrl": {
+    "a_head": 0.15,
+    "b_close": 0.103,
+    "c_oppend": 0.113,
+    "d_next": 0.161
+   },
+   "fold": {
+    "a_head": 0.164,
+    "b_close": 0.115,
+    "c_oppend": 0.128,
+    "d_next": 0.18
+   }
+  },
+  "ratio_r27": {
+   "a_head": 0.48,
+   "b_close": 0.34,
+   "c_oppend": 0.38,
+   "d_next": 0.57
+  },
+  "corr_net_vs_true_r27": {
+   "a_head": 0.125,
+   "b_close": 0.702,
+   "c_oppend": 0.657,
+   "d_next": 0.555
   }
  },
- "next_by_margin": {
-  "ge0.1": {
-   "n": 24,
-   "mean": 0.073,
-   "ci": [
-    0.002,
-    0.145
-   ]
+ "check3_trial": {
+  "base": "波 60（1 波・1 周・warm-start r27）",
+  "fold_rows": 475001,
+  "fold_games": 3600,
+  "fold_seed0": 5100000,
+  "kaido24": {
+   "r27": {
+    "article_decline_chose_decline": 0,
+    "early_chose_decline": 0,
+    "gain_per_point": 0.0
+   },
+   "ctrl": {
+    "article_decline_chose_decline": 10,
+    "early_chose_decline": 5,
+    "gain_per_point": 0.039,
+    "mean_decline_minus_accept": 0.05
+   },
+   "fold": {
+    "article_decline_chose_decline": 10,
+    "early_chose_decline": 5,
+    "gain_per_point": 0.016,
+    "mean_decline_minus_accept": 0.028
+   },
+   "ctrl_fold_same_choice": 20
   },
-  "ge0.2": {
-   "n": 13,
-   "mean": 0.101,
-   "ci": [
-    -0.011,
-    0.212
-   ]
-  }
- },
- "next_by_side": {
-  "saving": {
-   "n": 38,
-   "mean": 0.008
-  },
-  "using": {
-   "n": 42,
-   "mean": 0.03
+  "band_w59_holdout_v_mse": {
+   "r27": 0.5096,
+   "ctrl": 0.5069,
+   "fold": 0.5089
   }
  },
  "conclusion": [
-  "メインの手全体では別の読みに替えても有意に強くならない（4 倍の木 +0.032・35 点／次のターンの頭 +0.020・80 点・どちらも 0 をまたぐ）",
-  "4 倍の木で手が変わる割合は 6〜18%",
-  "ドンを付ける 対 付けない の組で次のターンの頭の手が +0.094（+0.010〜+0.177・18 点）。中身は攻撃の割り振りで温存ではない。10 通りの比べの 1 つ",
-  "窓のような「資源を使わない側が勝つ」型は見えない（使わない側 +0.008・使う側 +0.030）"
+  "見立て「窓で聞く盤面は訓練の分布の外」は支持されない: 相手の手番の窓の判断点は行の 32%・窓を閉じた直後の盤面の最近傍距離はふつうの判断点と同じ",
+  "窓を閉じた直後の盤面を価値だけの行で 47 万行足しても、窓の決め方もドンの値の割り引きも変わらない（足さない対照と 24 点中 20 点で同じ手）",
+  "ネットはドン 1 枚をどの時点でも小さく見る（打ち続けた差の 0.34〜0.57）。窓を閉じた直後がいちばん小さいが『その時点だけ半分』ではない",
+  "r27 を波 60 で 1 周学び直すだけで、窓の決め方が控える側へ動いた（記事が控える 18 点で 0→10・足す足さないに依らない）",
+  "疑う先は勝敗の信号（当てきれない分の縮み）と符号化（次のターンのドンを大型の可否に結び付けきれない）。直す場所として近いのは訓練の教材"
  ],
  "prediction_check": {
-  "big_tree_change_15_25pct": "やや低い（6〜18%）",
-  "big_tree_no_diff": "当たり",
-  "next_gain_0_to_0.02_ns": "平均は当たり（+0.020）・ドンの組だけ有意で外れ",
-  "next_flips_to_saving": "外れ（使う・使わないが半々）"
+  "rows_lt_1pct": "当たり（全体の 0.26%）",
+  "ratio_ad_0.8_1.2": "外れ（0.48・0.57）",
+  "ratio_b_0.4_0.6": "外れ（0.34）",
+  "fold_net_decline_10plus": "数は当たり（10/18）だが対照も同じ＝理由が違う"
  },
  "notes": [
-  "種類の分け方は機械の決まりで、ドンの組には攻撃先の違いも含まれる",
-  "シャード 5 の打ち比べが遅れたためこのセッションでも回し始め、届いた作業セッションの結果を使った",
-  "make test の 1 回目で rust-test が失敗したが、2 回目以降は green（Rust のコードは触っていない・負荷の下での一時的な失敗と見た）",
-  "窓の段 2（§7.67）はユーザの判断待ちのまま"
+  "基は仕様の 2 波でなく波 60 の 1 波（メモリ・時間・再起動）",
+  "足した行は選ばなかった候補にもその局の勝敗を付けた",
+  "分布の外かは scalars 127 列の距離だけで見た",
+  "作業者の再起動が 3 回あり、試験訓練 2 本と timeval 7 本は作業セッションで回した（生成の 1 本目は十数局の行が抜けた）",
+  "評価帯の policy 指標つきの 1 回目はメモリで落ちたので、価値だけで回し直した（policy の指標は 1 回目のログにある: top1 r27 0.542・ctrl 0.534・fold 0.534）"
  ]
 }
