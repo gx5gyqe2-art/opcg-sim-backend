@@ -241,7 +241,8 @@ def cmd_summary(a):
         ds = [r["ref"]["diff"] for r in rs]
         if not ds:
             return
-        m, (lo, hi) = KR.mean_ci(ds)
+        mc = KR.mean_ci(ds)
+        m, (lo, hi) = mc["mean"], (mc["ci"][0] if mc["ci"][0] is not None else mc["mean"], mc["ci"][1] if mc["ci"][1] is not None else mc["mean"])
         sig_b = sum(1 for r in rs if (r["ref"].get("ci") or [0, 0])[0] > 0)
         sig_a = sum(1 for r in rs if (r["ref"].get("ci") or [0, 0])[1] < 0)
         print(f"| {label} | {len(rs)} | {m:+.3f} | {lo:+.3f}〜{hi:+.3f} | {sig_b} | {sig_a} |")
@@ -256,6 +257,10 @@ def cmd_summary(a):
             line(f"　{lab}・青の {ot} ターン目", [r for r in rs if r["ot"] == ot])
     line("CPU が実際に戻した点", [r for r in rows if r["chosen_b"]])
     line("CPU が戻さなかった点", [r for r in rows if not r["chosen_b"]])
+    live = [r for r in rows if r.get("root_a") and abs(r["root_a"]["q"]) < 0.9]
+    line("勝負が決まっていない点（CPU の評価の絶対値 0.9 未満）", live)
+    for grp, lab in (("k6_only", "6キングだけ"), ("with_big", "他の大型あり")):
+        line(f"　{lab}・勝負が決まっていない点", [r for r in live if r["group"] == grp])
     out = {"n": len(rows), "rows": [{k: r[k] for k in ("src", "idx", "step", "ot", "group", "p1_bigs", "a_desc", "b_desc", "root_a", "root_b", "chosen_b", "forced")} | {"diff": r["ref"]["diff"], "ci": r["ref"].get("ci")} for r in rows]}
     json.dump(out, open(os.path.join(a.out, "summary.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 

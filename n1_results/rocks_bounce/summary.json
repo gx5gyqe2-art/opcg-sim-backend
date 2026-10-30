@@ -1,0 +1,6077 @@
+{
+ "n": 212,
+ "rows": [
+  {
+   "src": "kr",
+   "idx": 20,
+   "step": 97,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2338.0,
+    "share": 0.4798,
+    "q": -0.227,
+    "p": 0.1015
+   },
+   "root_b": {
+    "n": 67.0,
+    "share": 0.0137,
+    "q": -0.2791,
+    "p": 0.0068
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.37,
+    0.12
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 39,
+   "step": 55,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 993.0,
+    "share": 0.2579,
+    "q": -0.9331,
+    "p": 0.098
+   },
+   "root_b": {
+    "n": 522.0,
+    "share": 0.1355,
+    "q": -0.9428,
+    "p": 0.0746
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.2924,
+    0.0424
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 9,
+   "step": 86,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2259.0,
+    "share": 0.4915,
+    "q": -0.3803,
+    "p": 0.0182
+   },
+   "root_b": {
+    "n": 2259.0,
+    "share": 0.4915,
+    "q": -0.3803,
+    "p": 0.0182
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 2,
+   "step": 31,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2006.0,
+    "share": 0.3943,
+    "q": -0.5913,
+    "p": 0.6618
+   },
+   "root_b": {
+    "n": 1045.0,
+    "share": 0.2054,
+    "q": -0.5361,
+    "p": 0.0056
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 70,
+   "step": 92,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 951.0,
+    "share": 0.3196,
+    "q": -0.9699,
+    "p": 0.1005
+   },
+   "root_b": {
+    "n": 229.0,
+    "share": 0.0769,
+    "q": -0.9955,
+    "p": 0.0491
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 105,
+   "step": 81,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 847.0,
+    "share": 0.1845,
+    "q": 0.4358,
+    "p": 0.3721
+   },
+   "root_b": {
+    "n": 679.0,
+    "share": 0.1479,
+    "q": 0.534,
+    "p": 0.0118
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.375,
+   "ci": [
+    0.0716,
+    0.6784
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 44,
+   "step": 119,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1365.0,
+    "share": 0.2846,
+    "q": -0.825,
+    "p": 0.312
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 55,
+   "step": 151,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 308.0,
+    "share": 0.2003,
+    "q": -0.9969,
+    "p": 0.0586
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 168,
+   "step": 117,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 864.0,
+    "share": 0.2739,
+    "q": -0.9875,
+    "p": 0.1642
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 126,
+   "step": 50,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1990.0,
+    "share": 0.3903,
+    "q": -0.3822,
+    "p": 0.0138
+   },
+   "root_b": {
+    "n": 1990.0,
+    "share": 0.3903,
+    "q": -0.3822,
+    "p": 0.0138
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 79,
+   "step": 95,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 976.0,
+    "share": 0.2667,
+    "q": -0.9678,
+    "p": 0.192
+   },
+   "root_b": {
+    "n": 178.0,
+    "share": 0.0486,
+    "q": -0.9636,
+    "p": 0.0314
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 138,
+   "step": 68,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1553.0,
+    "share": 0.3087,
+    "q": -0.5409,
+    "p": 0.6062
+   },
+   "root_b": {
+    "n": 1552.0,
+    "share": 0.3085,
+    "q": -0.4582,
+    "p": 0.0112
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 189,
+   "step": 99,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1708.0,
+    "share": 0.3474,
+    "q": -0.8591,
+    "p": 0.2807
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 181,
+   "step": 43,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2731.0,
+    "share": 0.5364,
+    "q": -0.6479,
+    "p": 0.6069
+   },
+   "root_b": {
+    "n": 112.0,
+    "share": 0.022,
+    "q": -0.6259,
+    "p": 0.0104
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.18,
+    0.555
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 6,
+   "step": 104,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3909.0,
+    "share": 0.7635,
+    "q": 0.5456,
+    "p": 0.439
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.4375,
+   "ci": [
+    -0.6886,
+    -0.1864
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 28,
+   "step": 96,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1339.0,
+    "share": 0.377,
+    "q": -0.9822,
+    "p": 0.2744
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 44,
+   "step": 75,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 4735.0,
+    "share": 0.9277,
+    "q": 0.025,
+    "p": 0.0209
+   },
+   "root_b": {
+    "n": 4735.0,
+    "share": 0.9277,
+    "q": 0.025,
+    "p": 0.0209
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 50,
+   "step": 150,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 2, \"card\": \"OP17-052\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 330.0,
+    "share": 0.1484,
+    "q": -0.9987,
+    "p": 0.0641
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 58,
+   "step": 69,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3676.0,
+    "share": 0.7731,
+    "q": -0.9521,
+    "p": 0.6595
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.3125,
+   "ci": [
+    0.0779,
+    0.5471
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 21,
+   "step": 104,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2328.0,
+    "share": 0.4697,
+    "q": -0.4769,
+    "p": 0.1128
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.3578,
+    0.3578
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 74,
+   "step": 54,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2869.0,
+    "share": 0.5644,
+    "q": -0.6666,
+    "p": 0.6155
+   },
+   "root_b": {
+    "n": 13.0,
+    "share": 0.0026,
+    "q": -0.7835,
+    "p": 0.0081
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.2667,
+   "ci": [
+    -0.0895,
+    0.6228
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 65,
+   "step": 85,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2542.0,
+    "share": 0.5111,
+    "q": 0.774,
+    "p": 0.089
+   },
+   "root_b": {
+    "n": 60.0,
+    "share": 0.0121,
+    "q": 0.5092,
+    "p": 0.07
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 92,
+   "step": 122,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1966.0,
+    "share": 0.5522,
+    "q": -0.9752,
+    "p": 0.3718
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 81,
+   "step": 126,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 9, \"card\": \"OP17-039\", \"targets\": [\"OP17-063\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 410.0,
+    "share": 0.1689,
+    "q": -0.9858,
+    "p": 0.079
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 101,
+   "step": 125,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-052\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 704.0,
+    "share": 0.1918,
+    "q": -0.9933,
+    "p": 0.1395
+   },
+   "root_b": {
+    "n": 301.0,
+    "share": 0.082,
+    "q": -0.9922,
+    "p": 0.0579
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 109,
+   "step": 74,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1849.0,
+    "share": 0.4248,
+    "q": -0.7994,
+    "p": 0.1983
+   },
+   "root_b": {
+    "n": 864.0,
+    "share": 0.1985,
+    "q": -0.801,
+    "p": 0.0219
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 115,
+   "step": 79,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 992.0,
+    "share": 0.2313,
+    "q": -0.9507,
+    "p": 0.2298
+   },
+   "root_b": {
+    "n": 382.0,
+    "share": 0.0891,
+    "q": -0.9103,
+    "p": 0.0165
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 22,
+   "step": 157,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2769.0,
+    "share": 0.5412,
+    "q": 0.415,
+    "p": 0.2597
+   },
+   "root_b": {
+    "n": 37.0,
+    "share": 0.0072,
+    "q": -0.0417,
+    "p": 0.0418
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 39,
+   "step": 96,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 765.0,
+    "share": 0.2054,
+    "q": -0.9845,
+    "p": 0.1368
+   },
+   "root_b": {
+    "n": 269.0,
+    "share": 0.0722,
+    "q": -0.9878,
+    "p": 0.0521
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 10,
+   "step": 34,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-054\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1298.0,
+    "share": 0.2664,
+    "q": -0.6885,
+    "p": 0.1576
+   },
+   "root_b": {
+    "n": 917.0,
+    "share": 0.1882,
+    "q": -0.6745,
+    "p": 0.0548
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 48,
+   "step": 34,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1139.0,
+    "share": 0.2272,
+    "q": -0.8198,
+    "p": 0.282
+   },
+   "root_b": {
+    "n": 572.0,
+    "share": 0.1141,
+    "q": -0.7748,
+    "p": 0.0108
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 57,
+   "step": 62,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1944.0,
+    "share": 0.3965,
+    "q": -0.9304,
+    "p": 0.3523
+   },
+   "root_b": {
+    "n": 120.0,
+    "share": 0.0245,
+    "q": -0.9166,
+    "p": 0.0132
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 81,
+   "step": 138,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1294.0,
+    "share": 0.2534,
+    "q": -0.9345,
+    "p": 0.1719
+   },
+   "root_b": {
+    "n": 160.0,
+    "share": 0.0313,
+    "q": -0.9741,
+    "p": 0.0509
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 4,
+   "step": 91,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 764.0,
+    "share": 0.2913,
+    "q": -0.9912,
+    "p": 0.129
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 72,
+   "step": 36,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-050\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1434.0,
+    "share": 0.2888,
+    "q": -0.6435,
+    "p": 0.2359
+   },
+   "root_b": {
+    "n": 440.0,
+    "share": 0.0886,
+    "q": -0.6172,
+    "p": 0.0147
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 105,
+   "step": 127,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1537.0,
+    "share": 0.3071,
+    "q": -0.4173,
+    "p": 0.3184
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.2924,
+    0.0424
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 127,
+   "step": 46,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2813.0,
+    "share": 0.5528,
+    "q": -0.4642,
+    "p": 0.682
+   },
+   "root_b": {
+    "n": 75.0,
+    "share": 0.0147,
+    "q": -0.5581,
+    "p": 0.0068
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.1543,
+    0.2793
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 138,
+   "step": 98,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2025.0,
+    "share": 0.4192,
+    "q": -0.8274,
+    "p": 0.4161
+   },
+   "root_b": {
+    "n": 65.0,
+    "share": 0.0135,
+    "q": -0.8253,
+    "p": 0.0034
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 169,
+   "step": 47,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2989.0,
+    "share": 0.5911,
+    "q": -0.8144,
+    "p": 0.5391
+   },
+   "root_b": {
+    "n": 47.0,
+    "share": 0.0093,
+    "q": -0.8143,
+    "p": 0.0075
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.12,
+    0.37
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 181,
+   "step": 74,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1361.0,
+    "share": 0.3102,
+    "q": -0.6473,
+    "p": 0.3089
+   },
+   "root_b": {
+    "n": 294.0,
+    "share": 0.067,
+    "q": -0.6219,
+    "p": 0.016
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 8,
+   "step": 31,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2606.0,
+    "share": 0.526,
+    "q": -0.9061,
+    "p": 0.4963
+   },
+   "root_b": {
+    "n": 59.0,
+    "share": 0.0119,
+    "q": -0.9099,
+    "p": 0.0113
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 194,
+   "step": 68,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-042\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2180.0,
+    "share": 0.4336,
+    "q": 0.2681,
+    "p": 0.1398
+   },
+   "root_b": {
+    "n": 268.0,
+    "share": 0.0533,
+    "q": 0.2504,
+    "p": 0.0241
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 21,
+   "step": 147,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1591.0,
+    "share": 0.3331,
+    "q": -0.5609,
+    "p": 0.1301
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.1784,
+    0.4284
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 44,
+   "step": 124,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 2, \"card\": \"OP17-054\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2253.0,
+    "share": 0.4489,
+    "q": 0.6301,
+    "p": 0.1215
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 58,
+   "step": 105,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1849.0,
+    "share": 0.3844,
+    "q": -0.9588,
+    "p": 0.4474
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 32,
+   "step": 60,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 4605.0,
+    "share": 0.9081,
+    "q": 0.231,
+    "p": 0.0266
+   },
+   "root_b": {
+    "n": 4605.0,
+    "share": 0.9081,
+    "q": 0.231,
+    "p": 0.0266
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 52,
+   "step": 65,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3685.0,
+    "share": 0.7735,
+    "q": -0.9439,
+    "p": 0.7685
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.01,
+    0.385
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 65,
+   "step": 125,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP17-042\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1276.0,
+    "share": 0.2596,
+    "q": 0.9124,
+    "p": 0.1165
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 74,
+   "step": 79,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1869.0,
+    "share": 0.3976,
+    "q": -0.8151,
+    "p": 0.0898
+   },
+   "root_b": {
+    "n": 304.0,
+    "share": 0.0647,
+    "q": -0.9086,
+    "p": 0.0617
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.37,
+    0.12
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 82,
+   "step": 46,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-052\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2002.0,
+    "share": 0.3951,
+    "q": -0.6699,
+    "p": 0.2111
+   },
+   "root_b": {
+    "n": 50.0,
+    "share": 0.0099,
+    "q": -0.7915,
+    "p": 0.0207
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 94,
+   "step": 129,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-048\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2945.0,
+    "share": 0.5846,
+    "q": -0.4695,
+    "p": 0.3031
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.3125,
+   "ci": [
+    -0.6075,
+    -0.0175
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 119,
+   "step": 41,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2493.0,
+    "share": 0.4957,
+    "q": -0.7815,
+    "p": 0.5446
+   },
+   "root_b": {
+    "n": 367.0,
+    "share": 0.073,
+    "q": -0.736,
+    "p": 0.0057
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.1875,
+   "ci": [
+    -0.454,
+    0.079
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 102,
+   "step": 86,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1753.0,
+    "share": 0.3501,
+    "q": -0.1437,
+    "p": 0.1536
+   },
+   "root_b": {
+    "n": 170.0,
+    "share": 0.034,
+    "q": -0.247,
+    "p": 0.019
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.3125,
+   "ci": [
+    0.0175,
+    0.6075
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 110,
+   "step": 42,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3763.0,
+    "share": 0.7387,
+    "q": -0.7702,
+    "p": 0.6956
+   },
+   "root_b": {
+    "n": 223.0,
+    "share": 0.0438,
+    "q": -0.7435,
+    "p": 0.0111
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    -0.0847,
+    0.5847
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 39,
+   "step": 118,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 542.0,
+    "share": 0.2282,
+    "q": -0.9931,
+    "p": 0.1072
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 5,
+   "step": 104,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1311.0,
+    "share": 0.394,
+    "q": -0.9606,
+    "p": 0.1505
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 10,
+   "step": 62,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1296.0,
+    "share": 0.2558,
+    "q": -0.6602,
+    "p": 0.3489
+   },
+   "root_b": {
+    "n": 24.0,
+    "share": 0.0047,
+    "q": -0.6815,
+    "p": 0.0081
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 51,
+   "step": 160,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-069",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 274.0,
+    "share": 0.1652,
+    "q": -0.9958,
+    "p": 0.0536
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 23,
+   "step": 58,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1110.0,
+    "share": 0.2548,
+    "q": -0.8516,
+    "p": 0.1954
+   },
+   "root_b": {
+    "n": 1006.0,
+    "share": 0.2309,
+    "q": -0.8114,
+    "p": 0.0128
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 58,
+   "step": 59,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2099.0,
+    "share": 0.4651,
+    "q": -0.9618,
+    "p": 0.4528
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 72,
+   "step": 129,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 368.0,
+    "share": 0.208,
+    "q": -0.9925,
+    "p": 0.066
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 129,
+   "step": 118,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 991.0,
+    "share": 0.2868,
+    "q": -0.977,
+    "p": 0.1571
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 84,
+   "step": 26,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1439.0,
+    "share": 0.2874,
+    "q": -0.7267,
+    "p": 0.2985
+   },
+   "root_b": {
+    "n": 828.0,
+    "share": 0.1654,
+    "q": -0.6841,
+    "p": 0.0126
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 140,
+   "step": 104,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1417.0,
+    "share": 0.3067,
+    "q": -0.8106,
+    "p": 0.6083
+   },
+   "root_b": {
+    "n": 1144.0,
+    "share": 0.2476,
+    "q": -0.7285,
+    "p": 0.0077
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 169,
+   "step": 71,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1059.0,
+    "share": 0.2432,
+    "q": -0.9722,
+    "p": 0.2234
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 182,
+   "step": 68,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1088.0,
+    "share": 0.2564,
+    "q": -0.8849,
+    "p": 0.0419
+   },
+   "root_b": {
+    "n": 1088.0,
+    "share": 0.2564,
+    "q": -0.8849,
+    "p": 0.0419
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 195,
+   "step": 50,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1821.0,
+    "share": 0.3694,
+    "q": -0.5592,
+    "p": 0.3418
+   },
+   "root_b": {
+    "n": 792.0,
+    "share": 0.1606,
+    "q": -0.5288,
+    "p": 0.0114
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0667,
+   "ci": [
+    -0.165,
+    0.2983
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 111,
+   "step": 104,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1670.0,
+    "share": 0.363,
+    "q": -0.8853,
+    "p": 0.2158
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 8,
+   "step": 98,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 642.0,
+    "share": 0.2542,
+    "q": -0.998,
+    "p": 0.1269
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 23,
+   "step": 63,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 989.0,
+    "share": 0.2673,
+    "q": -0.9925,
+    "p": 0.1891
+   },
+   "root_b": {
+    "n": 509.0,
+    "share": 0.1376,
+    "q": -0.9897,
+    "p": 0.0916
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 33,
+   "step": 128,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3018.0,
+    "share": 0.6571,
+    "q": -0.9296,
+    "p": 0.497
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 45,
+   "step": 58,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2037.0,
+    "share": 0.3979,
+    "q": 0.5051,
+    "p": 0.1557
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 60,
+   "step": 52,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1393.0,
+    "share": 0.2773,
+    "q": -0.8079,
+    "p": 0.2193
+   },
+   "root_b": {
+    "n": 96.0,
+    "share": 0.0191,
+    "q": -0.7946,
+    "p": 0.0091
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.4375,
+   "ci": [
+    0.1292,
+    0.7458
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 52,
+   "step": 101,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2522.0,
+    "share": 0.6012,
+    "q": -0.9293,
+    "p": 0.2821
+   },
+   "root_b": {
+    "n": 246.0,
+    "share": 0.0586,
+    "q": -0.9777,
+    "p": 0.0681
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 68,
+   "step": 66,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1024.0,
+    "share": 0.2408,
+    "q": -0.8166,
+    "p": 0.1506
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 74,
+   "step": 120,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1379.0,
+    "share": 0.2965,
+    "q": -0.8288,
+    "p": 0.3906
+   },
+   "root_b": {
+    "n": 237.0,
+    "share": 0.051,
+    "q": -0.8172,
+    "p": 0.0536
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.01,
+    0.385
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 95,
+   "step": 48,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2739.0,
+    "share": 0.5439,
+    "q": -0.7976,
+    "p": 0.4898
+   },
+   "root_b": {
+    "n": 45.0,
+    "share": 0.0089,
+    "q": -0.8028,
+    "p": 0.0076
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.2,
+   "ci": [
+    -0.0095,
+    0.4095
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 102,
+   "step": 144,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-048\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3729.0,
+    "share": 0.7443,
+    "q": 0.3182,
+    "p": 0.1133
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 85,
+   "step": 122,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1484.0,
+    "share": 0.4702,
+    "q": -0.9808,
+    "p": 0.2434
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 110,
+   "step": 71,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1163.0,
+    "share": 0.2674,
+    "q": -0.7409,
+    "p": 0.1758
+   },
+   "root_b": {
+    "n": 242.0,
+    "share": 0.0556,
+    "q": -0.746,
+    "p": 0.0131
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 119,
+   "step": 69,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1563.0,
+    "share": 0.3592,
+    "q": -0.906,
+    "p": 0.3113
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 29,
+   "step": 100,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 939.0,
+    "share": 0.3139,
+    "q": -0.9958,
+    "p": 0.1786
+   },
+   "root_b": {
+    "n": 230.0,
+    "share": 0.0769,
+    "q": -0.9964,
+    "p": 0.0445
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 10,
+   "step": 91,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1911.0,
+    "share": 0.3973,
+    "q": -0.7956,
+    "p": 0.2929
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 5,
+   "step": 134,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-069",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-118\", \"targets\": [\"OP17-069\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 444.0,
+    "share": 0.1648,
+    "q": -0.9754,
+    "p": 0.0894
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 40,
+   "step": 51,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 712.0,
+    "share": 0.1802,
+    "q": -0.9348,
+    "p": 0.1264
+   },
+   "root_b": {
+    "n": 357.0,
+    "share": 0.0903,
+    "q": -0.9106,
+    "p": 0.0239
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 53,
+   "step": 51,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2630.0,
+    "share": 0.518,
+    "q": -0.2274,
+    "p": 0.0776
+   },
+   "root_b": {
+    "n": 1321.0,
+    "share": 0.2602,
+    "q": -0.2875,
+    "p": 0.011
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.4284,
+    0.1784
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 59,
+   "step": 27,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3456.0,
+    "share": 0.6778,
+    "q": -0.5009,
+    "p": 0.7451
+   },
+   "root_b": {
+    "n": 208.0,
+    "share": 0.0408,
+    "q": -0.6535,
+    "p": 0.0143
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 74,
+   "step": 48,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2666.0,
+    "share": 0.5639,
+    "q": -0.8535,
+    "p": 0.4885
+   },
+   "root_b": {
+    "n": 234.0,
+    "share": 0.0495,
+    "q": -0.8264,
+    "p": 0.0094
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 113,
+   "step": 116,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1355.0,
+    "share": 0.3345,
+    "q": -0.9608,
+    "p": 0.267
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 88,
+   "step": 150,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-069",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-049\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 549.0,
+    "share": 0.2071,
+    "q": -0.9962,
+    "p": 0.1189
+   },
+   "root_b": {
+    "n": 220.0,
+    "share": 0.083,
+    "q": -0.9934,
+    "p": 0.0447
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 130,
+   "step": 80,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2300.0,
+    "share": 0.4843,
+    "q": -0.2278,
+    "p": 0.1931
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 169,
+   "step": 104,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 640.0,
+    "share": 0.2306,
+    "q": -0.992,
+    "p": 0.1219
+   },
+   "root_b": {
+    "n": 218.0,
+    "share": 0.0786,
+    "q": -0.9919,
+    "p": 0.0415
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 141,
+   "step": 76,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 948.0,
+    "share": 0.2244,
+    "q": -0.9179,
+    "p": 0.1297
+   },
+   "root_b": {
+    "n": 174.0,
+    "share": 0.0412,
+    "q": -0.9034,
+    "p": 0.0105
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.2924,
+    0.0424
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 184,
+   "step": 65,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1894.0,
+    "share": 0.4025,
+    "q": -0.8033,
+    "p": 0.4282
+   },
+   "root_b": {
+    "n": 408.0,
+    "share": 0.0867,
+    "q": -0.757,
+    "p": 0.0047
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 13,
+   "step": 165,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 595.0,
+    "share": 0.2365,
+    "q": -0.9207,
+    "p": 0.0263
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 199,
+   "step": 116,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 639.0,
+    "share": 0.2214,
+    "q": -0.9883,
+    "p": 0.1348
+   },
+   "root_b": {
+    "n": 193.0,
+    "share": 0.0669,
+    "q": -0.9805,
+    "p": 0.0337
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 38,
+   "step": 146,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 2, \"card\": \"OP17-118\", \"targets\": [\"ST34-004\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 473.0,
+    "share": 0.1949,
+    "q": -0.9877,
+    "p": 0.0976
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 23,
+   "step": 98,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 621.0,
+    "share": 0.199,
+    "q": -0.9718,
+    "p": 0.1061
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 52,
+   "step": 151,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 3, \"card\": \"OP17-048\", \"targets\": [\"OP17-063\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2838.0,
+    "share": 0.612,
+    "q": -0.5691,
+    "p": 0.0233
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.4284,
+    0.1784
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 45,
+   "step": 95,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2169.0,
+    "share": 0.4309,
+    "q": -0.5277,
+    "p": 0.0571
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 68,
+   "step": 116,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 3, \"card\": \"OP17-048\", \"targets\": [\"OP17-063\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1094.0,
+    "share": 0.2887,
+    "q": -0.8461,
+    "p": 0.0645
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 61,
+   "step": 78,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1387.0,
+    "share": 0.33,
+    "q": -0.8282,
+    "p": 0.0851
+   },
+   "root_b": {
+    "n": 604.0,
+    "share": 0.1437,
+    "q": -0.8331,
+    "p": 0.0293
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.2186,
+    0.3436
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 78,
+   "step": 51,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2167.0,
+    "share": 0.4325,
+    "q": -0.6714,
+    "p": 0.3354
+   },
+   "root_b": {
+    "n": 48.0,
+    "share": 0.0096,
+    "q": -0.6776,
+    "p": 0.0064
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.4375,
+   "ci": [
+    0.0811,
+    0.7939
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 88,
+   "step": 51,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2105.0,
+    "share": 0.4205,
+    "q": -0.5598,
+    "p": 0.4272
+   },
+   "root_b": {
+    "n": 683.0,
+    "share": 0.1364,
+    "q": -0.5473,
+    "p": 0.0118
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 95,
+   "step": 118,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1120.0,
+    "share": 0.2757,
+    "q": -0.8881,
+    "p": 0.1017
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 119,
+   "step": 118,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 727.0,
+    "share": 0.2658,
+    "q": -0.9878,
+    "p": 0.1396
+   },
+   "root_b": {
+    "n": 200.0,
+    "share": 0.0731,
+    "q": -0.9855,
+    "p": 0.0365
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 103,
+   "step": 79,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1330.0,
+    "share": 0.3416,
+    "q": -0.9571,
+    "p": 0.2401
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 110,
+   "step": 106,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1625.0,
+    "share": 0.403,
+    "q": -0.9616,
+    "p": 0.3287
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 30,
+   "step": 130,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-049\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 761.0,
+    "share": 0.2711,
+    "q": -0.9987,
+    "p": 0.1532
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 40,
+   "step": 93,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 715.0,
+    "share": 0.2403,
+    "q": -0.9917,
+    "p": 0.1564
+   },
+   "root_b": {
+    "n": 200.0,
+    "share": 0.0672,
+    "q": -0.9837,
+    "p": 0.0367
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 6,
+   "step": 54,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2277.0,
+    "share": 0.4683,
+    "q": -0.9548,
+    "p": 0.4535
+   },
+   "root_b": {
+    "n": 55.0,
+    "share": 0.0113,
+    "q": -0.9509,
+    "p": 0.0097
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 53,
+   "step": 86,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2881.0,
+    "share": 0.5949,
+    "q": -0.8118,
+    "p": 0.4625
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 15,
+   "step": 137,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-048\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 4312.0,
+    "share": 0.8633,
+    "q": -0.3168,
+    "p": 0.2222
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.1875,
+   "ci": [
+    -0.454,
+    0.079
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 74,
+   "step": 93,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-052\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 511.0,
+    "share": 0.2013,
+    "q": -0.9965,
+    "p": 0.0992
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 130,
+   "step": 124,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1530.0,
+    "share": 0.3927,
+    "q": -0.9665,
+    "p": 0.2466
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 65,
+   "step": 128,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2583.0,
+    "share": 0.5077,
+    "q": 0.4024,
+    "p": 0.298
+   },
+   "root_b": {
+    "n": 65.0,
+    "share": 0.0128,
+    "q": 0.0531,
+    "p": 0.0083
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.2212,
+    0.5962
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 119,
+   "step": 68,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2958.0,
+    "share": 0.6132,
+    "q": -0.8959,
+    "p": 0.5349
+   },
+   "root_b": {
+    "n": 288.0,
+    "share": 0.0597,
+    "q": -0.8677,
+    "p": 0.0133
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 90,
+   "step": 127,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1412.0,
+    "share": 0.4098,
+    "q": -0.9609,
+    "p": 0.2856
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.2707,
+    0.3957
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 173,
+   "step": 51,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2129.0,
+    "share": 0.4171,
+    "q": -0.2034,
+    "p": 0.6281
+   },
+   "root_b": {
+    "n": 41.0,
+    "share": 0.008,
+    "q": -0.2391,
+    "p": 0.0044
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.25,
+   "ci": [
+    -0.5847,
+    0.0847
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 184,
+   "step": 100,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 704.0,
+    "share": 0.2626,
+    "q": -0.9866,
+    "p": 0.1235
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 16,
+   "step": 92,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1745.0,
+    "share": 0.4806,
+    "q": -0.9768,
+    "p": 0.2825
+   },
+   "root_b": {
+    "n": 148.0,
+    "share": 0.0408,
+    "q": -0.9859,
+    "p": 0.0303
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 0,
+   "step": 55,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2041.0,
+    "share": 0.4061,
+    "q": -0.4603,
+    "p": 0.0121
+   },
+   "root_b": {
+    "n": 2041.0,
+    "share": 0.4061,
+    "q": -0.4603,
+    "p": 0.0121
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 141,
+   "step": 112,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2590.0,
+    "share": 0.5699,
+    "q": -0.4913,
+    "p": 0.1105
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.625,
+   "ci": [
+    0.3216,
+    0.9284
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 41,
+   "step": 124,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 863.0,
+    "share": 0.2732,
+    "q": -0.9287,
+    "p": 0.0796
+   },
+   "root_b": {
+    "n": 294.0,
+    "share": 0.0931,
+    "q": -0.9573,
+    "p": 0.0629
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 23,
+   "step": 134,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-052\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 520.0,
+    "share": 0.2337,
+    "q": -0.989,
+    "p": 0.0968
+   },
+   "root_b": {
+    "n": 198.0,
+    "share": 0.089,
+    "q": -0.9915,
+    "p": 0.0392
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 45,
+   "step": 134,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3532.0,
+    "share": 0.7323,
+    "q": -0.2448,
+    "p": 0.1106
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.18,
+    0.555
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 54,
+   "step": 54,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1456.0,
+    "share": 0.2897,
+    "q": -0.0005,
+    "p": 0.3674
+   },
+   "root_b": {
+    "n": 1078.0,
+    "share": 0.2145,
+    "q": -0.0716,
+    "p": 0.0142
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.4375,
+   "ci": [
+    0.1864,
+    0.6886
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 69,
+   "step": 43,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2028.0,
+    "share": 0.4044,
+    "q": -0.783,
+    "p": 0.231
+   },
+   "root_b": {
+    "n": 478.0,
+    "share": 0.0953,
+    "q": -0.778,
+    "p": 0.0123
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 78,
+   "step": 80,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2043.0,
+    "share": 0.4228,
+    "q": -0.6923,
+    "p": 0.1347
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 63,
+   "step": 107,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1443.0,
+    "share": 0.2964,
+    "q": 0.0795,
+    "p": 0.0727
+   },
+   "root_b": {
+    "n": 872.0,
+    "share": 0.1791,
+    "q": 0.2242,
+    "p": 0.0045
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.1875,
+   "ci": [
+    -0.18,
+    0.555
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 89,
+   "step": 78,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2279.0,
+    "share": 0.4499,
+    "q": 0.6908,
+    "p": 0.1036
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 97,
+   "step": 44,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2061.0,
+    "share": 0.4058,
+    "q": -0.6103,
+    "p": 0.0048
+   },
+   "root_b": {
+    "n": 2061.0,
+    "share": 0.4058,
+    "q": -0.6103,
+    "p": 0.0048
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 106,
+   "step": 81,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1554.0,
+    "share": 0.3487,
+    "q": -0.8958,
+    "p": 0.3968
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 112,
+   "step": 56,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2354.0,
+    "share": 0.4657,
+    "q": -0.7899,
+    "p": 0.4237
+   },
+   "root_b": {
+    "n": 164.0,
+    "share": 0.0324,
+    "q": -0.7942,
+    "p": 0.0296
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.1784,
+    0.4284
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 17,
+   "step": 339,
+   "ot": 12,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2272.0,
+    "share": 0.4873,
+    "q": 0.8891,
+    "p": 0.0901
+   },
+   "root_b": {
+    "n": 422.0,
+    "share": 0.0905,
+    "q": 0.8681,
+    "p": 0.0551
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 53,
+   "step": 245,
+   "ot": 9,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1055.0,
+    "share": 0.245,
+    "q": 0.6659,
+    "p": 0.145
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.2924,
+    0.0424
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 41,
+   "step": 37,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1337.0,
+    "share": 0.2741,
+    "q": -0.7667,
+    "p": 0.0474
+   },
+   "root_b": {
+    "n": 1337.0,
+    "share": 0.2741,
+    "q": -0.7667,
+    "p": 0.0474
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 6,
+   "step": 90,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1977.0,
+    "share": 0.4841,
+    "q": -0.9733,
+    "p": 0.4525
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 35,
+   "step": 39,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2413.0,
+    "share": 0.4735,
+    "q": -0.4468,
+    "p": 0.3025
+   },
+   "root_b": {
+    "n": 326.0,
+    "share": 0.064,
+    "q": -0.6506,
+    "p": 0.0253
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.1784,
+    0.4284
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 74,
+   "step": 127,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-069",
+    "OP17-069"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 340.0,
+    "share": 0.1724,
+    "q": -0.9994,
+    "p": 0.0657
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 135,
+   "step": 115,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2430.0,
+    "share": 0.5142,
+    "q": -0.9766,
+    "p": 0.4924
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 67,
+   "step": 35,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3236.0,
+    "share": 0.636,
+    "q": -0.6772,
+    "p": 0.7064
+   },
+   "root_b": {
+    "n": 333.0,
+    "share": 0.0654,
+    "q": -0.651,
+    "p": 0.0059
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 93,
+   "step": 107,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 2, \"card\": \"OP17-052\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1251.0,
+    "share": 0.2638,
+    "q": 0.8157,
+    "p": 0.0654
+   },
+   "root_b": {
+    "n": 654.0,
+    "share": 0.1379,
+    "q": 0.8041,
+    "p": 0.0426
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 119,
+   "step": 93,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1101.0,
+    "share": 0.2763,
+    "q": -0.9582,
+    "p": 0.2367
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 173,
+   "step": 118,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1171.0,
+    "share": 0.2335,
+    "q": 0.8573,
+    "p": 0.2432
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.3125,
+   "ci": [
+    -0.5471,
+    -0.0779
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 150,
+   "step": 75,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1771.0,
+    "share": 0.3625,
+    "q": -0.9419,
+    "p": 0.3485
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 3,
+   "step": 31,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2682.0,
+    "share": 0.525,
+    "q": -0.8745,
+    "p": 0.5811
+   },
+   "root_b": {
+    "n": 221.0,
+    "share": 0.0433,
+    "q": -0.8612,
+    "p": 0.0378
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.1543,
+    0.2793
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 27,
+   "step": 67,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-052\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 635.0,
+    "share": 0.2017,
+    "q": -0.9893,
+    "p": 0.1217
+   },
+   "root_b": {
+    "n": 287.0,
+    "share": 0.0912,
+    "q": -0.9845,
+    "p": 0.0487
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 43,
+   "step": 54,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2731.0,
+    "share": 0.5397,
+    "q": -0.6981,
+    "p": 0.4444
+   },
+   "root_b": {
+    "n": 25.0,
+    "share": 0.0049,
+    "q": -0.7595,
+    "p": 0.0085
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.375,
+   "ci": [
+    0.13,
+    0.62
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 17,
+   "step": 128,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "ST34-004",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 2, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1361.0,
+    "share": 0.314,
+    "q": -0.7158,
+    "p": 0.1474
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.1875,
+   "ci": [
+    -0.385,
+    0.01
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 46,
+   "step": 85,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2815.0,
+    "share": 0.5547,
+    "q": 0.9296,
+    "p": 0.1995
+   },
+   "root_b": {
+    "n": 39.0,
+    "share": 0.0077,
+    "q": 0.7945,
+    "p": 0.0295
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 54,
+   "step": 133,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1151.0,
+    "share": 0.2526,
+    "q": -0.8408,
+    "p": 0.081
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 64,
+   "step": 52,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1607.0,
+    "share": 0.3184,
+    "q": -0.5743,
+    "p": 0.165
+   },
+   "root_b": {
+    "n": 44.0,
+    "share": 0.0087,
+    "q": -0.6667,
+    "p": 0.0057
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.375,
+   "ci": [
+    -0.0201,
+    0.7701
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 186,
+   "step": 98,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1953.0,
+    "share": 0.4114,
+    "q": -0.8063,
+    "p": 0.1855
+   },
+   "root_b": {
+    "n": 96.0,
+    "share": 0.0202,
+    "q": -0.8387,
+    "p": 0.0161
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 80,
+   "step": 75,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1550.0,
+    "share": 0.3106,
+    "q": -0.5672,
+    "p": 0.2363
+   },
+   "root_b": {
+    "n": 493.0,
+    "share": 0.0988,
+    "q": -0.5612,
+    "p": 0.0165
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.3099,
+    0.3099
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 69,
+   "step": 69,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1948.0,
+    "share": 0.4166,
+    "q": -0.8952,
+    "p": 0.4081
+   },
+   "root_b": {
+    "n": 146.0,
+    "share": 0.0312,
+    "q": -0.873,
+    "p": 0.0132
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 97,
+   "step": 99,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3070.0,
+    "share": 0.6114,
+    "q": -0.5826,
+    "p": 0.3365
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.3957,
+    0.2707
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 89,
+   "step": 119,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1897.0,
+    "share": 0.4232,
+    "q": 0.7414,
+    "p": 0.0747
+   },
+   "root_b": {
+    "n": 183.0,
+    "share": 0.0408,
+    "q": 0.635,
+    "p": 0.0447
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 107,
+   "step": 86,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2122.0,
+    "share": 0.4343,
+    "q": -0.6435,
+    "p": 0.0892
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 112,
+   "step": 86,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1190.0,
+    "share": 0.2677,
+    "q": -0.91,
+    "p": 0.1319
+   },
+   "root_b": {
+    "n": 238.0,
+    "share": 0.0535,
+    "q": -0.9232,
+    "p": 0.041
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 35,
+   "step": 150,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-063",
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 440.0,
+    "share": 0.1591,
+    "q": -0.9975,
+    "p": 0.0853
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 18,
+   "step": 100,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1824.0,
+    "share": 0.4493,
+    "q": -0.9786,
+    "p": 0.34
+   },
+   "root_b": {
+    "n": 250.0,
+    "share": 0.0616,
+    "q": -0.9706,
+    "p": 0.0373
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 8,
+   "step": 53,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2262.0,
+    "share": 0.4483,
+    "q": -0.1396,
+    "p": 0.0669
+   },
+   "root_b": {
+    "n": 257.0,
+    "share": 0.0509,
+    "q": -0.2561,
+    "p": 0.0165
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.3099,
+    0.3099
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 54,
+   "step": 57,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-049\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 638.0,
+    "share": 0.212,
+    "q": -0.9941,
+    "p": 0.1397
+   },
+   "root_b": {
+    "n": 313.0,
+    "share": 0.104,
+    "q": -0.9764,
+    "p": 0.0426
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 42,
+   "step": 97,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP17-050\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1393.0,
+    "share": 0.2803,
+    "q": 0.1,
+    "p": 0.0073
+   },
+   "root_b": {
+    "n": 150.0,
+    "share": 0.0302,
+    "q": 0.0743,
+    "p": 0.0096
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 99,
+   "step": 40,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1897.0,
+    "share": 0.3828,
+    "q": -0.8028,
+    "p": 0.0233
+   },
+   "root_b": {
+    "n": 1897.0,
+    "share": 0.3828,
+    "q": -0.8028,
+    "p": 0.0233
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 79,
+   "step": 35,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2018.0,
+    "share": 0.3954,
+    "q": -0.8356,
+    "p": 0.811
+   },
+   "root_b": {
+    "n": 184.0,
+    "share": 0.0361,
+    "q": -0.7672,
+    "p": 0.0144
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 67,
+   "step": 91,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 703.0,
+    "share": 0.2529,
+    "q": -0.9918,
+    "p": 0.1378
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 175,
+   "step": 251,
+   "ot": 9,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"ATTACK\", \"card\": \"OP17-050\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": null,
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 121,
+   "step": 72,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2279.0,
+    "share": 0.4831,
+    "q": -0.1514,
+    "p": 0.1101
+   },
+   "root_b": {
+    "n": 74.0,
+    "share": 0.0157,
+    "q": -0.1635,
+    "p": 0.0063
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 137,
+   "step": 43,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2167.0,
+    "share": 0.4335,
+    "q": -0.6001,
+    "p": 0.1808
+   },
+   "root_b": {
+    "n": 128.0,
+    "share": 0.0256,
+    "q": -0.6607,
+    "p": 0.0224
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 158,
+   "step": 73,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1457.0,
+    "share": 0.3116,
+    "q": -0.3629,
+    "p": 0.2572
+   },
+   "root_b": {
+    "n": 1235.0,
+    "share": 0.2641,
+    "q": -0.3298,
+    "p": 0.0215
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 5,
+   "step": 95,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2267.0,
+    "share": 0.4498,
+    "q": -0.0881,
+    "p": 0.0362
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.375,
+   "ci": [
+    -0.7272,
+    -0.0228
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 27,
+   "step": 104,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1114.0,
+    "share": 0.3429,
+    "q": -0.9869,
+    "p": 0.1978
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 19,
+   "step": 137,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1684.0,
+    "share": 0.3513,
+    "q": -0.349,
+    "p": 0.153
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.4407,
+    0.3157
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 47,
+   "step": 95,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 659.0,
+    "share": 0.1995,
+    "q": -0.9912,
+    "p": 0.1173
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 187,
+   "step": 94,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-048\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 4839.0,
+    "share": 0.9451,
+    "q": 0.7309,
+    "p": 0.3468
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 43,
+   "step": 87,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1533.0,
+    "share": 0.3136,
+    "q": -0.704,
+    "p": 0.0621
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 69,
+   "step": 112,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 826.0,
+    "share": 0.2407,
+    "q": -0.9919,
+    "p": 0.1584
+   },
+   "root_b": {
+    "n": 255.0,
+    "share": 0.0743,
+    "q": -0.9928,
+    "p": 0.0502
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 55,
+   "step": 60,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2141.0,
+    "share": 0.4254,
+    "q": -0.023,
+    "p": 0.0239
+   },
+   "root_b": {
+    "n": 2141.0,
+    "share": 0.4254,
+    "q": -0.023,
+    "p": 0.0239
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 64,
+   "step": 86,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 4303.0,
+    "share": 0.857,
+    "q": -0.8556,
+    "p": 0.7851
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 80,
+   "step": 110,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3253.0,
+    "share": 0.643,
+    "q": -0.595,
+    "p": 0.7179
+   },
+   "root_b": {
+    "n": 8.0,
+    "share": 0.0016,
+    "q": -0.8159,
+    "p": 0.0111
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.1875,
+   "ci": [
+    -0.385,
+    0.01
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 107,
+   "step": 127,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3566.0,
+    "share": 0.7674,
+    "q": -0.9618,
+    "p": 0.7338
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 99,
+   "step": 82,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1728.0,
+    "share": 0.3906,
+    "q": -0.9766,
+    "p": 0.3164
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 90,
+   "step": 75,
+   "ot": 5,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2231.0,
+    "share": 0.4414,
+    "q": 0.5638,
+    "p": 0.1495
+   },
+   "root_b": {
+    "n": 55.0,
+    "share": 0.0109,
+    "q": 0.4168,
+    "p": 0.0204
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 112,
+   "step": 124,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 763.0,
+    "share": 0.2418,
+    "q": -0.971,
+    "p": 0.2032
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.125,
+   "ci": [
+    -0.0424,
+    0.2924
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 39,
+   "step": 34,
+   "ot": 3,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-054\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1234.0,
+    "share": 0.2538,
+    "q": -0.8813,
+    "p": 0.2672
+   },
+   "root_b": {
+    "n": 416.0,
+    "share": 0.0856,
+    "q": -0.863,
+    "p": 0.0334
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.1789,
+    0.1789
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 18,
+   "step": 134,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 424.0,
+    "share": 0.1948,
+    "q": -0.9953,
+    "p": 0.0781
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 8,
+   "step": 151,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1960.0,
+    "share": 0.4007,
+    "q": 0.738,
+    "p": 0.1226
+   },
+   "root_b": {
+    "n": 655.0,
+    "share": 0.1339,
+    "q": 0.7409,
+    "p": 0.0371
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 54,
+   "step": 84,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-046\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 552.0,
+    "share": 0.2609,
+    "q": -0.9981,
+    "p": 0.1056
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 42,
+   "step": 127,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2796.0,
+    "share": 0.5618,
+    "q": -0.6861,
+    "p": 0.2583
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 69,
+   "step": 60,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2307.0,
+    "share": 0.5087,
+    "q": -0.959,
+    "p": 0.4426
+   },
+   "root_b": {
+    "n": 93.0,
+    "share": 0.0205,
+    "q": -0.954,
+    "p": 0.0158
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 79,
+   "step": 55,
+   "ot": 4,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2356.0,
+    "share": 0.4715,
+    "q": -0.8778,
+    "p": 0.7244
+   },
+   "root_b": {
+    "n": 378.0,
+    "share": 0.0756,
+    "q": -0.8111,
+    "p": 0.0074
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 101,
+   "step": 80,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3304.0,
+    "share": 0.6863,
+    "q": -0.9294,
+    "p": 0.7293
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 122,
+   "step": 92,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-039\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1241.0,
+    "share": 0.282,
+    "q": -0.8799,
+    "p": 0.1092
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 137,
+   "step": 110,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-049\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 368.0,
+    "share": 0.1724,
+    "q": -0.9969,
+    "p": 0.077
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 161,
+   "step": 85,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1680.0,
+    "share": 0.3292,
+    "q": -0.424,
+    "p": 0.0173
+   },
+   "root_b": {
+    "n": 1680.0,
+    "share": 0.3292,
+    "q": -0.424,
+    "p": 0.0173
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 179,
+   "step": 65,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1406.0,
+    "share": 0.2921,
+    "q": -0.7161,
+    "p": 0.0127
+   },
+   "root_b": {
+    "n": 1406.0,
+    "share": 0.2921,
+    "q": -0.7161,
+    "p": 0.0127
+   },
+   "chosen_b": true,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "kr",
+   "idx": 188,
+   "step": 96,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-045\", \"targets\": [\"OP17-068\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1940.0,
+    "share": 0.4092,
+    "q": 0.0751,
+    "p": 0.0278
+   },
+   "root_b": {
+    "n": 226.0,
+    "share": 0.0477,
+    "q": 0.0029,
+    "p": 0.0058
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    -0.3578,
+    0.3578
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 27,
+   "step": 155,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-062",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-054\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 418.0,
+    "share": 0.1624,
+    "q": -0.9975,
+    "p": 0.0822
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 20,
+   "step": 69,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1924.0,
+    "share": 0.3796,
+    "q": -0.5628,
+    "p": 0.0668
+   },
+   "root_b": {
+    "n": 38.0,
+    "share": 0.0075,
+    "q": -0.7223,
+    "p": 0.0102
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 5,
+   "step": 142,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "OP17-065"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-040\", \"targets\": [\"OP17-058\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1522.0,
+    "share": 0.3034,
+    "q": 0.244,
+    "p": 0.3373
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.1875,
+   "ci": [
+    -0.555,
+    0.18
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 43,
+   "step": 125,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 766.0,
+    "share": 0.2368,
+    "q": -0.9634,
+    "p": 0.1348
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 50,
+   "step": 108,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-062",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-045\", \"targets\": [\"EB04-032\"]}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 455.0,
+    "share": 0.1714,
+    "q": -0.9903,
+    "p": 0.0922
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 57,
+   "step": 121,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-042\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1871.0,
+    "share": 0.4014,
+    "q": -0.5811,
+    "p": 0.1823
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.3125,
+   "ci": [
+    0.0175,
+    0.6075
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 72,
+   "step": 103,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "ST34-004"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1397.0,
+    "share": 0.3171,
+    "q": -0.9882,
+    "p": 0.2658
+   },
+   "root_b": {
+    "n": 211.0,
+    "share": 0.0479,
+    "q": -0.989,
+    "p": 0.0414
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 64,
+   "step": 114,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-062"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1892.0,
+    "share": 0.4267,
+    "q": -0.8609,
+    "p": 0.4408
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 99,
+   "step": 120,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063",
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1392.0,
+    "share": 0.4143,
+    "q": -0.9913,
+    "p": 0.2447
+   },
+   "root_b": {
+    "n": 191.0,
+    "share": 0.0568,
+    "q": -0.9957,
+    "p": 0.0377
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 90,
+   "step": 115,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-061"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-118\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2442.0,
+    "share": 0.4864,
+    "q": 0.6717,
+    "p": 0.1791
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 81,
+   "step": 78,
+   "ot": 5,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-048\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 1902.0,
+    "share": 0.4102,
+    "q": -0.9673,
+    "p": 0.3684
+   },
+   "root_b": null,
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 109,
+   "step": 48,
+   "ot": 4,
+   "group": "k6_only",
+   "p1_bigs": [],
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-040\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 3449.0,
+    "share": 0.6845,
+    "q": -0.7371,
+    "p": 0.4444
+   },
+   "root_b": {
+    "n": 77.0,
+    "share": 0.0153,
+    "q": -0.7561,
+    "p": 0.0154
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": 0.5,
+   "ci": [
+    0.247,
+    0.753
+   ]
+  },
+  {
+   "src": "m5",
+   "idx": 113,
+   "step": 130,
+   "ot": 6,
+   "group": "with_big",
+   "p1_bigs": [
+    "OP17-063"
+   ],
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 9, \"card\": \"OP17-045\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-056\"}",
+   "root_a": {
+    "n": 2073.0,
+    "share": 0.4052,
+    "q": 0.7519,
+    "p": 0.7039
+   },
+   "root_b": {
+    "n": 21.0,
+    "share": 0.0041,
+    "q": 0.4643,
+    "p": 0.0102
+   },
+   "chosen_b": false,
+   "forced": 16,
+   "diff": -0.125,
+   "ci": [
+    -0.2924,
+    0.0424
+   ]
+  }
+ ]
+}
