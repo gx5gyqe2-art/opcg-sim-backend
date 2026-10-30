@@ -1,0 +1,94 @@
+{
+ "points": 24,
+ "truth": 0.338,
+ "nets": {
+  "nrel_ctrl_s2.npz": {
+   "a_head": {
+    "mean": 0.1351,
+    "ratio": 0.4,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0983,
+    "ratio": 0.291,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1122,
+    "ratio": 0.332,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1623,
+    "ratio": 0.48,
+    "n": 24
+   }
+  },
+  "nrel_A_s2.npz": {
+   "a_head": {
+    "mean": 0.1398,
+    "ratio": 0.414,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1005,
+    "ratio": 0.297,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1108,
+    "ratio": 0.328,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1695,
+    "ratio": 0.502,
+    "n": 24
+   }
+  },
+  "nrel_B_s2.npz": {
+   "a_head": {
+    "mean": 0.124,
+    "ratio": 0.367,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0916,
+    "ratio": 0.271,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1023,
+    "ratio": 0.303,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1412,
+    "ratio": 0.418,
+    "n": 24
+   }
+  },
+  "nrel_Bnr.npz": {
+   "a_head": {
+    "mean": 0.1593,
+    "ratio": 0.471,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1022,
+    "ratio": 0.302,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1162,
+    "ratio": 0.344,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1677,
+    "ratio": 0.496,
+    "n": 24
+   }
+  }
+ }
+}

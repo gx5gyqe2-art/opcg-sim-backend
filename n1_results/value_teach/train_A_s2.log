@@ -1,0 +1,19 @@
+value 2652064行（val 378772） policy 1054500点（val 150782） 95s
+warm-start: opcg_sim/data/learned/nrel_r27.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 1912706/2652064
+res: on λ=0.1 有効行 2164465/2652064
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 13385224行 14.9s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.518419868659487, "entropy_q_improved": 1.093331961064759}
+  ep0 step 5000/23000 mse 0.4916 ce 1.6988 296s
+  ep0 step 10000/23000 mse 0.4881 ce 1.6974 470s
+  ep0 step 15000/23000 mse 0.4865 ce 1.6995 641s
+  ep0 step 20000/23000 mse 0.4845 ce 1.6997 816s
+ep0 train mse 0.4835 ce 1.6995 | val v_mse 0.5613 v_sign 0.794 pi_top1 0.502 ce 1.668 920s
+  aux val huber 0.4320 tok 0.1195
+  res val huber 0.0362（16133 行）
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 796.063, "steps": 23000, "breakdown": {"budget_p": 2.671, "holdout": 2.367, "rel_p": 0.071, "rel_v": 33.286, "slice_p": 35.526, "slice_v": 53.742, "step_p": 0.111, "step_p_bwd": 202.357, "step_p_fwd": 124.249, "step_v": 1.31, "step_v_bwd": 195.217, "step_v_fwd": 145.322, "step_v_prep": 0.088}, "train_mse": 0.4835415159696126, "train_ce": 1.6995465046960976, "val_vmse": 0.5613123774528503, "val_vsign": 0.79355, "val_pi_top1": 0.50175, "val_p_loss": 1.6681302642822267, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.518419868659487, "entropy_q_improved": 1.093331961064759}, "val_pi_top1_visits": 0.55125, "val_p_loss_visits": 1.807792236328125, "aux_weight": 0.1, "val_aux": 0.4320454290379649, "val_aux_tok": 0.11948194002515805, "train_aux": [0.4088825285434723, 0.11187504976987839], "res_weight": 0.1, "val_res_huber": 0.03618656962658308, "val_res_rows": 16133, "train_res": [0.03581688180565834, 209]}
+  ep0 を n1_results/value_teach/nrel_A_s2.npz に保存（暫定最良）
+best ep0 val v_mse 0.5613 を保存
+N_REL_TRAIN_DONE {"out": "n1_results/value_teach/nrel_A_s2.npz"}

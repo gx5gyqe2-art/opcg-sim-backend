@@ -1,0 +1,4 @@
+nrel_ctrl_s2.npz a_head 0.135(0.40) b_close 0.098(0.29) c_oppend 0.112(0.33) d_next 0.162(0.48)
+nrel_A_s2.npz a_head 0.140(0.41) b_close 0.101(0.30) c_oppend 0.111(0.33) d_next 0.170(0.50)
+nrel_B_s2.npz a_head 0.124(0.37) b_close 0.092(0.27) c_oppend 0.102(0.30) d_next 0.141(0.42)
+nrel_Bnr.npz a_head 0.159(0.47) b_close 0.102(0.30) c_oppend 0.116(0.34) d_next 0.168(0.50)
