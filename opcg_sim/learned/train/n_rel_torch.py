@@ -242,9 +242,10 @@ class TorchNRel(torch.nn.Module):
         """共有表現 e → 時間軸の予測 [B,7]（numpy 版 `NRelNet.time_head` と同じ式）。"""
         return torch.relu(e @ self.Wu1 + self.bu1) @ self.Wu2 + self.bu2
 
-    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False, time=False):
+    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False, time=False,
+                    want_e=False):
         """(value, aux, aux_tok, plan, time)＝要るヘッドだけ計算し、要らないものは None
-        （共有部は 1 回）。"""
+        （共有部は 1 回）。`want_e` なら末尾に共有表現 e を足す（WP `value-teach` の案 A の頭が使う）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
         e = self.body(sc, h, present)
@@ -258,7 +259,13 @@ class TorchNRel(torch.nn.Module):
             pq = self.plan_head(e)
         if time:
             pu = self.time_head(e)
+        if want_e:
+            return v, pa, pt, pq, pu, e
         return v, pa, pt, pq, pu
+
+    def res_head(self, e):
+        """共有表現 e → 資源の先読み [B,20]（WP `value-teach` の案 A・`value_teach.RES_COLS`）。"""
+        return torch.relu(e @ self.Wn1 + self.bn1) @ self.Wn2 + self.bn2
 
     # --- 方策 ---
     def cand_feats(self, tab, at, cid, tcid, tail):
@@ -384,7 +391,7 @@ class TorchTrainer:
     学習中の重みは `sync_to_numpy()` で書き戻す。"""
 
     def __init__(self, net, lr=5e-4, threads=None, betas=(0.9, 0.999), eps=1e-8, aux_weight=0.0,
-                 plan_weight=0.0, time_weight=0.0):
+                 plan_weight=0.0, time_weight=0.0, res_weight=0.0):
         self.net = net
         self.aux_weight = float(aux_weight)
         self.plan_weight = float(plan_weight)
@@ -395,6 +402,15 @@ class TorchTrainer:
         self.aux_loss = (0.0, 0.0)                # 直近の (aux, aux_tok)（エポック行に出す）
         self.plan_loss = (0.0, 0)                 # 直近の (方針損失, 有効行数)
         self.time_loss = (0.0, 0)                 # 直近の (時間軸損失, 有効行数)
+        # 資源の先読みの頭（WP `value-teach` の案 A）。`res_weight>0` のときだけ Parameter にする＝
+        # 0 なら optimizer が知りもしない＝今までの学習と 1 ビットも変わらない。
+        self.res_weight = float(res_weight)
+        self.res_loss = (0.0, 0)
+        self.pair_loss = (0.0, 0.0)               # 直近の (価値の mse, 対の差の mse)
+        if self.res_weight > 0.0:
+            from opcg_sim.learned.train import value_teach as VT
+            for k, a in VT.init_res_params(int(net.Wv.shape[0])).items():
+                setattr(self.tn, k, torch.nn.Parameter(_f32(a)))
         # 既定（threads が 0/None）は全コア。`n_rel_train` は import 時に OMP_NUM_THREADS=1 を
         # 立てる（numpy の BLAS はスレッドを増やすと**遅くなる**＝§4 の対照表）ので、torch の
         # 既定スレッド数もそれに引きずられて 1 になる。ここで明示的に上書きする。
@@ -444,7 +460,7 @@ class TorchTrainer:
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
                    aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None,
-                   tm=None, tm_mask=None, time_w=None):
+                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
@@ -455,8 +471,13 @@ class TorchTrainer:
         use_plan = bool(self.tn.plan and wq > 0.0 and plan is not None)
         wu = self.time_weight if time_w is None else float(time_w)
         use_time = bool(self.tn.time and wu > 0.0 and tm is not None and tm_mask is not None)
+        use_res = bool(self.res_weight > 0.0 and res is not None and res_mask is not None)
         self._mark("step_v_fwd")
-        if use_aux or use_plan or use_time:
+        if use_res:
+            v, pa, pt, pq, pu, e = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
+                                                       aux=use_aux, plan=use_plan, time=use_time,
+                                                       want_e=True)
+        elif use_aux or use_plan or use_time:
             v, pa, pt, pq, pu = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
                                                     aux=use_aux, plan=use_plan, time=use_time)
         else:
@@ -480,9 +501,31 @@ class TorchTrainer:
             lu, nu = time_loss_terms(pu, _f32(tm), _f32(tm_mask))
             loss = loss + wu * lu
             self.time_loss = (float(lu.detach()), nu)
+        if use_res:
+            # 資源の先読み（WP `value-teach` の案 A）: `time` と同じ流儀（有効行の平均 Huber）
+            from opcg_sim.learned.train import value_teach as VT
+            lr_, nr_ = VT.res_loss_terms(self.tn.res_head(e), _f32(res), _f32(res_mask))
+            loss = loss + self.res_weight * lr_
+            self.res_loss = (float(lr_.detach()), nr_)
         self._mark("step_v_bwd")
         self._update(loss, lr)
         return out
+
+    def pair_step(self, sc, ci, tok, t_a, t_b, lr, value_weight=1.0, lam=1.0):
+        """対照の対（WP `value-teach` の案 B）。行は [a の B 本, b の B 本]・`--ablate rel` 前提（R は渡さない）。"""
+        from opcg_sim.learned.train import value_teach as VT
+        v = self.tn.value(_f32(sc), _i64(ci), _f32(tok), None, None)
+        loss, mse, dmse = VT.pair_loss_terms(v, _f32(t_a), _f32(t_b), value_weight, lam)
+        self._update(loss, lr)
+        self.pair_loss = (float(mse.detach()), float(dmse.detach()))
+        return self.pair_loss
+
+    def res_params(self):
+        """案 A の頭の重み（numpy・保存用）。立っていなければ空。"""
+        if self.res_weight <= 0.0:
+            return {}
+        from opcg_sim.learned.train import value_teach as VT
+        return {k: getattr(self.tn, k).detach().numpy().copy() for k in VT.RES_PARAMS}
 
     def policy_step(self, sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget, pi, lr):
         """numpy 版と同じ引数の口（袋を毎回組み立てる＝従来どおり）。"""

@@ -150,7 +150,8 @@ class Split:
         return {k: round(v, nd) for k, v in sorted(self.t.items())}
 
 
-def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, time_weight=0.0):
+def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, time_weight=0.0,
+                 res_weight=0.0):
     """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
 
     `numpy`＝この module の手書き backward（参照実装）。`torch`＝`n_rel_torch.TorchTrainer`
@@ -167,7 +168,7 @@ def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, t
               flush=True)
         return net, "numpy", "torch-import-failed"
     tr = TorchTrainer(net, lr=lr, threads=threads, aux_weight=aux_weight, plan_weight=plan_weight,
-                      time_weight=time_weight)
+                      time_weight=time_weight, res_weight=res_weight)
     return tr, "torch", f"threads={tr.threads}"
 
 
@@ -957,6 +958,30 @@ def train(args):
         n_ok = int(np.asarray(V["time_mask"][:], np.int32).sum()) if time_on else 0
         print(f"time: {'on' if time_on else 'off（dump に time 列＝sidecar が無い）'}"
               f" λ={time_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
+    # WP `value-teach`（§7.71）の案 A（資源の先読みの頭）と案 B（対照の対）。どちらも既定は切＝
+    # ここで何も読まず、backend にも何も足さない＝今までの学習と 1 ビットも変わらない。torch 専用。
+    res_w = float(getattr(args, "res_weight", 0.0) or 0.0)
+    res_on = False
+    pair_paths = list(getattr(args, "pair_in", None) or [])
+    if (res_w > 0.0 or pair_paths) and args.backend != "torch":
+        raise SystemExit("--res-weight／--pair-in は torch backend 専用（WP value-teach）")
+    if res_w > 0.0:
+        from opcg_sim.learned.train import value_teach as VT
+        V["res"], V["res_mask"] = VT.load_res(_expand(args.src), _expand(args.zsrc), len(V["z"]))
+        res_on = V["res"] is not None
+        n_ok = int(V["res_mask"].sum()) if res_on else 0
+        print(f"res: {'on' if res_on else 'off（sidecar が無い）'} λ={res_w} 有効行 {n_ok}/{len(V['z'])}",
+              flush=True)
+        if not res_on:
+            res_w = 0.0
+    PR = None
+    if pair_paths:
+        from opcg_sim.learned.train import value_teach as VT
+        PR = VT.load_pairs(pair_paths)
+        PR["tr"] = np.where(~PR["hold"])[0]
+        PR["va"] = np.where(PR["hold"])[0]
+        print(f"pair: {len(PR['t_a'])} 対（holdout {len(PR['va'])}）λ={args.pair_lambda} 価値の重み {args.pair_value_weight}"
+              f" {args.pair_every} 回ごとに {args.pair_bs} 組", flush=True)
     # V と方策の更新回数の比（§20.11 の候補 A）。1.0＝今までと同じ。
     pi_mult = float(getattr(args, "pi_steps_mult", 1.0) or 1.0)
     if pi_mult != 1.0:
@@ -965,7 +990,7 @@ def train(args):
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
                                                aux_weight=aux_w, plan_weight=plan_w,
-                                               time_weight=time_w)
+                                               time_weight=time_w, res_weight=res_w)
     if getattr(args, "fast", False):
         args.fast_pairs = args.fast_max = args.fast_index = True
     if getattr(args, "fast_pairs", False) and hasattr(backend, "tn"):
@@ -999,6 +1024,7 @@ def train(args):
                                              tn=getattr(backend, "tn", None),
                                              cache_dir=args.cache_dir)
     rng = np.random.default_rng(args.seed)
+    pair_rng = np.random.default_rng(args.seed + 101) if PR is not None else None   # 主の並びと別の列
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
     for ep in range(args.epochs):
@@ -1032,7 +1058,13 @@ def train(args):
                         kw["plan"] = b[9]
                     if len(b) >= 12:
                         kw.update(tm=b[10], tm_mask=b[11])
+                    if res_on:
+                        bi_ = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
+                        kw.update(res=np.asarray(V["res"][bi_], np.float32),
+                                  res_mask=np.asarray(V["res_mask"][bi_], np.float32))
                     mse += backend.value_step(*b[:6], args.lr, **kw)
+                    if PR is not None and iv % args.pair_every == 0:
+                        _pair_step(backend, PR, pair_rng, args)
                 else:
                     sp("slice_v")
                     bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
@@ -1120,6 +1152,15 @@ def train(args):
             row.update({"time_weight": time_w, "val_time_huber": vu, "val_time_rows": nu,
                         "train_time": list(getattr(backend, "time_loss", (0.0, 0)))})
             print(f"  time val huber {vu:.4f}（{nu} 行）", flush=True)
+        if res_on:
+            vr, nr = _eval_res(backend, V, vi)
+            row.update({"res_weight": res_w, "val_res_huber": vr, "val_res_rows": nr,
+                        "train_res": list(backend.res_loss)})
+            print(f"  res val huber {vr:.4f}（{nr} 行）", flush=True)
+        if PR is not None:
+            pe = _eval_pairs(backend, PR)
+            row.update({"pair": pe, "train_pair": list(backend.pair_loss)})
+            print(f"  pair {json.dumps(pe)}", flush=True)
         if plan_on:
             vq, nq = eval_plan(net, rt, V, vi)
             row.update({"plan_weight": plan_w, "val_plan_mse": vq, "val_plan_rows": nq,
@@ -1141,8 +1182,73 @@ def train(args):
             setattr(net, p, w)
         print(f"best ep{best_ep} val v_mse {best[0]:.4f} を保存", flush=True)
     _save(net, args, vocab, V, P, best_ep)
+    if res_on:
+        # 案 A の頭は本体の npz に焼かない（serve も Rust も知らない）＝別ファイルに置く
+        np.savez(args.out[:-4] + ".res_head.npz" if args.out.endswith(".npz") else args.out + ".res_head.npz",
+                 **backend.res_params())
     print("N_REL_TRAIN_DONE " + json.dumps({"out": args.out}))
     return 0
+
+
+def _pair_take(PR, ix):
+    """対の行を [a の行, b の行] に並べる（`pair_step`・`_eval_pairs` の入力）。"""
+    sc = np.concatenate([PR["sc_a"][ix], PR["sc_b"][ix]]).astype(np.float32)
+    ci = np.concatenate([PR["ci_a"][ix], PR["ci_b"][ix]]).astype(np.int64)
+    tok = np.concatenate([PR["tok_a"][ix], PR["tok_b"][ix]]).astype(np.float32)
+    return sc, ci, tok
+
+
+def _pair_step(backend, PR, rng, args):
+    """案 B の 1 回（WP `value-teach`）。対は訓練側（holdout 以外）から `pair_bs` 組を引く。"""
+    ix = rng.choice(PR["tr"], size=min(args.pair_bs, len(PR["tr"])), replace=False)
+    sc, ci, tok = _pair_take(PR, ix)
+    backend.pair_step(sc, ci, tok, PR["t_a"][ix].astype(np.float32), PR["t_b"][ix].astype(np.float32),
+                      args.lr, value_weight=args.pair_value_weight, lam=args.pair_lambda)
+
+
+def _eval_pairs(backend, PR, bs=256):
+    """対の当てはまり（訓練側・holdout 別）: 価値の mse・対の差の mse・差の相関・差の比（回帰の傾き）。"""
+    import torch
+    out = {}
+    for nm in ("tr", "va"):
+        ix = PR[nm]
+        if not len(ix):
+            continue
+        va_, vb_ = [], []
+        with torch.no_grad():
+            for s in range(0, len(ix), bs):
+                j = ix[s:s + bs]
+                sc, ci, tok = _pair_take(PR, j)
+                v = backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok),
+                                     None, None).numpy()
+                va_.append(v[:len(j)]); vb_.append(v[len(j):])
+        va_, vb_ = np.concatenate(va_), np.concatenate(vb_)
+        ta, tb = PR["t_a"][ix].astype(np.float64), PR["t_b"][ix].astype(np.float64)
+        dv, dt = vb_ - va_, tb - ta
+        out[nm] = {"n": int(len(ix)),
+                   "v_mse": round(float(np.mean(np.concatenate([(va_ - ta) ** 2, (vb_ - tb) ** 2]))), 4),
+                   "d_mse": round(float(np.mean((dv - dt) ** 2)), 4),
+                   "d_corr": round(float(np.corrcoef(dv, dt)[0, 1]), 4) if np.std(dt) > 0 and np.std(dv) > 0 else None,
+                   "d_slope": round(float(np.dot(dv, dt) / max(np.dot(dt, dt), 1e-9)), 4),
+                   "dv_mean": round(float(dv.mean()), 4), "dt_mean": round(float(dt.mean()), 4)}
+    return out
+
+
+def _eval_res(backend, V, vi, bs=512):
+    """案 A の holdout の損失（有効行の平均 Huber）。"""
+    import torch
+    from opcg_sim.learned.train import value_teach as VT
+    tot = 0.0; n_tot = 0
+    with torch.no_grad():
+        for s in range(0, len(vi), bs):
+            bi = vi[s:s + bs]
+            sc, ci, tok = DIO.rows_f32(V, bi)
+            _v, _a, _t, _q, _u, e = backend.tn.value_heads(torch.from_numpy(sc), torch.from_numpy(ci),
+                                                           torch.from_numpy(tok), None, None, want_e=True)
+            m = torch.from_numpy(np.asarray(V["res_mask"][bi], np.float32))
+            l, n = VT.res_loss_terms(backend.tn.res_head(e), torch.from_numpy(np.asarray(V["res"][bi], np.float32)), m)
+            tot += float(l) * n; n_tot += n
+    return (tot / n_tot if n_tot else float("nan")), n_tot
 
 
 def _save(net, args, vocab, V, P, best_ep, out=None):
@@ -1164,6 +1270,12 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
+                             **({"res_weight": float(args.res_weight)}
+                                if float(getattr(args, "res_weight", 0.0) or 0.0) > 0.0 else {}),
+                             **({"pair_in": list(args.pair_in), "pair_lambda": float(args.pair_lambda),
+                                 "pair_value_weight": float(args.pair_value_weight),
+                                 "pair_every": int(args.pair_every), "pair_bs": int(args.pair_bs)}
+                                if getattr(args, "pair_in", None) else {}),
                              **({} if float(getattr(args, "pi_steps_mult", 1.0) or 1.0) == 1.0 else
                                 {"pi_steps_mult": float(args.pi_steps_mult)})})
 
@@ -1244,6 +1356,15 @@ def main(argv=None):
                          "仕方だけが違う＝丸めの範囲の一致・既定は切・docs/reports/2026-10-17_train_speed.md）")
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
+    tr.add_argument("--res-weight", type=float, default=0.0,
+                    help="WP value-teach の案 A: 資源の先読みの頭（sidecar *.res.npz・value_teach.RES_COLS）の重み。"
+                         "**0 で完全に無効＝今までと 1 bit も同じ**。torch 専用")
+    tr.add_argument("--pair-in", nargs="*", default=[],
+                    help="WP value-teach の案 B: 対照の対の npz（tests/scripts/value_teach.py pairs）。無ければ切。torch 専用")
+    tr.add_argument("--pair-lambda", type=float, default=0.5, help="案 B: 対の差の損失の重み")
+    tr.add_argument("--pair-value-weight", type=float, default=1.0, help="案 B: 対の盤面の価値の損失の重み")
+    tr.add_argument("--pair-every", type=int, default=16, help="案 B: 価値の更新この回数ごとに 1 回")
+    tr.add_argument("--pair-bs", type=int, default=32, help="案 B: 1 回に引く対の組数")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")

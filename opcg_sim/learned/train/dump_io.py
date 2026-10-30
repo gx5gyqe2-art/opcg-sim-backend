@@ -113,7 +113,8 @@ def default_cache_dir():
 
 def shard_files(d):
     return sorted(f for f in glob.glob(os.path.join(d, "n_record_*.npz"))
-                  if not (f.endswith(".plan.npz") or f.endswith(".time.npz")))
+                  if not (f.endswith(".plan.npz") or f.endswith(".time.npz")
+                          or f.endswith(".res.npz")))   # .res＝WP value-teach の案 A の sidecar
 
 
 def plan_sidecar(f):
