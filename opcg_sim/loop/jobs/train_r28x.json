@@ -6,7 +6,8 @@
  "job": "train-r28x",
  "branch": "claude/train-r28x",
  "base": {
-  "branch": "claude/gen-explore"
+  "branch": "claude/gen-explore",
+  "commit": "151ea2c5847a1de2077f1be387e88dcb29c6657c"
  },
  "shards": 1,
  "hours": 5,
