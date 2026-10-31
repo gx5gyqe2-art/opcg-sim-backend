@@ -648,15 +648,20 @@ def opp_draw(seed, pool):
 
 
 def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
-                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None, pool=None):
+                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None, pool=None,
+                 explore=None):
     E.engine()
+    # §7.73: 後半の低確率の温度（`temp_late`・生成の席だけ）と価値の教師の扱い。
+    # None＝切（既定・opts も dump の列も今までと同じ）。
+    _G["explore"] = explore
+    late = {"temp_late": explore["temp_late"]} if explore else {}
     # `search`＝探索の設定の上書き（§20.8.6・波 29〜: worlds／select_rule／q_min_frac／
     # root_prior_temp）。None／空＝serve 既定のまま＝歴代の波と同じ。
     # **学ぶ側を最初に読む**＝符号化の語彙は学ぶ側のネットのもの（`engine.load_net` は最初の語彙を使う）。
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
                             eps_target=eps_target,
-                            prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}))
+                            prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}), **late)
     # 相手の集団（§7.56）: 名前 → 席。探索の設定は学ぶ側と同じ。学ぶ側と同じネットは同じ席を使い回す。
     _G["pool"] = None
     if pool:
@@ -666,7 +671,7 @@ def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=
                            E.SeatSpec(path, sims=sims, dirichlet_eps=dirichlet_eps,
                                       temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
                                       eps_target=eps_target,
-                                      prune_futile=E.GEN_PRUNE_FUTILE, **(search or {})))
+                                      prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}), **late))
         _G["pool"] = {"entries": pool, "specs": specs,
                       "learner_name": learner_name(pool, _G["spec"].net)}
     _G["db"] = D.load_db()
@@ -702,7 +707,7 @@ class _Recorder:
         self._cids = None
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
                                      "step", "sig", "pol_len", "pol_chosen", "tokens",
-                                     "forced", "forced_sig", "pol_v0")}
+                                     "forced", "forced_sig", "pol_v0", "explore")}
         self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti", "p")}
         # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
         self.snaps = []
@@ -793,6 +798,10 @@ class _Recorder:
         self.rows["forced"].append(0)          # ε で差し替えたら `swap` が上書きする
         self.rows["forced_sig"].append("")     # 同上（差し替えた手の move_sig・JSON）
         self.rows["pol_v0"].append(0.0)        # main で候補があれば下で上書きする（§20.6.1）
+        # §7.73: 温度サンプルの印（0＝引いていない・貪欲と同じ手／1＝序盤の温度で貪欲と違う手／
+        # 2＝後半の低確率の温度で貪欲と違う手）。dump に積むのは `--temp-late` > 0 のときだけ。
+        tp = out.get("temp_pick") or {}
+        self.rows["explore"].append(int(tp.get("stage", 0)) if tp.get("explored") else 0)
         self.rows["kind"].append(_KIND.get(out.get("kind"), 0))
         self.rows["turn"].append(int(turn))
         self.rows["step"].append(step)
@@ -936,6 +945,15 @@ def play_one(seed):
                                  "hold": rows["forced"].count(2),
                                  "target": rows["forced"].count(3)},
                       "removal_legal_rows": rec.removal_legal_rows}}
+    ex = _G.get("explore")
+    if ex:
+        # §7.73: 温度サンプルの印（0／1＝序盤／2＝後半）と、価値の教師の扱い（`--explore-z`）。
+        out["explore"] = np.array(rows["explore"], np.int8)
+        out["_meta"]["explore"] = {"early": rows["explore"].count(1), "late": rows["explore"].count(2)}
+        if ex["z"] == "root":
+            out["z_game"] = out["z"].copy()
+            out["z"] = explore_z(out["z"], out["who"], out["step"],
+                                 out["pol_v0"].astype(np.float32), out["explore"])
     if nets:
         # 相手の集団（§7.56）: その席を打ったネットの名前と「学ぶ側のネットか」の印（方策の教師の選び方に使う）
         out["seat_net"] = np.array([nets[w] for w in rows["who"]])
@@ -952,6 +970,26 @@ def play_one(seed):
         out["_rean"] = inline_reanalyze(out, rec.stash, seed, [la, lb], _G["rean"])
         out["_meta"]["sec_rean"] = round(time.time() - t_start - out["_meta"]["sec"], 3)
         rec.stash = None
+    return out
+
+
+def explore_z(z, who, step, v0, explore, stage=2):
+    """§7.73 の (ii): 最善でない手を後半の温度で打った行（`explore == stage`）**までの**行の価値の教師を、
+    その手番の根の評価（`pol_v0`＝訪問で重み付けた Q・手番の視点）に替える。
+
+    行 r の教師＝「r 以後で最初に最善でない手を打った行 e」の根の評価（e と r の席が違えば符号を反転）。
+    そういう e が無い行（最後の最善でない手より後）は局の勝敗 `z` のまま。1 局ぶんの列を受け取る
+    （行の並びは問わない・`step` で並べる）。→ 新しい教師の列（float32）
+    """
+    z = np.asarray(z, np.float32)
+    out = z.copy()
+    order = np.argsort(np.asarray(step), kind="stable")
+    nxt = None                                     # (根の評価, 席)
+    for r in order[::-1]:
+        if int(explore[r]) == stage:
+            nxt = (float(v0[r]), int(who[r]))
+        if nxt is not None:
+            out[r] = nxt[0] if int(who[r]) == nxt[1] else -nxt[0]
     return out
 
 
@@ -997,6 +1035,7 @@ _V4_KEYS = ("deck_kinds", "forced", "forced_sig", "pol_v0")   # v4 で追加（�
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 _AUX_DEF_KEYS = ("aux_def", "aux_def_row")            # 守る側の補助教師（v5 で追加・P8・`2026-09-24_p8_defender_columns.md`）
 _POOL_KEYS = ("seat_net", "learner")                  # 相手の集団（§7.56・`--opp-pool` のときだけ）
+_EXPLORE_KEYS = ("explore",)                          # §7.73（`--temp-late` > 0 のときだけ）
 
 
 def main(argv=None):
@@ -1061,8 +1100,18 @@ def main(argv=None):
                     help="相手の集団（§7.56）: `r24:0.5,r23:0.2,r22:0.15,r13d:0.15`。局ごとに片方の席を学ぶ側（--net）、"
                          "もう片方を集団から重みどおりに引く（局の seed で決まる・学ぶ側の席は seed の偶奇で交互）。"
                          "名前だけなら opcg_sim/data/learned/nrel_<名前>.npz。列 seat_net／learner を足す（既定＝集団なし＝自己対戦）")
+    ap.add_argument("--temp-late", type=float, default=0.0,
+                    help="§7.73: --temp-turns より後のメイン窓でも、1 手ごとにこの確率で訪問分布から手を引く"
+                         "（既定 0＝切＝今までと 1 ビットも同じ）。>0 なら列 explore（0／1＝序盤／2＝後半で最善でない手）を足す")
+    ap.add_argument("--explore-z", default="game", choices=("game", "root"),
+                    help="§7.73: 後半の温度で最善でない手を打った行までの価値の教師。game＝局の勝敗のまま（既定）・"
+                         "root＝その手番の根の評価に替える（元の勝敗は列 z_game に残す）。--temp-late > 0 のときだけ効く")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
+    if args.temp_late < 0 or args.temp_late > 1:
+        ap.error("--temp-late は 0〜1")
+    if args.explore_z != "game" and args.temp_late <= 0:
+        ap.error("--explore-z root は --temp-late > 0 のときだけ")
     opp_pool = None
     if args.opp_pool:
         try:
@@ -1098,6 +1147,10 @@ def main(argv=None):
                                 ("q_min_frac", args.q_min_frac),
                                 ("root_prior_temp", args.root_prior_temp),
                                 ("budget", args.budget)) if v is not None}
+    explore = None
+    if args.temp_late > 0:
+        # 生成の席だけに載せる（再分析の深い席は温度なし）＝`search` には入れない。
+        explore = {"z": args.explore_z, "temp_late": args.temp_late}
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
@@ -1105,12 +1158,15 @@ def main(argv=None):
         print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
     keys = (_ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS
            + (() if args.no_aux else _AUX_KEYS + _AUX_DEF_KEYS)    # v5: aux_def／aux_def_row も同じ旗（P8）
-           + (_POOL_KEYS if opp_pool else ()))                         # 相手の集団（§7.56）
+           + (_POOL_KEYS if opp_pool else ())                          # 相手の集団（§7.56）
+           + ((_EXPLORE_KEYS + (("z_game",) if args.explore_z == "root" else ()))
+              if explore else ()))                                     # §7.73
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
     initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
-                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean, opp_pool)
+                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean, opp_pool,
+                explore)
     nm = len(rean["mults"]) if rean else 0                   # 再分析の dump（--reanalyze-mult・倍率ごと）
     rbufs, rgames, rshard = [{k: [] for k in keys} for _ in range(nm)], [[] for _ in range(nm)], 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
@@ -1174,6 +1230,10 @@ def main(argv=None):
                    "forced": forced, "removal_legal_rows": removal_legal,
                    # 探索の設定の上書き（§20.8.6・空＝serve 既定）
                    "search": search,
+                   # §7.73: 後半の温度（書くのは使ったときだけ）
+                   **({"temp_late": args.temp_late, "explore_z": args.explore_z,
+                       "explore": {k: sum(g["explore"][k] for g in games) for k in ("early", "late")}}
+                      if explore else {}),
                    # 相手の集団（§7.56）: 書くのは集団を使ったときだけ（既定の meta は今までと同じ）
                    **({"opp_pool": [{"name": n, "net": p, "weight": w} for n, p, w in opp_pool],
                        "opp_games": {n: sum(1 for g in games

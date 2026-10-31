@@ -44,6 +44,9 @@ pub struct DecideOptions {
     pub dirichlet_eps: f64,
     /// `temp_turns`（0＝無効。turn <= これ のメイン窓で訪問分布からサンプルする）
     pub temp_turns: i32,
+    /// §7.73 `gen-explore`: `temp_turns` より後のメイン窓でも、1 手ごとにこの確率で訪問分布から
+    /// サンプルする（0＝無効＝乱数を引かない＝今までと 1 ビットも同じ）。
+    pub temp_late: f64,
     /// `SERVE_BOX_COMMIT`
     pub box_commit: bool,
     /// `TREE_BOX_BATTLE`
@@ -293,6 +296,7 @@ impl Default for DecideOptions {
             c_puct: C_PUCT,
             dirichlet_eps: 0.0,
             temp_turns: 0,
+            temp_late: 0.0,
             box_commit: true,
             box_battle: true,
             box_dialog: true,
@@ -436,6 +440,9 @@ pub struct DecideOut {
     pub window_read: Option<(usize, bool)>,
     /// 守りの証明の実績（§7.51・`defense_proof` で対象の窓だったときだけ・[`defense_pick`]）。
     pub defense_proof: Option<Value>,
+    /// 温度サンプルの印（§7.73・サンプルを引いたときだけ）: (1＝序盤の温度／2＝後半の低確率の温度,
+    /// 引いた手が貪欲に選ぶ手と違ったか)。
+    pub temp_pick: Option<(u8, bool)>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -2024,6 +2031,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         lethal_reply: None,
         window_read: None,
         defense_proof: None,
+        temp_pick: None,
     }
 }
 
@@ -2152,6 +2160,7 @@ fn decide_after_lethal(
                 lethal_reply: None,
                 window_read: pick.read,
                 defense_proof: pick.defense,
+                temp_pick: None,
             });
         }
     }
@@ -2183,6 +2192,7 @@ fn decide_after_lethal(
     };
     let mut groups = Vec::new();
     let mut sel_groups: Vec<SelectGroup> = Vec::new();
+    let mut temp_pick: Option<(u8, bool)> = None;
     if !run.legal.is_empty() {
         groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
         sel_groups = select_groups(state, ctx.masters, &run.legal, &groups);
@@ -2203,12 +2213,23 @@ fn decide_after_lethal(
                 rep = sel_groups[select_index(&sn, &sq, SelectRule::QMinN, floor)].rep;
             }
             // 生成の温度サンプリング（序盤は訪問分布から引く）
-            if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
+            let early = opts.temp_turns > 0 && state.turn_count <= opts.temp_turns;
+            // §7.73: 序盤より後も、1 手ごとに確率 `temp_late` で訪問分布から引く。
+            // `temp_late` が 0 なら乱数を引かない（既定の生成と 1 ビットも同じ）。
+            let late = !early
+                && opts.temp_late > 0.0
+                && rng.choice(&[1.0 - opts.temp_late.min(1.0), opts.temp_late.min(1.0)])? == 1;
+            if early || late {
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
                 let total: f64 = ns.iter().sum();
                 if total > 0.0 {
                     let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
-                    rep = groups[rng.choice(&probs)?].rep;
+                    let greedy = rep;
+                    let gi = rng.choice(&probs)?;
+                    rep = groups[gi].rep;
+                    // 貪欲に選ぶ手と同じ候補（等価手マージ後のグループ）か
+                    let same = groups[gi].rep == greedy || groups[gi].idxs.contains(&greedy);
+                    temp_pick = Some((if early { 1 } else { 2 }, !same));
                 }
             }
             mv = Some(run.legal[rep].clone());
@@ -2361,6 +2382,7 @@ fn decide_after_lethal(
         lethal_reply: reply,
         window_read: None,
         defense_proof: None,
+        temp_pick,
     })
 }
 

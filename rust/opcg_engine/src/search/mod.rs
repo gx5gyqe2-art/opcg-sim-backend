@@ -429,6 +429,10 @@ pub fn decide_on_state(
     if let Some(d) = &out.defense_proof {
         body["defense_proof"] = d.clone();
     }
+    // 温度サンプル（§7.73）は引いた決定だけに欄を足す（温度なしでは鍵ごと出ない）。
+    if let Some((stage, explored)) = out.temp_pick {
+        body["temp_pick"] = serde_json::json!({"stage": stage, "explored": explored});
+    }
     let rollout = quiesce::take_rollout_stats();
     // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
     if out.lethal.is_some() || out.lethal_reply.is_some() {
@@ -596,6 +600,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_i64)
             .map(|n| n as i32)
             .unwrap_or(d.temp_turns),
+        temp_late: v.get("temp_late").and_then(Value::as_f64).unwrap_or(d.temp_late),
         box_commit: flag("box_commit", d.box_commit),
         box_battle: flag("box_battle", d.box_battle),
         box_dialog: flag("box_dialog", d.box_dialog),
