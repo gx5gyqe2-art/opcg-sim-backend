@@ -1,0 +1,3 @@
+real: n=2800 r28m_judgment 0.5038 r28_judgment 0.4984 diff_wr +0.0054 ±0.0126  Elo diff ≈ +3.7 [-5.1..]
+mirror: n=2800 r28m_judgment 0.4804 r28_judgment 0.4763 diff_wr +0.0041 ±0.0143  Elo diff ≈ +2.9 [-7.1..]
+synth2: n=2800 r28m_judgment 0.4909 r28_judgment 0.4907 diff_wr +0.0002 ±0.0126  Elo diff ≈ +0.1 [-8.6..]
