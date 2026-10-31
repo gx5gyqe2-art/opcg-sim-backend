@@ -1,166 +1,26 @@
 {
- "wp": "value-mix",
- "job": "value-mix",
- "role": "wp",
- "status": "done",
- "branch": "claude/value-mix",
- "spec": "docs/search_efficiency_plan.md §7.72（台帳 2+488）・docs/n_loop_ops.md §7.68",
- "report": "docs/reports/2026-10-31_value_mix.md",
- "results_dir": [
-  "n1_results/r28m_judgment/",
-  "n1_results/value_mix/"
- ],
- "code": [
-  "opcg_sim/learned/train/n_rel_train.py（--z-mode v0mix・load_root_v0・mix_root_v0・視点の検算＝相関 0.2 未満で止まる）"
- ],
- "test": "tests/test_n_rel_train_omni.py（cpu_infra・既定は同じオブジェクト＝1 bit も同じ・v0mix は根の探索が在る行だけ混ぜる）",
- "jobs": [
-  "opcg_sim/loop/jobs/train_r28m.json",
-  "opcg_sim/loop/jobs/arena_r28m.json"
- ],
- "engine_changed": false,
- "shipping_changed": false,
- "nets_shipped": false,
- "gate": "make test green（888 passed・14 skipped・cargo 640 passed）",
+ "job": "arena-r28x-w03",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "warm_start": "opcg_sim/data/learned/nrel_r27.npz",
-  "pi_waves": [
-   58,
-   59
-  ],
-  "z_waves": [
-   58,
-   59
-  ],
-  "z_mode": "v0mix",
-  "epochs": 2,
-  "lr": 0.0002,
-  "net": "claude/train-r28m:n1_results/nrel_r28m.npz（340fcc20・best ep1）",
-  "control": "claude/train-r28:n1_results/nrel_r28.npz"
+  "candidate": "nrel_r28x.npz (claude/train-r28x)",
+  "baseline": "nrel_r27.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "outputs": {
+  "files": [
+   "arena_r28x/r28x_real_w03.jsonl"
+  ]
  },
  "metrics": {
-  "teacher": {
-   "rows_mixed": 2350229,
-   "rows_total": 5308955,
-   "corr_v0_z": 0.702
-  },
-  "arena_vs_r27": {
-   "real": {
-    "wr": 0.5038,
-    "ci95": [
-     0.4939,
-     0.5136
-    ],
-    "elo": 2.6,
-    "elo95": [
-     -4.3,
-     9.5
-    ]
-   },
-   "mirror": {
-    "wr": 0.4804,
-    "ci95": [
-     0.4688,
-     0.4919
-    ],
-    "elo": -13.7,
-    "elo95": [
-     -21.7,
-     -5.6
-    ]
-   },
-   "synth2": {
-    "wr": 0.4909,
-    "ci95": [
-     0.481,
-     0.5008
-    ],
-    "elo": -6.3,
-    "elo95": [
-     -13.2,
-     0.5
-    ]
-   },
-   "void": 0,
-   "pairs_each": 2800,
-   "promoted": false
-  },
-  "paired_vs_r28": {
-   "real": {
-    "elo": 3.7,
-    "dwr": 0.0054,
-    "ci": 0.0126
-   },
-   "mirror": {
-    "elo": 2.9,
-    "dwr": 0.0041,
-    "ci": 0.0143
-   },
-   "synth2": {
-    "elo": 0.1,
-    "dwr": 0.0002,
-    "ci": 0.0126
-   }
-  },
-  "paired_vs_r28b": {
-   "real": {
-    "elo": -0.4
-   },
-   "mirror": {
-    "elo": -11.7
-   },
-   "synth2": {
-    "elo": -5.5
-   }
-  },
-  "band_vmse": {
-   "r27": 0.5096,
-   "r28": 0.5049,
-   "r28m": 0.5031
-  },
-  "testbeds": {
-   "kaido_decline_of18": {
-    "r27": 0,
-    "r28": 9,
-    "r28m": 8
-   },
-   "rocks_bounce_of53": {
-    "r27": 8,
-    "r28": 4,
-    "r28m": 9
-   },
-   "rocks_qdiff": {
-    "r27": -0.047,
-    "r28": -0.0854,
-    "r28m": -0.0322
-   },
-   "don_ratio": {
-    "r27": [
-     0.48,
-     0.34,
-     0.38,
-     0.57
-    ],
-    "r28": [
-     0.44,
-     0.28,
-     0.31,
-     0.51
-    ],
-    "r28m": [
-     0.39,
-     0.28,
-     0.29,
-     0.47
-    ]
-   }
-  }
+  "arena_r28x/r28x_real_w03.jsonl": 175
  },
- "verdict": "r28m は非昇格（主 +2.6・下限 0 未満）。同じ配り方で r28 に主 +3.7（揺れの内）。推薦は既定を変えない（切替は残す）",
- "notes": [
-  "§7.72 本文は教材を波 60＋61 と書いていたが、対照 r28 の実物（train_r28）は波 58＋59。r28 に揃えて 58＋59 で作った（コーディネータ了解）",
-  "訓練の検証の誤差（0.30）は混ぜた教師に対する値で r28（0.45）とは比べられない。比べるのは評価帯",
-  "予告: 評価帯は当たり・主 +5〜+15 は外れ（+3.7）・ドンの割り引きが縮むは外れ（少し広がった）",
-  "n_loop_ops の節番号 7.68 は gen-explore 側と重なる可能性あり（照合の文字列は別）"
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r28x.json",
+  "k": 3,
+  "branch": "claude/arena-r28x-w03",
+  "code_commit": "564eb4bbd6d58de08040dcd21d31a3cd723af4d3"
+ }
 }
