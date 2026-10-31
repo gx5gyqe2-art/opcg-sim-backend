@@ -1,317 +1,35 @@
 {
- "wp": "value-teach",
- "status": "done",
- "branch": "claude/value-teach",
- "spec": "docs/search_efficiency_plan.md §7.71（本線 claude/cpu-spec-improvements-yw91jd・台帳 2+485）",
- "report": "docs/reports/2026-10-30_value_teach.md",
- "results_dir": "n1_results/value_teach/",
- "code": [
-  "opcg_sim/learned/train/value_teach.py（案 A の sidecar・案 B の損失・既定は切）",
-  "opcg_sim/learned/train/n_rel_train.py（--res-weight・--pair-in ほか）",
-  "opcg_sim/learned/train/n_rel_torch.py（res_head・pair_step）",
-  "opcg_sim/learned/train/dump_io.py（*.res.npz をシャードと見なさない）"
- ],
- "tool": "tests/scripts/value_teach.py",
- "test": "tests/test_value_teach.py（cpu_infra・重み 0 で 1 bit も変わらない）",
- "engine_changed": false,
- "shipping_changed": false,
- "nets_shipped": false,
- "gate": "make test green（887 passed・14 skipped・cargo 640 passed）",
- "recipe": "r27 から warm-start・波 60 を 1 周・lr 2e-4・--ablate rel --aux-weight 0.1 --pi-teacher q_improved --fast（seed 13・2 本目は seed 14）",
- "nets": {
-  "ctrl": "n1_results/value_teach/nrel_ctrl.npz（claude/offdist-value-ctrl のもの）",
-  "A": "--res-weight 0.1",
-  "B": "--pair-in pairs.npz（λ0.5・価値の重み1・16回ごとに32組）",
-  "AB": "両方",
-  "ctrl_s2/A_s2/B_s2": "seed 14",
-  "Bnr": "案 B からロックス海賊団の対（104）を抜いた"
+ "job": "n62x-w18",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r27.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "temp_late": 0.2,
+  "explore_z": "game",
+  "seed_base": 2779500
  },
- "pairs": {
-  "shard": null,
-  "jobs": 1485,
-  "ok": 1417,
-  "all": 1639,
-  "leak_excluded": 154,
-  "fails": {
-   "blunder_audit|ValueError: ドン!!を付与する対象のカードが見つ": 6,
-   "blunder_audit|ValueError: 不適切なアクションです。期待されてい": 9,
-   "blunder_audit|ended": 50,
-   "main_read|ended": 2,
-   "window_read_all|ended": 1
-  },
-  "by_src": {
-   "blunder_audit": 862,
-   "main_read": 110,
-   "matchup_5": 219,
-   "matchup_kr": 36,
-   "rocks_bounce": 104,
-   "window_read_all": 86
-  },
-  "holdout_pairs": 206,
-  "bench_games_excluded": 71
+ "outputs": {
+  "dirs": [
+   "n_records/n62x_w18_p0"
+  ]
  },
- "plan_a_labels": {
-  "rows": 2652064,
-  "labeled": 2164465,
-  "cols": 20
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 21040,
+  "dropped": 0,
+  "sec_play_mean": 28.36
  },
- "bench1_kaido24_window": {
-  "r27": {
-   "article_decline18_chose_decline": 0,
-   "early7_chose_decline": 0,
-   "article_use6_chose_decline": 6
-  },
-  "ctrl": {
-   "article_decline18_chose_decline": 10,
-   "early7_chose_decline": 5,
-   "article_use6_chose_decline": 5
-  },
-  "A": {
-   "article_decline18_chose_decline": 12,
-   "early7_chose_decline": 5,
-   "article_use6_chose_decline": 5
-  },
-  "B": {
-   "article_decline18_chose_decline": 11,
-   "early7_chose_decline": 4,
-   "article_use6_chose_decline": 5
-  },
-  "AB": {
-   "article_decline18_chose_decline": 12,
-   "early7_chose_decline": 4,
-   "article_use6_chose_decline": 5
-  },
-  "ctrl_s2": {
-   "article_decline18_chose_decline": 13,
-   "early7_chose_decline": 7,
-   "article_use6_chose_decline": 5
-  },
-  "A_s2": {
-   "article_decline18_chose_decline": 13,
-   "early7_chose_decline": 7,
-   "article_use6_chose_decline": 5
-  },
-  "B_s2": {
-   "article_decline18_chose_decline": 13,
-   "early7_chose_decline": 6,
-   "article_use6_chose_decline": 6
-  }
- },
- "bench1_don_discount": {
-  "truth_value_diff": 0.338,
-  "nets": {
-   "r27": {
-    "a_head": 0.1636,
-    "b_close": 0.1152,
-    "c_oppend": 0.1284,
-    "d_next": 0.1927,
-    "ratio_b_close": 0.341
-   },
-   "ctrl": {
-    "a_head": 0.1499,
-    "b_close": 0.1027,
-    "c_oppend": 0.1134,
-    "d_next": 0.1607,
-    "ratio_b_close": 0.304
-   },
-   "A": {
-    "a_head": 0.1572,
-    "b_close": 0.0997,
-    "c_oppend": 0.1095,
-    "d_next": 0.1671,
-    "ratio_b_close": 0.295
-   },
-   "B": {
-    "a_head": 0.16,
-    "b_close": 0.1002,
-    "c_oppend": 0.1111,
-    "d_next": 0.1616,
-    "ratio_b_close": 0.296
-   },
-   "AB": {
-    "a_head": 0.1573,
-    "b_close": 0.1019,
-    "c_oppend": 0.1141,
-    "d_next": 0.154,
-    "ratio_b_close": 0.302
-   },
-   "ctrl_s2": {
-    "a_head": 0.1351,
-    "b_close": 0.0983,
-    "c_oppend": 0.1122,
-    "d_next": 0.1623,
-    "ratio_b_close": 0.291
-   },
-   "A_s2": {
-    "a_head": 0.1398,
-    "b_close": 0.1005,
-    "c_oppend": 0.1108,
-    "d_next": 0.1695,
-    "ratio_b_close": 0.297
-   },
-   "B_s2": {
-    "a_head": 0.124,
-    "b_close": 0.0916,
-    "c_oppend": 0.1023,
-    "d_next": 0.1412,
-    "ratio_b_close": 0.271
-   },
-   "Bnr": {
-    "a_head": 0.1593,
-    "b_close": 0.1022,
-    "c_oppend": 0.1162,
-    "d_next": 0.1677,
-    "ratio_b_close": 0.302
-   }
-  }
- },
- "bench2_rocks53_root": {
-  "r27": {
-   "chose_bounce": 8,
-   "root_q_diff": -0.0472,
-   "bounce_visit_share": 0.124
-  },
-  "ctrl": {
-   "chose_bounce": 9,
-   "root_q_diff": -0.0323,
-   "bounce_visit_share": 0.163
-  },
-  "A": {
-   "chose_bounce": 11,
-   "root_q_diff": -0.0227,
-   "bounce_visit_share": 0.172
-  },
-  "B": {
-   "chose_bounce": 15,
-   "root_q_diff": -0.0373,
-   "bounce_visit_share": 0.203
-  },
-  "AB": {
-   "chose_bounce": 13,
-   "root_q_diff": -0.028,
-   "bounce_visit_share": 0.196
-  },
-  "ctrl_s2": {
-   "chose_bounce": 9,
-   "root_q_diff": -0.0824,
-   "bounce_visit_share": 0.138
-  },
-  "A_s2": {
-   "chose_bounce": 9,
-   "root_q_diff": -0.0719,
-   "bounce_visit_share": 0.147
-  },
-  "B_s2": {
-   "chose_bounce": 13,
-   "root_q_diff": -0.0125,
-   "bounce_visit_share": 0.198
-  },
-  "Bnr": {
-   "chose_bounce": 12,
-   "root_q_diff": -0.0377,
-   "bounce_visit_share": 0.17
-  }
- },
- "net_value_only": {
-  "truth": {
-   "kaido24": 0.1615,
-   "rocks53": 0.1899
-  },
-  "nets": {
-   "r27": {
-    "kaido24_net_diff": -0.0165,
-    "rocks53_net_diff": 0.0268,
-    "rocks53_bounce_higher": 25,
-    "pairs_hold_corr": 0.325,
-    "pairs_train_corr": 0.154
-   },
-   "ctrl": {
-    "kaido24_net_diff": 0.0455,
-    "rocks53_net_diff": 0.0332,
-    "rocks53_bounce_higher": 31,
-    "pairs_hold_corr": 0.311,
-    "pairs_train_corr": 0.144
-   },
-   "A": {
-    "kaido24_net_diff": 0.0364,
-    "rocks53_net_diff": 0.0579,
-    "rocks53_bounce_higher": 37,
-    "pairs_hold_corr": 0.292,
-    "pairs_train_corr": 0.137
-   },
-   "B": {
-    "kaido24_net_diff": 0.0255,
-    "rocks53_net_diff": 0.0792,
-    "rocks53_bounce_higher": 40,
-    "pairs_hold_corr": 0.286,
-    "pairs_train_corr": 0.316
-   },
-   "AB": {
-    "kaido24_net_diff": 0.0214,
-    "rocks53_net_diff": 0.0758,
-    "rocks53_bounce_higher": 40,
-    "pairs_hold_corr": 0.309,
-    "pairs_train_corr": 0.317
-   },
-   "ctrl_s2": {
-    "kaido24_net_diff": 0.0457,
-    "rocks53_net_diff": 0.0313,
-    "rocks53_bounce_higher": 32,
-    "pairs_hold_corr": 0.287,
-    "pairs_train_corr": 0.143
-   },
-   "A_s2": {
-    "kaido24_net_diff": 0.0592,
-    "rocks53_net_diff": 0.0259,
-    "rocks53_bounce_higher": 32,
-    "pairs_hold_corr": 0.271,
-    "pairs_train_corr": 0.15
-   },
-   "B_s2": {
-    "kaido24_net_diff": 0.0245,
-    "rocks53_net_diff": 0.0435,
-    "rocks53_bounce_higher": 32,
-    "pairs_hold_corr": 0.252,
-    "pairs_train_corr": 0.338
-   },
-   "Bnr": {
-    "kaido24_net_diff": 0.0371,
-    "rocks53_net_diff": 0.0483,
-    "rocks53_bounce_higher": 33,
-    "pairs_hold_corr": 0.339,
-    "pairs_train_corr": 0.326
-   }
-  }
- },
- "band_wave59": {
-  "r27": 0.5096,
-  "ctrl": 0.5069,
-  "A": 0.5076,
-  "B": 0.5079,
-  "AB": 0.5077
- },
- "thresholds": {
-  "decline_plus": 4,
-  "bounce_plus": 8,
-  "discount_shrink": 0.1,
-  "band_tol": 0.005
- },
- "verdict": {
-  "A": "動かない（控える 12 対 10・2 本目 13 対 13・戻す 11 対 9・2 本目 9 対 9・割り引き 0.29 対 0.30）",
-  "B": "線に届かない（戻す 15 対 9・2 本目 13 対 9＝2 本とも +4〜6 だが +8 に届かず・約半分はロックスの対から〔抜くと 12〕・控える 11 対 10・2 本目 13 対 13・割り引き 0.30 対 0.30・取り置いた対の相関は上がらない 0.31→0.29）",
-  "AB": "動かない（控える 12・戻す 13・割り引き 0.30）",
-  "band": "どれも r27 より良い（0.5069〜0.5079 対 0.5096）"
- },
- "conclusion": "どちらの案も 1 周の足しでは価値の目盛りを動かさなかった（仕様の線をどの試験台でも越えない・評価帯の悪化なし）。案 B は教えた対を覚えたが見ていない局の対へ広がらない。仕様の「両案とも対照と同じ」の枝＝次は教材そのもの（生成で見込みの小さい手にも読みを回して対照を作る）。あわせて 1 周の学び直しだけで窓の決め方が 10〜13 点動く（種の揺れ）ので、窓の決め方の改善は同じ作り方を 2 本以上並べて測る。",
- "prediction_check": {
-  "B_root_diff_shrinks_choice_static": "選ぶ数は大きくは動かない＝当たり・根の評価の差は 2 本で逆の向き＝どちらとも言えない",
-  "A_discount_shrinks_0.05": "外れ（縮まない）"
- },
- "notes": [
-  "割り引きの盤面は r27 が作るのでネットに依らない＝1 回だけ作って符号化を残し各ネットの値を後付け（tv_states/）。offdist_value.py timeval を 1 ネットずつ回すと 1 点 9 分かかったため。対照の §7.69 の数を再現した。",
-  "案 B の対の盤面は配り直さない本当の盤面で手の続きと窓を出荷の設定で片付けた盤面。教師（勝率）は配り直した世界 16 本の平均。自己対戦の次点の手の対 862 は当時の審判 r13d の勝率。",
-  "根の評価の差（戻す − 訪問最多）は同じ作り方の 2 本で −0.032 と −0.082 と大きく揺れる＝比べる列としては弱い。",
-  "評価帯は seed 13 の 5 本だけ測った（2 本目・Bnr は測っていない・訓練中の取り置きの当てはまりは 0.544〜0.561 で対照と同じ幅）。",
-  "このセッションで重い計算を全部回した（作業セッションは起こしていない）。訓練 1 本 約 15 分。"
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n62x.json",
+  "k": 18,
+  "branch": "claude/n62x-w18",
+  "code_commit": "151ea2c5847a1de2077f1be387e88dcb29c6657c"
+ }
 }
