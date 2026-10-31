@@ -1,7 +1,7 @@
 {
  "job": "arena-r28x-w03",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r28x.npz (claude/train-r28x)",
   "baseline": "nrel_r27.npz",
