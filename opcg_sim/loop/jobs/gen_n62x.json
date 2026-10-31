@@ -42,9 +42,9 @@
   "--shard-games",
   "10",
   "--temp-late",
-  "TEMP_LATE",
+  "0.2",
   "--explore-z",
-  "EXPLORE_Z"
+  "game"
  ],
  "log": "~/n62x_w{K}.log",
  "copy_logs": [
@@ -63,8 +63,8 @@
   "worlds": 1,
   "budget": 0,
   "decks": "real",
-  "temp_late": "TEMP_LATE",
-  "explore_z": "EXPLORE_Z"
+  "temp_late": 0.2,
+  "explore_z": "game"
  },
  "commit_message": "gen wave 62x shard {K}"
 }
