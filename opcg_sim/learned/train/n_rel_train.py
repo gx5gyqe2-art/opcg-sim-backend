@@ -839,7 +839,41 @@ def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, c
 #: 価値の教師の作り方（`docs/search_efficiency_plan.md` §7.16・WP `omni-value`）。
 #: z＝勝敗（既定・今までと 1 bit も変わらない）／omni＝全部見える探索の根の評価 `v_omni`／
 #: mix＝0.5 z + 0.5 v_omni。`v_omni` が無い行（根の探索が無い点・復元に失敗した行）は z のまま。
-Z_MODES = ("z", "omni", "mix")
+#: v0mix＝0.5 z + 0.5 pol_v0（記録にある**生成役の根の価値の推定**・公平な配り直しの探索・§7.72・WP `value-mix`）。
+#: 根の探索が在る行（main・候補 1 つ以上・訪問 > 0）だけ差し替え、窓・コミットの行は z のまま。`--omni-in` は要らない。
+Z_MODES = ("z", "omni", "mix", "v0mix")
+
+
+def load_root_v0(dirs, z_dirs=()):
+    """行ごとの (根の価値の推定 `pol_v0` float32, 根の探索が在る印 bool)。pack と同じ行順（§7.72）。
+
+    印＝`kind==0`（main）かつ `pol_len>=1` かつ候補の訪問の合計 > 0（`record_gen` は訪問 0 の根に 0 を書く＝
+    推定ではない）。`pol_v0` は手番（行の `who`）視点＝`z` と同じ視点（record_gen が根の手番の Q で書く）。
+    1 本でも `pol_v0` を持たないシャードがあれば ValueError（dump v4 より前の波は混ぜられない）。"""
+    vs, ms = [], []
+    for d in [d for d in list(dirs) + list(z_dirs) if DIO.shard_files(d)]:
+        for f in DIO.shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                if "pol_v0" not in dd.files:
+                    raise ValueError(f"--z-mode v0mix: {f} に pol_v0 が無い（dump v4 より前の波）")
+                nr = int(dd["z"].shape[0])
+                pl = np.asarray(dd["pol_len"][:nr], np.int64)
+                off = np.concatenate([[0], np.cumsum(pl)]).astype(np.int64)
+                csum = np.concatenate([[0.0], np.cumsum(np.asarray(dd["pol_n"], np.float64))])
+                ntot = csum[off[1:]] - csum[off[:-1]]
+                ms.append((np.asarray(dd["kind"][:nr]) == 0) & (pl >= 1) & (ntot > 0))
+                vs.append(np.asarray(dd["pol_v0"][:nr], np.float32))
+    if not vs:
+        raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    return np.concatenate(vs), np.concatenate(ms)
+
+
+def mix_root_v0(z, v0, mask):
+    """`0.5 z + 0.5 v0` を印の立つ行だけに当てる → (教師 float32, 差し替えた行数)。印の無い行は z のまま。"""
+    out = np.asarray(z, np.float32).copy()
+    m = np.asarray(mask, bool)
+    out[m] = 0.5 * out[m] + 0.5 * np.asarray(v0, np.float32)[m]
+    return out, int(m.sum())
 
 
 def load_omni(pats):
@@ -909,7 +943,19 @@ def train(args):
     if args.zsrc:
         print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
     z_mode = getattr(args, "z_mode", "z") or "z"
-    if z_mode != "z":
+    if z_mode == "v0mix":
+        v0, m0 = load_root_v0(_expand(args.src), _expand(args.zsrc))
+        if len(v0) != len(V["z"]):
+            raise ValueError(f"pol_v0 の行数 {len(v0)} が value 行 {len(V['z'])} と合わない")
+        zf = np.asarray(V["z"], np.float32)
+        if m0.any():   # 視点の検算（§7.72）: 根の推定と勝敗は同じ視点なら正に相関する
+            r = float(np.corrcoef(zf[m0], v0[m0])[0, 1])
+            print(f"z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f}（行 {int(m0.sum())}）", flush=True)
+            if not r > 0.2:
+                raise ValueError(f"--z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
+        V["z"], n_rep = mix_root_v0(V["z"], v0, m0)
+        print(f"z-mode v0mix: 根の推定で混ぜた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    elif z_mode != "z":
         steps = DIO.load_row_col(_expand(args.src), "step", _expand(args.zsrc))
         omni_key, v_omni = load_omni(getattr(args, "omni_in", None) or [])
         V["z"], n_rep = value_teacher(V["z"], V["seed"], steps, omni_key, v_omni, z_mode)
@@ -1291,7 +1337,8 @@ def main(argv=None):
                          "学ぶ側のネットが打った席の行だけ（learner 列の無い波は全部）。価値の教師はどちらでも全部の行")
     tr.add_argument("--z-mode", choices=Z_MODES, default="z",
                     help="価値の教師（§7.16・WP omni-value）: z＝勝敗（**既定・今までと 1 bit も変わらない**）／"
-                         "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま")
+                         "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま／"
+                         "v0mix＝0.5 z + 0.5 pol_v0（記録の生成役の根の推定・§7.72・根の探索が無い行は z のまま）")
     tr.add_argument("--omni-in", nargs="*", default=[],
                     help="--z-mode omni|mix の v_omni（omni_value_relabel.py の omni_*.npz・glob 可）")
     tr.add_argument("--epochs", type=int, default=2)
