@@ -1,0 +1,90 @@
+{
+ "kind": "train",
+ "section": "§7.73",
+ "ledger_grep": "波 62x・63x",
+ "about": "r28x（WP gen-explore・warm-start r27・π と価値とも波 62x＋63x＝後半の低確率の温度で打った r27 の 2 波）→ 評価帯（波 59 holdout・r28 と同じ帯）",
+ "job": "train-r28x",
+ "branch": "claude/train-r28x",
+ "base": {
+  "branch": "claude/gen-explore"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n62x-w{ww}",
+   "shards": 32,
+   "dest": "~/n62x",
+   "glob": "~/n62x/n_records/n62x_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n63x-w{ww}",
+   "shards": 32,
+   "dest": "~/n63x",
+   "glob": "~/n63x/n_records/n63x_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n59-w{ww}",
+   "shards": 32,
+   "dest": "~/n59",
+   "glob": "~/n59/n_records/n59_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r27.npz"
+ ],
+ "runs": [
+  {
+   "name": "r28x",
+   "in": [
+    "~/n62x/n_records/n62x_w*_p[0-3]",
+    "~/n63x/n_records/n63x_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r28x.npz",
+   "log": "~/train_r28x.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n59/n_records/n59_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r27.npz",
+    "~/nrel_r28x.npz",
+    "~/nrel_r28x.ep0.npz",
+    "~/nrel_r28x.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r28x.json",
+   "log": "~/band_r28x.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r27.npz"
+ },
+ "commit_message": "r28x のセット（訓練・評価帯）"
+}
