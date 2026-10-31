@@ -16,15 +16,16 @@
  "outputs": {
   "dirs": [
    "n_records/n62x_w09_p0",
-   "n_records/n62x_w09_p1"
+   "n_records/n62x_w09_p1",
+   "n_records/n62x_w09_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 41665,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 62498,
   "dropped": 0,
-  "sec_play_mean": 29.93
+  "sec_play_mean": 30.7
  },
  "notes": "",
  "worker": {
