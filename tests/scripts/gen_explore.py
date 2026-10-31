@@ -100,7 +100,50 @@ def summarize(games, base=None):
     return out
 
 
+def load_arena(d, cond):
+    """判定アリーナの jsonl（`<cond>_w*.jsonl` か `*_<cond>_w*.jsonl`）→ seed ごとの得点（0〜2）。"""
+    out = {}
+    for f in sorted(glob.glob(os.path.join(d, f"*{cond}_w*.jsonl"))):
+        for line in open(f, encoding="utf-8"):
+            if line.strip():
+                r = json.loads(line)
+                out[int(r["seed"])] = float(r["score"])
+    return out
+
+
+def elo(p):
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return 400.0 * np.log10(p / (1 - p))
+
+
+def paired(a, b):
+    """同じ配り方の対の差（a − b・1 ペア 2 局の勝ち数の差の平均）→ 勝率の差 ±95%・Elo 換算。"""
+    common = sorted(set(a) & set(b))
+    d = np.array([(a[s] - b[s]) / 2.0 for s in common])
+    m, h = float(d.mean()), float(1.96 * d.std(ddof=1) / np.sqrt(len(d)))
+    return {"pairs": len(common), "wr_diff": m, "ci95": h, "elo": elo(0.5 + m)}
+
+
 def main(argv=None):
+    if argv is None and len(sys.argv) > 1 and sys.argv[1] == "pair":
+        # python tests/scripts/gen_explore.py pair <候補の dir> <対照 名前=dir …>
+        ap = argparse.ArgumentParser()
+        ap.add_argument("cmd")
+        ap.add_argument("cand")
+        ap.add_argument("refs", nargs="+")
+        ap.add_argument("--out", required=True)
+        a = ap.parse_args()
+        res = {}
+        for cond in ("real", "mirror", "synth2"):
+            c = load_arena(a.cand, cond)
+            res[cond] = {"self": {"pairs": len(c), "wr": sum(c.values()) / (2 * max(len(c), 1)),
+                                  "elo": elo(sum(c.values()) / (2 * max(len(c), 1)))}}
+            for r in a.refs:
+                name, d = r.split("=", 1)
+                res[cond][name] = paired(c, load_arena(d, cond))
+        json.dump(res, open(a.out, "w"), ensure_ascii=False, indent=1)
+        print(json.dumps(res, ensure_ascii=False, indent=1))
+        return 0
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--base", nargs="+", required=True)
     ap.add_argument("--run", action="append", default=[], help="名前=part（glob・カンマ区切り可）")
