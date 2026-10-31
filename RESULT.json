@@ -17,15 +17,16 @@
   "dirs": [
    "n_records/n62x_w25_p0",
    "n_records/n62x_w25_p1",
-   "n_records/n62x_w25_p2"
+   "n_records/n62x_w25_p2",
+   "n_records/n62x_w25_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 61539,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 83556,
   "dropped": 0,
-  "sec_play_mean": 31.28
+  "sec_play_mean": 31.74
  },
  "notes": "",
  "worker": {
