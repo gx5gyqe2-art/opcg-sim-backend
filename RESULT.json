@@ -1,20 +1,56 @@
 {
  "job": "train-r28x",
  "role": "train",
- "status": "error",
+ "status": "partial",
  "inputs": {
   "warm_start": "opcg_sim/data/learned/nrel_r27.npz",
-  "nets": {}
+  "nets": {
+   "r28x": {
+    "pi_dirs": 256,
+    "z_dirs": 0,
+    "rows_v": 5373286,
+    "points_p": 2115776,
+    "enc_version": 15,
+    "best_ep": 1,
+    "ablate": [
+     "rel"
+    ]
+   }
+  }
  },
  "outputs": {
-  "files": []
+  "files": [
+   "n1_results/nrel_r28x.ep0.npz",
+   "n1_results/nrel_r28x.ep1.npz",
+   "n1_results/nrel_r28x.npz"
+  ]
  },
  "metrics": {
+  "r28x": {
+   "best_ep": 1,
+   "epochs": [
+    {
+     "ep": 0,
+     "val_vmse": 0.49045535922050476,
+     "val_vsign": 0.8192,
+     "val_pi_top1": 0.49325,
+     "train_sec": 940.062
+    },
+    {
+     "ep": 1,
+     "val_vmse": 0.4747354984283447,
+     "val_vsign": 0.8288,
+     "val_pi_top1": 0.4935,
+     "train_sec": 879.272
+    }
+   ],
+   "train_sec": 2029
+  },
   "band": {},
-  "rss_gb": 1.02,
+  "rss_gb": 11.36,
   "band_sec": null
  },
- "notes": "error: 失敗（-15）: PYTHONPATH=/root/torch_env python -c 'import torch' 2>/dev/null || pip install -q --target /root/torch_env torch",
+ "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/train_r28x.json",
   "k": 1,
