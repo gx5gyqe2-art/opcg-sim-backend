@@ -15,15 +15,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n64x_w08_p0"
+   "n_records/n64x_w08_p0",
+   "n_records/n64x_w08_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 20553,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 42166,
   "dropped": 0,
-  "sec_play_mean": 24.29
+  "sec_play_mean": 27.44
  },
  "notes": "",
  "worker": {
