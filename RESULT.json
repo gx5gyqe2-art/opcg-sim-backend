@@ -15,15 +15,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n65x_w16_p0"
+   "n_records/n65x_w16_p0",
+   "n_records/n65x_w16_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 21176,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 41655,
   "dropped": 0,
-  "sec_play_mean": 33.23
+  "sec_play_mean": 30.78
  },
  "notes": "",
  "worker": {
