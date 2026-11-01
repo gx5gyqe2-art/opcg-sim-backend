@@ -18,15 +18,16 @@
   "dirs": [
    "n_records/n66pow_w01_p0",
    "n_records/n66pow_w01_p1",
-   "n_records/n66pow_w01_p2"
+   "n_records/n66pow_w01_p2",
+   "n_records/n66pow_w01_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 180,
-  "rows": 31350,
+  "parts_done": 4,
+  "games": 240,
+  "rows": 41843,
   "dropped": 0,
-  "sec_play_mean": 32.48
+  "sec_play_mean": 32.05
  },
  "notes": "",
  "worker": {
