@@ -11,12 +11,14 @@
  "outputs": {
   "files": [
    "arena_r28x4/r28x4_mirror_w06.jsonl",
-   "arena_r28x4/r28x4_real_w06.jsonl"
+   "arena_r28x4/r28x4_real_w06.jsonl",
+   "arena_r28x4/r28x4_synth2_w06.jsonl"
   ]
  },
  "metrics": {
   "arena_r28x4/r28x4_mirror_w06.jsonl": 175,
-  "arena_r28x4/r28x4_real_w06.jsonl": 175
+  "arena_r28x4/r28x4_real_w06.jsonl": 175,
+  "arena_r28x4/r28x4_synth2_w06.jsonl": 175
  },
  "notes": "",
  "worker": {
