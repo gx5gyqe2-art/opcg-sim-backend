@@ -79,3 +79,16 @@ def test_explore_z_relabels_rows_up_to_each_late_non_best_move():
     assert np.array_equal(got2, got[perm])
     # 後半の印が無ければ何も替えない
     assert np.array_equal(G.explore_z(z, who, step, v0, np.zeros(6, np.int8)), z)
+
+
+def test_temp_late_pow_one_is_bit_identical_and_zero_flattens_to_uniform():
+    """§7.73 段 5（度合い）: 指数 1.0 は渡さないときと 1 ビットも同じ。指数 0（一様）は
+    後半の引きだけを変え、最善でない手の数が増える（序盤の印・窓の行は不変）。"""
+    ref = _play(SEED, {"z": "game", "temp_late": 1.0})
+    same = _play(SEED, {"z": "game", "temp_late": 1.0, "temp_late_pow": 1.0})
+    for key in sorted(set(ref) - {"_meta"}):
+        assert np.array_equal(ref[key], same[key]), f"指数 1.0 で列 {key} が変わっている"
+    flat = _play(SEED, {"z": "game", "temp_late": 1.0, "temp_late_pow": 0.0})
+    assert flat is not None
+    assert (flat["kind"][flat["explore"] > 0] == 0).all(), "印はメイン窓の行だけ"
+    assert (flat["turn"][flat["explore"] == 2] > 4).all()

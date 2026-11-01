@@ -601,6 +601,10 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .map(|n| n as i32)
             .unwrap_or(d.temp_turns),
         temp_late: v.get("temp_late").and_then(Value::as_f64).unwrap_or(d.temp_late),
+        temp_late_pow: v
+            .get("temp_late_pow")
+            .and_then(Value::as_f64)
+            .unwrap_or(d.temp_late_pow),
         box_commit: flag("box_commit", d.box_commit),
         box_battle: flag("box_battle", d.box_battle),
         box_dialog: flag("box_dialog", d.box_dialog),

@@ -655,6 +655,9 @@ def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=
     # None＝切（既定・opts も dump の列も今までと同じ）。
     _G["explore"] = explore
     late = {"temp_late": explore["temp_late"]} if explore else {}
+    # §7.73 段 5: 度合い（引く分布の指数・1.0＝今までと同じ）。書くのは 1.0 でないときだけ。
+    if explore and explore.get("temp_late_pow", 1.0) != 1.0:
+        late["temp_late_pow"] = float(explore["temp_late_pow"])
     # `search`＝探索の設定の上書き（§20.8.6・波 29〜: worlds／select_rule／q_min_frac／
     # root_prior_temp）。None／空＝serve 既定のまま＝歴代の波と同じ。
     # **学ぶ側を最初に読む**＝符号化の語彙は学ぶ側のネットのもの（`engine.load_net` は最初の語彙を使う）。
@@ -1103,6 +1106,9 @@ def main(argv=None):
     ap.add_argument("--temp-late", type=float, default=0.0,
                     help="§7.73: --temp-turns より後のメイン窓でも、1 手ごとにこの確率で訪問分布から手を引く"
                          "（既定 0＝切＝今までと 1 ビットも同じ）。>0 なら列 explore（0／1＝序盤／2＝後半で最善でない手）を足す")
+    ap.add_argument("--temp-late-pow", type=float, default=1.0,
+                    help="§7.73 段 5: 後半の温度で引く分布の指数（訪問の割合をこの乗数にして正規化・1.0＝訪問に比例＝既定・"
+                         "0.5＝平らに・0＝一様）。--temp-late > 0 のときだけ効く。序盤の温度には効かない")
     ap.add_argument("--explore-z", default="game", choices=("game", "root"),
                     help="§7.73: 後半の温度で最善でない手を打った行までの価値の教師。game＝局の勝敗のまま（既定）・"
                          "root＝その手番の根の評価に替える（元の勝敗は列 z_game に残す）。--temp-late > 0 のときだけ効く")
@@ -1112,6 +1118,10 @@ def main(argv=None):
         ap.error("--temp-late は 0〜1")
     if args.explore_z != "game" and args.temp_late <= 0:
         ap.error("--explore-z root は --temp-late > 0 のときだけ")
+    if args.temp_late_pow < 0:
+        ap.error("--temp-late-pow は 0 以上")
+    if args.temp_late_pow != 1.0 and args.temp_late <= 0:
+        ap.error("--temp-late-pow は --temp-late > 0 のときだけ")
     opp_pool = None
     if args.opp_pool:
         try:
@@ -1150,7 +1160,8 @@ def main(argv=None):
     explore = None
     if args.temp_late > 0:
         # 生成の席だけに載せる（再分析の深い席は温度なし）＝`search` には入れない。
-        explore = {"z": args.explore_z, "temp_late": args.temp_late}
+        explore = {"z": args.explore_z, "temp_late": args.temp_late,
+                   "temp_late_pow": args.temp_late_pow}
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
@@ -1231,7 +1242,8 @@ def main(argv=None):
                    # 探索の設定の上書き（§20.8.6・空＝serve 既定）
                    "search": search,
                    # §7.73: 後半の温度（書くのは使ったときだけ）
-                   **({"temp_late": args.temp_late, "explore_z": args.explore_z,
+                   **({"temp_late": args.temp_late, "temp_late_pow": args.temp_late_pow,
+                       "explore_z": args.explore_z,
                        "explore": {k: sum(g["explore"][k] for g in games) for k in ("early", "late")}}
                       if explore else {}),
                    # 相手の集団（§7.56）: 書くのは集団を使ったときだけ（既定の meta は今までと同じ）

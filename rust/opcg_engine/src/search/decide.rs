@@ -47,6 +47,9 @@ pub struct DecideOptions {
     /// §7.73 `gen-explore`: `temp_turns` より後のメイン窓でも、1 手ごとにこの確率で訪問分布から
     /// サンプルする（0＝無効＝乱数を引かない＝今までと 1 ビットも同じ）。
     pub temp_late: f64,
+    /// §7.73 段 5（度合い）: 後半の温度で引くときの分布の指数。訪問の割合を `pow` 乗して正規化する
+    /// （1.0＝訪問に比例＝今までと 1 ビットも同じ・0.5＝平らに・0＝一様）。序盤の温度には効かない。
+    pub temp_late_pow: f64,
     /// `SERVE_BOX_COMMIT`
     pub box_commit: bool,
     /// `TREE_BOX_BATTLE`
@@ -297,6 +300,7 @@ impl Default for DecideOptions {
             dirichlet_eps: 0.0,
             temp_turns: 0,
             temp_late: 0.0,
+            temp_late_pow: 1.0,
             box_commit: true,
             box_battle: true,
             box_dialog: true,
@@ -2223,7 +2227,18 @@ fn decide_after_lethal(
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
                 let total: f64 = ns.iter().sum();
                 if total > 0.0 {
-                    let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
+                    // 度合い（`temp_late_pow`）は後半の引きだけに効く。1.0 のときは割り算のまま
+                    // （`powf(1.0)` を通さない＝浮動小数の経路も今までと同じ）。
+                    let probs: Vec<f64> = if late && opts.temp_late_pow != 1.0 {
+                        let ws: Vec<f64> = ns
+                            .iter()
+                            .map(|n| if *n > 0.0 { (n / total).powf(opts.temp_late_pow.max(0.0)) } else { 0.0 })
+                            .collect();
+                        let wt: f64 = ws.iter().sum();
+                        ws.iter().map(|w| w / wt).collect()
+                    } else {
+                        ns.iter().map(|n| n / total).collect()
+                    };
                     let greedy = rep;
                     let gi = rng.choice(&probs)?;
                     rep = groups[gi].rep;
