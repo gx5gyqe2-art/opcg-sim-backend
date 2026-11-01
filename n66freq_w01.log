@@ -1,0 +1,7 @@
+  10/60局 行2155（main 966） 棄却0 102s
+  20/60局 行3712（main 1663） 棄却0 152s
+  30/60局 行5558（main 2477） 棄却0 220s
+  40/60局 行7149（main 3183） 棄却0 284s
+  50/60局 行8744（main 3940） 棄却0 334s
+  60/60局 行10607（main 4759） 棄却0 420s
+N_RECORD_DONE {"rows": 10607, "main_rows": 4759, "dropped": 0, "forced": {"play": 45, "hold": 14, "target": 17}, "removal_legal_rows": 1707}
