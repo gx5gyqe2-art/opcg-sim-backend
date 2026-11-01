@@ -1,0 +1,81 @@
+{
+ "kind": "train",
+ "section": "§7.73",
+ "ledger_grep": "波 66x〜69x",
+ "about": "r29x4（WP gen-explore 段 4・warm-start r28x4・π と価値とも波 66x＋67x＋68x＋69x＝後半 2 割の温度で打った r28x4 の 4 波・r28x4 と同じ作り）。評価帯は省く",
+ "job": "train-r29x4",
+ "branch": "claude/train-r29x4",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd",
+  "commit": "544a9d3ad4c1357e190ec9e7885971079207afba"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n66x-w{ww}",
+   "shards": 32,
+   "dest": "~/n66x",
+   "glob": "~/n66x/n_records/n66x_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n67x-w{ww}",
+   "shards": 32,
+   "dest": "~/n67x",
+   "glob": "~/n67x/n_records/n67x_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n68x-w{ww}",
+   "shards": 32,
+   "dest": "~/n68x",
+   "glob": "~/n68x/n_records/n68x_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n69x-w{ww}",
+   "shards": 32,
+   "dest": "~/n69x",
+   "glob": "~/n69x/n_records/n69x_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r28x4.npz"
+ ],
+ "runs": [
+  {
+   "name": "r29x4",
+   "in": [
+    "~/n66x/n_records/n66x_w*_p[0-3]",
+    "~/n67x/n_records/n67x_w*_p[0-3]",
+    "~/n68x/n_records/n68x_w*_p[0-3]",
+    "~/n69x/n_records/n69x_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r29x4.npz",
+   "log": "~/train_r29x4.log"
+  }
+ ],
+ "bands": [],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r28x4.npz"
+ },
+ "commit_message": "r29x4 の訓練"
+}
