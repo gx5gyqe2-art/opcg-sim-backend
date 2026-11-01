@@ -1,0 +1,75 @@
+{
+ "kind": "gen",
+ "section": "§7.73",
+ "ledger_grep": "度合いの下見",
+ "about": "度合いの下見（WP gen-explore 段 5・波 66x の 1 本目と同じ種の 240 局・生成役 r28x4・頻度 2 割はそのまま・k=1 は指数 0.5〔平ら〕・k=2 は指数 0〔一様〕・対照は波 66x の 1 本目〔訪問に比例〕）",
+ "job": "n66pow-w{K}",
+ "branch": "claude/n66pow-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd",
+  "commit": "dcd3e9868e21077658f6504e5fa7b7b82b0ad7f7"
+ },
+ "shards": 2,
+ "hours": 1.5,
+ "vars": {
+  "BASE": "2851000",
+  "POW": "0.5 if k == 1 else 0.0"
+ },
+ "seed_base": "BASE",
+ "games": 60,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n66pow_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10",
+  "--temp-late",
+  "0.2",
+  "--explore-z",
+  "game",
+  "--temp-late-pow",
+  "{POW}"
+ ],
+ "log": "~/n66pow_w{K}.log",
+ "copy_logs": [
+  "~/n66pow_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--temp-late-pow\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+  "games": 240,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "temp_late": 0.2,
+  "explore_z": "game",
+  "temp_late_pow": "{POW}"
+ },
+ "commit_message": "gen pilot 66pow shard {K}"
+}
