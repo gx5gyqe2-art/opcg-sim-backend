@@ -1,0 +1,67 @@
+{
+ "kind": "arena",
+ "section": "§7.73",
+ "ledger_grep": "r28x4 の本番の設定",
+ "about": "r28x4 vs r27・両席とも出荷の設定（1,280 回・世界 4 本・枝予算なし・詰みの証明 root・公平）・random×real",
+ "job": "arena-r28x4p-w{KK}",
+ "branch": "claude/arena-r28x4p-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r28x4:n1_results/nrel_r28x4.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r27.npz"
+ },
+ "out_dir": "arena_r28x4p",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "4",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "4",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "4261000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r28x4p_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r28x4.npz (claude/train-r28x4)",
+  "baseline": "nrel_r27.npz",
+  "both": "sims 1280 x worlds 4 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
+ "commit_message": "arena r28x4p shard {KK}"
+}
