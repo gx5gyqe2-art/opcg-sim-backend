@@ -14,7 +14,7 @@ Rust の `decide` に切り替わった（§16.3-A3）ので、**再生側も同
   `resolve_recorded_action` → [`resolve_recorded`]（記述子の逆写像。記述は Rust の
     `describe_move_json`＝旧 `cpu_ai._describe_move` と同じ形）
   `_HumanReplaySeat`        → [`replay_from_descriptor`] の中のカーソル
-  `_cpu_seat`               → `RsGame.decide`（serve と同じ経路）
+  `_cpu_seat`               → `RsGame.decide`（serve と同じ経路・同じ探索設定）
 """
 import os as _os
 import random
@@ -27,6 +27,21 @@ import _bootstrap  # noqa: E402,F401
 
 from opcg_sim.api.engine_rs import RsGame  # noqa: E402
 from opcg_sim.api.services.games import _resolve_first_player_seat  # noqa: E402
+from opcg_sim.loop import engine as _E  # noqa: E402
+
+
+def _play_decide(game: RsGame, actor: str):
+    """対戦 API（`routers.py` の `_think`）と**同じ探索設定**で decide する。
+
+    既定の decide（160 回・世界 1 本）で再生すると、API の録画（1,280 回・世界 4 本・
+    根の詰みの証明）と別の脳になり、たまたま手が揃うネットでしか一致しない
+    （2026-11-01・r28x4 で露見: 録画は 3 ターン目にドンを付け、再生は付けずに殴った）。
+    """
+    return game.decide(actor, sims=_E.PLAY_SIMS, budget=_E.PLAY_BUDGET,
+                       worlds=_E.PLAY_WORLDS,
+                       rethink_ratio=_E.PLAY_RETHINK_RATIO,
+                       rethink_worlds=_E.PLAY_RETHINK_WORLDS,
+                       lethal_proof=_E.PLAY_LETHAL_PROOF)
 
 
 def _key(desc: Optional[Dict[str, Any]]):
@@ -104,7 +119,7 @@ def replay_from_descriptor(descriptor: Dict[str, Any], first_player: Optional[st
             break
         actor = pending["player_id"]
         if actor == cpu_name:
-            move = game.decide(actor)
+            move = _play_decide(game, actor)
             if move is None:
                 misses.append({"reason": "cpu_no_move", "step": steps})
                 break
