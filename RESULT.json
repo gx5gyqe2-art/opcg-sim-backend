@@ -10,10 +10,12 @@
  },
  "outputs": {
   "files": [
+   "arena_r29f4b/r29f4b_mirror_w12.jsonl",
    "arena_r29f4b/r29f4b_real_w12.jsonl"
   ]
  },
  "metrics": {
+  "arena_r29f4b/r29f4b_mirror_w12.jsonl": 175,
   "arena_r29f4b/r29f4b_real_w12.jsonl": 175
  },
  "notes": "",
