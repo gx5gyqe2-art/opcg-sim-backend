@@ -14,15 +14,16 @@
  "outputs": {
   "dirs": [
    "n_records/n74c_w21_p0",
-   "n_records/n74c_w21_p1"
+   "n_records/n74c_w21_p1",
+   "n_records/n74c_w21_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 41455,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 61874,
   "dropped": 0,
-  "sec_play_mean": 26.19
+  "sec_play_mean": 25.92
  },
  "notes": "",
  "worker": {
