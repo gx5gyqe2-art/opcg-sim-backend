@@ -1,32 +1,26 @@
 {
- "job": "gen-explore",
- "section": "§7.73",
- "status": "done",
- "branch": "claude/gen-explore",
- "report": "docs/reports/2026-11-01_gen_explore.md",
- "decision": {
-  "temp_late": 0.2,
-  "explore_z": "game",
-  "why": "stage 1 (240 seeds each): p=0.1 -> 3.3 late non-best moves/game, winner flips 15%; p=0.2 -> 6.9/game, 17%; mean root-Q loss 0.03. Root-value relabel (ii) would replace 85% of value targets (overlaps value-mix) -> kept game result (i)."
- },
+ "job": "arena-r29c-w01",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "generator": "nrel_r27.npz",
-  "waves": {"n62x": {"games": 15360, "rows": 2683320, "late_per_game": 6.69}, "n63x": {"games": 15360, "rows": 2689966, "late_per_game": 6.71}},
-  "train": "claude/train-r28x (warm-start r27, waves 62x+63x, same recipe as r28)",
-  "arena": "n1_results/r28x_judgment (same seeds as r28/r28b/r28m judgments)"
+  "candidate": "nrel_r29c.npz (claude/train-r29c)",
+  "baseline": "nrel_r28x4.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "outputs": {
+  "files": [
+   "arena_r29c/r29c_real_w01.jsonl"
+  ]
  },
  "metrics": {
-  "arena_vs_r27": {"real": {"wr": 0.5086, "elo": 6.0, "elo95": [-1.0, 12.9]}, "mirror": {"wr": 0.4934, "ci95": [0.4817, 0.5051], "elo": -4.6}, "synth2": {"wr": 0.4888, "elo": -7.8, "elo95": [-14.7, -0.9]}, "void": 0, "promoted": false},
-  "paired_elo": {"vs_r28": {"real": 7.1, "mirror": 11.9, "synth2": -1.4}, "vs_r28b": {"real": 3.0, "mirror": -2.6, "synth2": -6.9}, "vs_r28m": {"real": 3.4, "mirror": 9.1, "synth2": -1.5}},
-  "band_vmse": {"r27": 0.5096, "r28x": 0.5057},
-  "testbeds": {"kaido_decline_of_18": 7, "kaido_early_decline_of_7": 1, "rocks_return_of_53": 0, "rocks_root_diff": -0.1717, "rocks_return_visit_share": 0.018, "don_ratio": {"head": 0.376, "close": 0.262, "oppend": 0.279, "next": 0.428}}
+  "arena_r29c/r29c_real_w01.jsonl": 175
  },
- "outputs": ["n1_results/gen_explore/stage1/", "n1_results/gen_explore/stage1_summary.json", "n1_results/gen_explore/testbeds/", "n1_results/gen_explore/r28x_paired.json"],
- "notes": [
-  "Non-promoted (main CI crosses 0). Better than r28 on same deals: main +7.1 (within noise), mirror +11.9 (significant, +0.017 +-0.016); about equal to r28b (4 waves).",
-  "Testbeds got worse (rocks return 4 -> 0, DON discount larger): the targeted weakness is not fixed by late exploration.",
-  "Control r28 was actually trained on waves 58+59 (spec text said 60+61); both are r27's plain 2 waves.",
-  "make test: 1 failure test_n_rel_train_torch.py::test_grads_match_numpy caused by CUDA-only torch wheel in this container (same as ledger r11); WP does not touch training. Rust 640 / Python 917 pass. make audit-cross: void 0.",
-  "Recommendation to user: (c) make one r28x-style net from 4 explored waves (add 2 waves to 62x+63x)."
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r29c.json",
+  "k": 1,
+  "branch": "claude/arena-r29c-w01",
+  "code_commit": "544ebdaf3873f94f7c7c30dd953bc1a49210f853"
+ }
 }
