@@ -11,12 +11,14 @@
  "outputs": {
   "files": [
    "arena_r29c/r29c_mirror_w02.jsonl",
-   "arena_r29c/r29c_real_w02.jsonl"
+   "arena_r29c/r29c_real_w02.jsonl",
+   "arena_r29c/r29c_synth2_w02.jsonl"
   ]
  },
  "metrics": {
   "arena_r29c/r29c_mirror_w02.jsonl": 175,
-  "arena_r29c/r29c_real_w02.jsonl": 175
+  "arena_r29c/r29c_real_w02.jsonl": 175,
+  "arena_r29c/r29c_synth2_w02.jsonl": 175
  },
  "notes": "",
  "worker": {
