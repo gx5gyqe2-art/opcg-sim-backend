@@ -1,0 +1,80 @@
+{
+ "kind": "train",
+ "section": "§7.73",
+ "ledger_grep": "波 78s〜81s",
+ "about": "r29s（§7.73 段 8・教師の質の試験・warm-start r28x4・π と価値とも波 78s〜81s＝読み 2,560 回で打った r28x4 の散らしなし 4 波・r29c と同じ作り＝違いは読みの量だけ）。評価帯は省く",
+ "job": "train-r29s",
+ "branch": "claude/train-r29s",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n78s-w{ww}",
+   "shards": 32,
+   "dest": "~/n78s",
+   "glob": "~/n78s/n_records/n78s_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n79s-w{ww}",
+   "shards": 32,
+   "dest": "~/n79s",
+   "glob": "~/n79s/n_records/n79s_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n80s-w{ww}",
+   "shards": 32,
+   "dest": "~/n80s",
+   "glob": "~/n80s/n_records/n80s_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n81s-w{ww}",
+   "shards": 32,
+   "dest": "~/n81s",
+   "glob": "~/n81s/n_records/n81s_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r28x4.npz"
+ ],
+ "runs": [
+  {
+   "name": "r29s",
+   "in": [
+    "~/n78s/n_records/n78s_w*_p[0-3]",
+    "~/n79s/n_records/n79s_w*_p[0-3]",
+    "~/n80s/n_records/n80s_w*_p[0-3]",
+    "~/n81s/n_records/n81s_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r29s.npz",
+   "log": "~/train_r29s.log"
+  }
+ ],
+ "bands": [],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r28x4.npz"
+ },
+ "commit_message": "r29s の訓練"
+}

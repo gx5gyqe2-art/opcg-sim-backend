@@ -1,0 +1,59 @@
+{
+ "kind": "gen",
+ "section": "§7.73",
+ "ledger_grep": "波 78s〜81s",
+ "about": "波 81s の生成（§7.73 段 8・教師の質の試験・生成役 r28x4・波 74c〜77c と同じ設定だが読み 2,560 回〔今の 2 倍〕・散らしなし・32 シャード × 480 局・r29s の教材 4 波のうちの 1 本）",
+ "job": "n81s-w{K}",
+ "branch": "claude/n81s-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "3230000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n81s_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+ "args": [
+  "--sims",
+  "2560",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10"
+ ],
+ "log": "~/n81s_w{K}.log",
+ "copy_logs": [
+  "~/n81s_w{K}.log"
+ ],
+ "require": [],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+  "games": 480,
+  "sims": 2560,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real"
+ },
+ "commit_message": "gen wave 81s shard {K}"
+}
