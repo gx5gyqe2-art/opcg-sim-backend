@@ -37,3 +37,16 @@ N_RECORD_DONE {"rows": 21019, "main_rows": 9466, "dropped": 0, "forced": {"play"
   110/120局 行18505（main 8223） 棄却0 883s
   120/120局 行20699（main 9149） 棄却0 993s
 N_RECORD_DONE {"rows": 20699, "main_rows": 9149, "dropped": 0, "forced": {"play": 76, "hold": 15, "target": 29}, "removal_legal_rows": 3346}
+  10/120局 行1806（main 861） 棄却0 95s
+  20/120局 行3634（main 1660） 棄却0 167s
+  30/120局 行5389（main 2453） 棄却0 281s
+  40/120局 行7024（main 3173） 棄却0 334s
+  50/120局 行8711（main 3895） 棄却0 399s
+  60/120局 行10443（main 4651） 棄却0 477s
+  70/120局 行12115（main 5383） 棄却0 553s
+  80/120局 行13679（main 6106） 棄却0 643s
+  90/120局 行15513（main 6939） 棄却0 718s
+  100/120局 行17232（main 7716） 棄却0 806s
+  110/120局 行18793（main 8419） 棄却0 872s
+  120/120局 行20485（main 9164） 棄却0 957s
+N_RECORD_DONE {"rows": 20485, "main_rows": 9164, "dropped": 0, "forced": {"play": 66, "hold": 14, "target": 23}, "removal_legal_rows": 3204}
