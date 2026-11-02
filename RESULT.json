@@ -16,15 +16,16 @@
  "outputs": {
   "dirs": [
    "n_records/n70f_w25_p0",
-   "n_records/n70f_w25_p1"
+   "n_records/n70f_w25_p1",
+   "n_records/n70f_w25_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 42719,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 64042,
   "dropped": 0,
-  "sec_play_mean": 32.27
+  "sec_play_mean": 33.92
  },
  "notes": "",
  "worker": {
