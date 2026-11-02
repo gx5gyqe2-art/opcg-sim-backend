@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.73",
+ "ledger_grep": "r29f4b・r29cb",
+ "about": "r29f4 vs r28x4 の判定の 2 本目（§7.73 段 6・新しい帯・r29cb と対にして「4 割 vs 散らしなし」の差の幅を縮める）",
+ "job": "arena-r29f4b-w{KK}",
+ "branch": "claude/arena-r29f4b-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r29f4:n1_results/nrel_r29f4.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r28x4.npz"
+ },
+ "out_dir": "arena_r29f4b",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "4361000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r29f4b_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "4381000 + B*1000",
+   "args": [],
+   "out": "r29f4b_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "4401000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r29f4b_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "claude/train-r29f4:n1_results/nrel_r29f4.npz",
+  "baseline": "nrel_r28x4.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r29f4b shard {KK}"
+}

@@ -1,0 +1,82 @@
+{
+ "kind": "train",
+ "section": "§7.73",
+ "ledger_grep": "r29f4w",
+ "about": "r29f4w（§7.73 段 7・容量の試験・warm-start は r28x4 の中間を 192 → 384 に広げた n1_results/widen/nrel_r28x4_h384.npz〔広げた直後は r28x4 と同じ関数〕・教材は r29f4 と同じ波 70f〜73f＝違いは容量だけ）。評価帯は省く",
+ "job": "train-r29f4w",
+ "branch": "claude/train-r29f4w",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n70f-w{ww}",
+   "shards": 32,
+   "dest": "~/n70f",
+   "glob": "~/n70f/n_records/n70f_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n71f-w{ww}",
+   "shards": 32,
+   "dest": "~/n71f",
+   "glob": "~/n71f/n_records/n71f_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n72f-w{ww}",
+   "shards": 32,
+   "dest": "~/n72f",
+   "glob": "~/n72f/n_records/n72f_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n73f-w{ww}",
+   "shards": 32,
+   "dest": "~/n73f",
+   "glob": "~/n73f/n_records/n73f_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "n1_results/widen/nrel_r28x4_h384.npz"
+ ],
+ "runs": [
+  {
+   "name": "r29f4w",
+   "in": [
+    "~/n70f/n_records/n70f_w*_p[0-3]",
+    "~/n71f/n_records/n71f_w*_p[0-3]",
+    "~/n72f/n_records/n72f_w*_p[0-3]",
+    "~/n73f/n_records/n73f_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r29f4w.npz",
+   "log": "~/train_r29f4w.log"
+  }
+ ],
+ "bands": [],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "n1_results/widen/nrel_r28x4_h384.npz",
+  "hidden": 384
+ },
+ "commit_message": "r29f4w の訓練",
+ "require": []
+}
