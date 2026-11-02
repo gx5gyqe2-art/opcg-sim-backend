@@ -1,7 +1,7 @@
 {
  "job": "train-r29f4w",
  "role": "train",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "warm_start": "n1_results/widen/nrel_r28x4_h384.npz",
   "hidden": 384,
