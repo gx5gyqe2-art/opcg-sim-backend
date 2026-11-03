@@ -1,7 +1,7 @@
 {
  "job": "value-split-a",
  "role": "measurement",
- "status": "done (stage 1); stage 2 (rocks) appended when shards r01-r08 arrive",
+ "status": "done (stage 1 + stage 2)",
  "spec": "docs/search_efficiency_plan.md §7.74 計測 A (ledger 2+506)",
  "branch": "claude/value-split-a",
  "report": "docs/reports/2026-11-03_value_split_playout.md",
@@ -10,7 +10,7 @@
    "tests/scripts/value_split.py"
   ],
   "data": "n1_results/value_split/ (rows_s01..s16.jsonl, play_s*.log, summary.json, tvval_nets.json, SHARD_HOWTO.md)",
-  "shards": "claude/value-split-a-s01..s16 (16 x 192 rows)"
+  "shards": "claude/value-split-a-s01..s16 (16 x 192 rows); stage 2 claude/value-split-a-r01..r08 (8 x 106 rows)"
  },
  "gates": {
   "make_test": "green on the final tree (cargo test 640 passed; pytest 894 passed, 14 skipped)",
@@ -292,7 +292,54 @@
    "ref|void": 1,
    "teach_r29f4|void": 6,
    "teach_r27|void": 2
+  },
+  "rocks_stage2": {
+   "points": 53,
+   "games": 1696,
+   "win_diff_b_minus_a": 0.0873,
+   "value_diff": 0.1747,
+   "value_diff_ci": [
+    0.0918,
+    0.2574
+   ],
+   "win_a": 0.3692,
+   "win_b": 0.4564,
+   "b_better_points": 29,
+   "win_diff_ci_winrate": [
+    0.0459,
+    0.1287
+   ],
+   "by_own_turn": {
+    "3": {
+     "n": 14,
+     "diff": 0.031
+    },
+    "4": {
+     "n": 30,
+     "diff": 0.1128
+    },
+    "5": {
+     "n": 6,
+     "diff": 0.1354
+    },
+    "9+12": {
+     "n": 3,
+     "diff": 0.0
+    }
+   },
+   "sig_b": 8,
+   "sig_a": 0,
+   "prev_7_70": {
+    "diff": 0.095,
+    "ci": [
+     0.051,
+     0.139
+    ],
+    "sig_b": 9,
+    "sig_a": 0
+   },
+   "fails_void": 11
   }
  },
- "conclusion": "Teacher-style play keeps the don-1 difference (value scale +0.34 / +0.29 / +0.25 for the r27 / r28x4 / r29f4 teaching settings vs referee +0.29); net diff / teacher-play diff = 0.34 / 0.27 / 0.46, far below the 0.7-1.0 predicted for a play-side cause. The shrinkage is mostly on the fitting side; scatter removes at most ~10% (r29f4 teaching: -0.04 paired vs referee, CI -0.14..+0.06)."
+ "conclusion": "Teacher-style play keeps the don-1 difference (value scale +0.34 / +0.29 / +0.25 for the r27 / r28x4 / r29f4 teaching settings vs referee +0.29); net diff / teacher-play diff = 0.34 / 0.27 / 0.46, far below the 0.7-1.0 predicted for a play-side cause. The shrinkage is mostly on the fitting side; scatter removes at most ~10% (r29f4 teaching: -0.04 paired vs referee, CI -0.14..+0.06). Stage 2: the bounce advantage (53 k6-only points) under the r29f4 teaching play is +0.087 win-rate [0.046, 0.129] vs +0.095 under the referee (7.70): 0.92x, same conclusion."
 }

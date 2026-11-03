@@ -838,5 +838,20 @@
   "ref|void": 1,
   "teach_r29f4|void": 6,
   "teach_r27|void": 2
+ },
+ "rocks": {
+  "teach_r29f4": {
+   "points": 53,
+   "games": 1674,
+   "win_diff_b_minus_a": 0.0873,
+   "value_diff": 0.1747,
+   "value_diff_ci": [
+    0.0918,
+    0.2574
+   ],
+   "win_a": 0.3692,
+   "win_b": 0.4564,
+   "b_better_points": 29
+  }
  }
 }
