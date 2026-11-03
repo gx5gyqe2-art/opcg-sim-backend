@@ -435,15 +435,54 @@ def cmd_summary(a):
             row["ii_minus_i_value"] = round(2 * float(np.mean(d)), 4) if d else None
             row["ii_minus_i_ci"] = [None if x is None else round(2 * x, 4) for x in _ci(d)] if len(d) > 1 else None
             row["paired_n"] = len(d)
+            # 比の区間（点を引き直す bootstrap・4,000 回）
+            common = [p for p in sorted(nd) if str(p) in ref["per_point_win_diff"] and str(p) in res["modes"][m]["per_point_win_diff"]]
+            if len(common) >= 3:
+                N = np.array([nd[p] for p in common])
+                R = 2 * np.array([ref["per_point_win_diff"][str(p)] for p in common])
+                T = 2 * np.array([res["modes"][m]["per_point_win_diff"][str(p)] for p in common])
+                rng = np.random.default_rng(0)
+                bi, bii = [], []
+                for _ in range(4000):
+                    idx = rng.integers(0, len(common), len(common))
+                    if R[idx].mean() > 0 and T[idx].mean() > 0:
+                        bi.append(N[idx].mean() / R[idx].mean()); bii.append(N[idx].mean() / T[idx].mean())
+                q = lambda x: [round(float(np.percentile(x, 2.5)), 3), round(float(np.percentile(x, 97.5)), 3)]  # noqa: E731
+                row["ratio_i_ci"], row["ratio_ii_ci"] = q(bi), q(bii)
         res["generations"][net] = row
+    # 点の種類（記事が控える理由: early＝序盤・big_next＝次の大物・bk_on＝記事は使う）ごとの差（価値の目盛り）
+    why = {str(p["pid"]): p["why"] for p in OV.kaido_points()}
+    res["by_why"] = {}
+    for w in sorted(set(why.values())):
+        ps = [p for p in why if why[p] == w]
+        res["by_why"][w] = {"points": len(ps)}
+        for m, mr in res["modes"].items():
+            xs = [mr["per_point_win_diff"][p] for p in ps if p in mr["per_point_win_diff"]]
+            if xs:
+                res["by_why"][w][m] = round(2 * float(np.mean(xs)), 4)
+        for net in NETS:
+            xs = [tv_net[net][int(p)] for p in ps if int(p) in tv_net[net]]
+            if xs:
+                res["by_why"][w]["net_" + net] = round(float(np.mean(xs)), 4)
+    # 失敗の数（決着せず・対を作る段で決着）
+    res["fails"] = {}
+    for f in sorted(glob.glob(os.path.join(a.out, "rows_*.jsonl"))):
+        for r in BA.read_jsonl(f):
+            if not r.get("ok"):
+                k = r["mode"] + "|" + (r.get("fail") or "void")
+                res["fails"][k] = res["fails"].get(k, 0) + 1
     os.makedirs(a.out, exist_ok=True)
     json.dump(res, open(os.path.join(a.out, "summary.json"), "w"), ensure_ascii=False, indent=1)
     for m, r in res["modes"].items():
         print(f"{m:13s} 点 {r['points']} 世界/点 {r['worlds_per_point']} 勝率 a {r['win_a']:.3f} b {r['win_b']:.3f} "
               f"差(目盛り) {r['value_diff']:+.3f} {r['value_diff_ci']} ε/局 {r['forced_per_game']} 散らし/局 {r['late_per_game']}")
     for net, r in res["generations"].items():
-        print(f"{net:6s} ネットの差 {r['net_diff_saved']} (i) {r.get('play_diff_i')} 比 {r.get('ratio_i')} 相関 {r.get('corr_i')} | "
-              f"(ii) {r.get('play_diff_ii')} 比 {r.get('ratio_ii')} 相関 {r.get('corr_ii')} | (ii)−(i) {r.get('ii_minus_i_value')} {r.get('ii_minus_i_ci')}")
+        print(f"{net:6s} ネットの差 {r['net_diff_saved']} (i) {r.get('play_diff_i')} 比 {r.get('ratio_i')} {r.get('ratio_i_ci')} 相関 {r.get('corr_i')} | "
+              f"(ii) {r.get('play_diff_ii')} 比 {r.get('ratio_ii')} {r.get('ratio_ii_ci')} 相関 {r.get('corr_ii')} | "
+              f"(ii)−(i) {r.get('ii_minus_i_value')} {r.get('ii_minus_i_ci')}")
+    for w, r in res["by_why"].items():
+        print("種類", w, json.dumps(r, ensure_ascii=False))
+    print("失敗", json.dumps(res["fails"], ensure_ascii=False))
     # 段 2（あれば）
     rocks = load_rows(a.out, "rocks")
     if rocks:
