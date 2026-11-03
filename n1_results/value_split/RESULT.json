@@ -1,0 +1,298 @@
+{
+ "job": "value-split-a",
+ "role": "measurement",
+ "status": "done (stage 1); stage 2 (rocks) appended when shards r01-r08 arrive",
+ "spec": "docs/search_efficiency_plan.md §7.74 計測 A (ledger 2+506)",
+ "branch": "claude/value-split-a",
+ "report": "docs/reports/2026-11-03_value_split_playout.md",
+ "outputs": {
+  "code": [
+   "tests/scripts/value_split.py"
+  ],
+  "data": "n1_results/value_split/ (rows_s01..s16.jsonl, play_s*.log, summary.json, tvval_nets.json, SHARD_HOWTO.md)",
+  "shards": "claude/value-split-a-s01..s16 (16 x 192 rows)"
+ },
+ "gates": {
+  "make_test": "green on the final tree (cargo test 640 passed; pytest 894 passed, 14 skipped)",
+  "engine_changed": false
+ },
+ "invariants": {
+  "ref_diff_in_prev_interval": {
+   "value": 0.292,
+   "ci": [
+    0.1198,
+    0.464
+   ],
+   "prev": [
+    0.338,
+    [
+     0.13,
+     0.55
+    ]
+   ],
+   "ok": true
+  },
+  "net_diff_r27_saved_boards": {
+   "value": 0.1152,
+   "ratio": 0.341,
+   "prev_7_71": [
+    0.115,
+    0.34
+   ],
+   "ok": true
+  },
+  "net_diff_r28x4_saved_boards": {
+   "value": 0.0782,
+   "ratio": 0.231,
+   "note": "§7.74 cites 0.26 but that is r28x (2 waves); r28x4 had not been measured before"
+  },
+  "same_pair_across_modes": "state keys identical across the 4 modes for all 768 (point, world) pairs"
+ },
+ "metrics": {
+  "modes": {
+   "ref": {
+    "points": 24,
+    "worlds_per_point": 31.6,
+    "games": 1516,
+    "win_diff": 0.146,
+    "value_diff": 0.292,
+    "value_diff_ci": [
+     0.1198,
+     0.464
+    ],
+    "win_a": 0.7344,
+    "win_b": 0.5884,
+    "forced_per_game": 0.0,
+    "late_per_game": 0.0,
+    "steps_per_game": 0.0,
+    "world_net_corr": {
+     "r26": 0.262,
+     "r27": 0.278,
+     "r28x4": 0.295,
+     "r29f4": 0.243
+    },
+    "world_net_mean": {
+     "r26": 0.1217,
+     "r27": 0.1158,
+     "r28x4": 0.0784,
+     "r29f4": 0.1132
+    }
+   },
+   "teach_r29f4": {
+    "points": 24,
+    "worlds_per_point": 31.4,
+    "games": 1506,
+    "win_diff": 0.1225,
+    "value_diff": 0.245,
+    "value_diff_ci": [
+     0.1174,
+     0.3726
+    ],
+    "win_a": 0.6744,
+    "win_b": 0.5519,
+    "forced_per_game": 0.845,
+    "late_per_game": 12.245,
+    "steps_per_game": 161.7,
+    "world_net_corr": {
+     "r26": 0.154,
+     "r27": 0.174,
+     "r28x4": 0.165,
+     "r29f4": 0.176
+    },
+    "world_net_mean": {
+     "r26": 0.1215,
+     "r27": 0.1156,
+     "r28x4": 0.0784,
+     "r29f4": 0.1131
+    }
+   },
+   "teach_r28x4": {
+    "points": 24,
+    "worlds_per_point": 31.6,
+    "games": 1518,
+    "win_diff": 0.144,
+    "value_diff": 0.288,
+    "value_diff_ci": [
+     0.1554,
+     0.4206
+    ],
+    "win_a": 0.7599,
+    "win_b": 0.6159,
+    "forced_per_game": 0.866,
+    "late_per_game": 6.273,
+    "steps_per_game": 158.6,
+    "world_net_corr": {
+     "r26": 0.185,
+     "r27": 0.189,
+     "r28x4": 0.208,
+     "r29f4": 0.185
+    },
+    "world_net_mean": {
+     "r26": 0.1218,
+     "r27": 0.116,
+     "r28x4": 0.0785,
+     "r29f4": 0.1133
+    }
+   },
+   "teach_r27": {
+    "points": 24,
+    "worlds_per_point": 31.5,
+    "games": 1514,
+    "win_diff": 0.1716,
+    "value_diff": 0.3432,
+    "value_diff_ci": [
+     0.1888,
+     0.4974
+    ],
+    "win_a": 0.749,
+    "win_b": 0.5774,
+    "forced_per_game": 0.795,
+    "late_per_game": 0.03,
+    "steps_per_game": 144.5,
+    "world_net_corr": {
+     "r26": 0.19,
+     "r27": 0.222,
+     "r28x4": 0.23,
+     "r29f4": 0.196
+    },
+    "world_net_mean": {
+     "r26": 0.1215,
+     "r27": 0.1156,
+     "r28x4": 0.0782,
+     "r29f4": 0.113
+    }
+   }
+  },
+  "generations": {
+   "r29f4": {
+    "net_diff_saved": 0.1134,
+    "mode": "teach_r29f4",
+    "player": "r28x4",
+    "temp_late": 0.4,
+    "play_diff_i": 0.292,
+    "ratio_i": 0.388,
+    "corr_i": 0.579,
+    "n_points_i": 24,
+    "play_diff_ii": 0.245,
+    "ratio_ii": 0.463,
+    "corr_ii": 0.628,
+    "n_points_ii": 24,
+    "ii_minus_i_value": -0.0399,
+    "ii_minus_i_ci": [
+     -0.137,
+     0.0572
+    ],
+    "paired_n": 752,
+    "ratio_i_ci": [
+     0.262,
+     0.75
+    ],
+    "ratio_ii_ci": [
+     0.333,
+     0.759
+    ]
+   },
+   "r28x4": {
+    "net_diff_saved": 0.0782,
+    "mode": "teach_r28x4",
+    "player": "r27",
+    "temp_late": 0.2,
+    "play_diff_i": 0.292,
+    "ratio_i": 0.268,
+    "corr_i": 0.702,
+    "n_points_i": 24,
+    "play_diff_ii": 0.288,
+    "ratio_ii": 0.272,
+    "corr_ii": 0.668,
+    "n_points_ii": 24,
+    "ii_minus_i_value": -0.0053,
+    "ii_minus_i_ci": [
+     -0.0956,
+     0.085
+    ],
+    "paired_n": 758,
+    "ratio_i_ci": [
+     0.19,
+     0.48
+    ],
+    "ratio_ii_ci": [
+     0.201,
+     0.413
+    ]
+   },
+   "r27": {
+    "net_diff_saved": 0.1152,
+    "mode": "teach_r27",
+    "player": "r26",
+    "temp_late": 0.0,
+    "play_diff_i": 0.292,
+    "ratio_i": 0.395,
+    "corr_i": 0.661,
+    "n_points_i": 24,
+    "play_diff_ii": 0.3432,
+    "ratio_ii": 0.336,
+    "corr_ii": 0.603,
+    "n_points_ii": 24,
+    "ii_minus_i_value": 0.0556,
+    "ii_minus_i_ci": [
+     -0.0388,
+     0.1498
+    ],
+    "paired_n": 756,
+    "ratio_i_ci": [
+     0.274,
+     0.754
+    ],
+    "ratio_ii_ci": [
+     0.25,
+     0.521
+    ]
+   }
+  },
+  "by_why": {
+   "big_next": {
+    "points": 11,
+    "ref": 0.2024,
+    "teach_r29f4": 0.2511,
+    "teach_r28x4": 0.2785,
+    "teach_r27": 0.3051,
+    "net_r26": 0.1215,
+    "net_r27": 0.1104,
+    "net_r28x4": 0.07,
+    "net_r29f4": 0.1215
+   },
+   "bk_on": {
+    "points": 6,
+    "ref": 0.0104,
+    "teach_r29f4": 0.0729,
+    "teach_r28x4": 0.0313,
+    "teach_r27": 0.1562,
+    "net_r26": 0.0447,
+    "net_r27": 0.0488,
+    "net_r28x4": 0.0252,
+    "net_r29f4": 0.031
+   },
+   "early": {
+    "points": 7,
+    "ref": 0.6739,
+    "teach_r29f4": 0.3828,
+    "teach_r28x4": 0.5231,
+    "teach_r27": 0.5632,
+    "net_r26": 0.1837,
+    "net_r27": 0.1795,
+    "net_r28x4": 0.1366,
+    "net_r29f4": 0.1712
+   }
+  },
+  "fails": {
+   "ref|ended": 9,
+   "teach_r29f4|ended": 9,
+   "teach_r28x4|ended": 9,
+   "teach_r27|ended": 9,
+   "ref|void": 1,
+   "teach_r29f4|void": 6,
+   "teach_r27|void": 2
+  }
+ },
+ "conclusion": "Teacher-style play keeps the don-1 difference (value scale +0.34 / +0.29 / +0.25 for the r27 / r28x4 / r29f4 teaching settings vs referee +0.29); net diff / teacher-play diff = 0.34 / 0.27 / 0.46, far below the 0.7-1.0 predicted for a play-side cause. The shrinkage is mostly on the fitting side; scatter removes at most ~10% (r29f4 teaching: -0.04 paired vs referee, CI -0.14..+0.06)."
+}
