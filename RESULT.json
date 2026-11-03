@@ -5,7 +5,7 @@
  "branch": "claude/value-split-b",
  "report": "docs/reports/2026-11-03_value_split_epochs.md",
  "results_dir": "n1_results/value_split",
- "gate": "GATE_PLACEHOLDER",
+ "gate": "make test green（2026-11-03 17:48・cargo test 640 passed・pytest 894 passed 14 skipped・付録の道具 1 ファイルを足したため 1 回だけ回した）",
  "what": "r28x4 を土台に波 70f＋71f（535 万行）で α 2e-4・4 周／β 1e-4・4 周を訓練し、各周の重み 8 本＋r28x4＋r29f4 を同じ試験台（ドンの比 tvval・6キング 53 点 rocks・検証の誤差）にかけた。付録: 波 70f のドンの総数の規則からの外れ（don_variation.py）。",
  "invariants": {
   "r27_tvval_matches_7_71": true,
