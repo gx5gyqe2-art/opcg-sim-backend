@@ -301,6 +301,13 @@
    "n_q": 52,
    "share_b": 0.073
   },
+  "nrel_vsb_b.ep3.npz": {
+   "points": 53,
+   "chose_b": 4,
+   "q_diff": -0.0515,
+   "n_q": 52,
+   "share_b": 0.066
+  },
   "nrel_vsb_a.ep2.npz": {
    "points": 53,
    "chose_b": 3,
