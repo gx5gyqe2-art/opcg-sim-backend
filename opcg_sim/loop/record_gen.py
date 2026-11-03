@@ -649,8 +649,10 @@ def opp_draw(seed, pool):
 
 def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
                  eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None, pool=None,
-                 explore=None):
+                 explore=None, don_jitter=0.0):
     E.engine()
+    # §7.75（WP `don-jitter`）: 局ごとに確率 P で 1 回だけ、手番の頭にドンを 1 枚出し入れする。0＝切（既定）。
+    _G["don_jitter"] = float(don_jitter or 0.0)
     # §7.73: 後半の低確率の温度（`temp_late`・生成の席だけ）と価値の教師の扱い。
     # None＝切（既定・opts も dump の列も今までと同じ）。
     _G["explore"] = explore
@@ -872,6 +874,44 @@ class _Recorder:
                                      {"stats": {"legal": legal}, "groups": groups})
 
 
+#: §7.75 の乱数の塩（局の seed から決まる・対局・探索・ε の乱数とは別系統＝切替 0 では一度も引かない）。
+DON_JITTER_SALT = 75_0075
+#: ドンを動かしうる手番（全体の手番数・1 始まり）。
+DON_JITTER_TURNS = (3, 10)
+
+
+class DonJitter:
+    """§7.75（WP `don-jitter`）: 1 局に 1 回だけ、手番の頭に手番の席のドンを 1 枚出し入れする（`driver.run_game(pre=…)`）。
+
+    局の seed から（確率 P で起こすか・手番 3〜10 のどれか・符号は半々）を決める。その手番で手番の席が
+    メインの判断を最初に迎えたとき（対話なし）に `Game.shift_don` を 1 回呼ぶ。増やす側でドンデッキが空なら
+    減らす側にする・減らす側で場のアクティブもレストも無ければ増やす側にする。どちらも動かなければ何もしない。
+    `done`＝`(手番, 席 0/1, 符号)`（動かしていなければ None）。
+    """
+
+    def __init__(self, seed, p):
+        rng = random.Random(int(seed) * 1000003 + DON_JITTER_SALT)
+        self.on = rng.random() < p
+        self.turn = rng.randint(*DON_JITTER_TURNS)
+        self.sign = 1 if rng.random() < 0.5 else -1
+        self.done = None
+        self.src = None
+
+    def __call__(self, game, name, turn, step):
+        if not self.on or self.done is not None or turn != self.turn:
+            return
+        if name != game.turn_player() or game.has_interaction or game.phase != "MAIN":
+            return
+        self.on = False                                   # この手番の最初のメインの判断で 1 回だけ
+        sign = self.sign
+        src = game.shift_don(name, sign)
+        if src is None:
+            sign = -sign
+            src = game.shift_don(name, sign)
+        if src is not None:
+            self.done, self.src = (int(turn), 0 if name == "p1" else 1, int(sign)), src
+
+
 def play_one(seed):
     """1 局を打って行を返す（勝敗が付いた局だけ・純正 z）。失敗は None。"""
     spec, db = _G["spec"], _G["db"]
@@ -883,6 +923,7 @@ def play_one(seed):
     t_start = time.time()
     if _G.get("rean"):
         rec.stash = {}
+    jit = DonJitter(seed, _G["don_jitter"]) if _G.get("don_jitter", 0.0) > 0 else None
     try:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
@@ -895,7 +936,8 @@ def play_one(seed):
             seats = {lseat: spec, oseat: pool["specs"][oname]}
             nets = {lseat: pool["learner_name"], oseat: oname}
         res = DR.run_game(seed, seats, p1, p2, max_steps=MAX_STEPS,
-                          observer=rec, post=rec.post if aux_on else None, swap=rec.swap)
+                          observer=rec, post=rec.post if aux_on else None, swap=rec.swap,
+                          pre=jit)
     except Exception:                                          # noqa: BLE001  1 局の失敗で止めない
         return None
     winner, turn, steps, acts = res["winner"], res["turns"], res["steps"], res["acts"]
@@ -957,6 +999,12 @@ def play_one(seed):
             out["z_game"] = out["z"].copy()
             out["z"] = explore_z(out["z"], out["who"], out["step"],
                                  out["pol_v0"].astype(np.float32), out["explore"])
+    if jit is not None:
+        # §7.75: 局ごとの（手番・席 0/1・符号）を全行に写す（動かしていない局は 0・−1・0）。
+        dj = jit.done or (0, -1, 0)
+        out["don_jitter"] = np.tile(np.array(dj, np.int16), (len(rows["who"]), 1))
+        out["_meta"]["don_jitter"] = ({"turn": dj[0], "seat": "p1" if dj[1] == 0 else "p2",
+                                       "sign": dj[2], "from": jit.src} if jit.done else None)
     if nets:
         # 相手の集団（§7.56）: その席を打ったネットの名前と「学ぶ側のネットか」の印（方策の教師の選び方に使う）
         out["seat_net"] = np.array([nets[w] for w in rows["who"]])
@@ -1039,6 +1087,7 @@ _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追
 _AUX_DEF_KEYS = ("aux_def", "aux_def_row")            # 守る側の補助教師（v5 で追加・P8・`2026-09-24_p8_defender_columns.md`）
 _POOL_KEYS = ("seat_net", "learner")                  # 相手の集団（§7.56・`--opp-pool` のときだけ）
 _EXPLORE_KEYS = ("explore",)                          # §7.73（`--temp-late` > 0 のときだけ）
+_DON_JITTER_KEYS = ("don_jitter",)                    # §7.75（`--don-jitter` > 0 のときだけ）
 
 
 def main(argv=None):
@@ -1112,8 +1161,14 @@ def main(argv=None):
     ap.add_argument("--explore-z", default="game", choices=("game", "root"),
                     help="§7.73: 後半の温度で最善でない手を打った行までの価値の教師。game＝局の勝敗のまま（既定）・"
                          "root＝その手番の根の評価に替える（元の勝敗は列 z_game に残す）。--temp-late > 0 のときだけ効く")
+    ap.add_argument("--don-jitter", type=float, default=0.0,
+                    help="§7.75: 局ごとにこの確率で 1 回だけ、手番 3〜10 のうち無作為な 1 手番の頭（最初のメインの判断の前）に"
+                         "手番の席のドンを 1 枚増やすか減らす（符号は半々・効果の見返りなし）。既定 0＝切＝今までと 1 ビットも同じ。"
+                         ">0 なら列 don_jitter（局ごとの手番・席 0/1・符号・動かしていない局は 0,−1,0）を足す")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
+    if args.don_jitter < 0 or args.don_jitter > 1:
+        ap.error("--don-jitter は 0〜1")
     if args.temp_late < 0 or args.temp_late > 1:
         ap.error("--temp-late は 0〜1")
     if args.explore_z != "game" and args.temp_late <= 0:
@@ -1171,13 +1226,14 @@ def main(argv=None):
            + (() if args.no_aux else _AUX_KEYS + _AUX_DEF_KEYS)    # v5: aux_def／aux_def_row も同じ旗（P8）
            + (_POOL_KEYS if opp_pool else ())                          # 相手の集団（§7.56）
            + ((_EXPLORE_KEYS + (("z_game",) if args.explore_z == "root" else ()))
-              if explore else ()))                                     # §7.73
+              if explore else ())                                      # §7.73
+           + (_DON_JITTER_KEYS if args.don_jitter > 0 else ()))        # §7.75
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
     initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
                 not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean, opp_pool,
-                explore)
+                explore, args.don_jitter)
     nm = len(rean["mults"]) if rean else 0                   # 再分析の dump（--reanalyze-mult・倍率ごと）
     rbufs, rgames, rshard = [{k: [] for k in keys} for _ in range(nm)], [[] for _ in range(nm)], 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
@@ -1246,6 +1302,12 @@ def main(argv=None):
                        "explore_z": args.explore_z,
                        "explore": {k: sum(g["explore"][k] for g in games) for k in ("early", "late")}}
                       if explore else {}),
+                   # §7.75: ドンの出し入れ（書くのは使ったときだけ）
+                   **({"don_jitter": args.don_jitter,
+                       "don_jitter_games": sum(1 for g in games if g.get("don_jitter")),
+                       "don_jitter_sign": {"+1": sum(1 for g in games if (g.get("don_jitter") or {}).get("sign") == 1),
+                                           "-1": sum(1 for g in games if (g.get("don_jitter") or {}).get("sign") == -1)}}
+                      if args.don_jitter > 0 else {}),
                    # 相手の集団（§7.56）: 書くのは集団を使ったときだけ（既定の meta は今までと同じ）
                    **({"opp_pool": [{"name": n, "net": p, "weight": w} for n, p, w in opp_pool],
                        "opp_games": {n: sum(1 for g in games
