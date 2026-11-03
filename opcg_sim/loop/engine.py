@@ -35,8 +35,10 @@ CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 #: ＝era16・価値の教師は今の生成役の 2 波だけ〔2026-10-26 の決まり〕・本番の設定〔世界 4 本〕で r26 に +9.2）。
 #: **r28x4**（2026-11-01 採用・`docs/reports/r28x4_adoption_20261101.md`・r27 が 4 ターン目より後も 1 手ごとに 2 割で訪問の割合から
 #: 引いて打った 4 波〔波 62x〜65x〕の π と価値で r27 から育てた＝era17・本番の設定で r27 に +17.3）。
-#: ロールバック先は r27（同梱 `nrel_r27.npz`）、その先は r26（`nrel_r26.npz`）、r24（`nrel_r24.npz`）、r23（`nrel_r23.npz`）、r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_r28x4.npz")
+#: **r29f4**（2026-11-03 採用・`docs/reports/r29f4_adoption_20261103.md`・r28x4 が 4 ターン目より後も 1 手ごとに 4 割で訪問の割合から
+#: 引いて打った 4 波〔波 70f〜73f〕の π と価値で r28x4 から育てた＝era18・本番の設定で r28x4 に +7.1［+0.2, +14.0］）。
+#: ロールバック先は r28x4（同梱 `nrel_r28x4.npz`）、その先は r27（`nrel_r27.npz`）、r26（`nrel_r26.npz`）、r24（`nrel_r24.npz`）、r23（`nrel_r23.npz`）、r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r29f4.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
