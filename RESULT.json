@@ -14,15 +14,16 @@
  "outputs": {
   "dirs": [
    "n_records/n78s_w18_p0",
-   "n_records/n78s_w18_p1"
+   "n_records/n78s_w18_p1",
+   "n_records/n78s_w18_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 41231,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 62416,
   "dropped": 0,
-  "sec_play_mean": 56.76
+  "sec_play_mean": 58.33
  },
  "notes": "",
  "worker": {
