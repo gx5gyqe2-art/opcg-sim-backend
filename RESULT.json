@@ -1,7 +1,7 @@
 {
  "job": "n80s-w13",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r28x4.npz",
   "games": 480,
