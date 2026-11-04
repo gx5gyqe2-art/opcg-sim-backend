@@ -27,7 +27,7 @@ use super::mcts::{
     C_PUCT, Q_MIN_FRAC, SERVE_SIMS,
 };
 use super::quiesce::{
-    best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
+    argmax_f64, best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
     Ctx, SearchState, TraceStep, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
 };
 use super::rng::SearchRng;
@@ -50,6 +50,11 @@ pub struct DecideOptions {
     /// §7.73 段 5（度合い）: 後半の温度で引くときの分布の指数。訪問の割合を `pow` 乗して正規化する
     /// （1.0＝訪問に比例＝今までと 1 ビットも同じ・0.5＝平らに・0＝一様）。序盤の温度には効かない。
     pub temp_late_pow: f64,
+    /// §7.79 WP `light-rollout`（**測定専用**・既定 0＝無効＝1 ビットも同じ）: メインの判断点の木の手を、
+    /// 根の事前分布（ネットの打ち方の割合）から選び直す。1＝割合が最大の手・2＝割合に比例して引く（温度 1）。
+    /// 探索の回数（`sims`）は別に決める（0 にすれば木は回らず、根を広げた 1 回の評価だけ）。
+    /// 窓・対話の決め方は変えない。`temp_turns`／`temp_late` より後に掛かる（両方を渡したらこちらが勝つ）。
+    pub prior_pick: u8,
     /// `SERVE_BOX_COMMIT`
     pub box_commit: bool,
     /// `TREE_BOX_BATTLE`
@@ -301,6 +306,7 @@ impl Default for DecideOptions {
             temp_turns: 0,
             temp_late: 0.0,
             temp_late_pow: 1.0,
+            prior_pick: 0,
             box_commit: true,
             box_battle: true,
             box_dialog: true,
@@ -2245,6 +2251,19 @@ fn decide_after_lethal(
                     // 貪欲に選ぶ手と同じ候補（等価手マージ後のグループ）か
                     let same = groups[gi].rep == greedy || groups[gi].idxs.contains(&greedy);
                     temp_pick = Some((if early { 1 } else { 2 }, !same));
+                }
+            }
+            // §7.79: 根の事前分布から選び直す（既定 0 は何もしない＝乱数も引かない）。
+            if opts.prior_pick != 0 && run.p.len() == run.legal.len() {
+                let total: f64 = run.p.iter().map(|x| x.max(0.0)).sum();
+                if total > 0.0 {
+                    rep = if opts.prior_pick == 1 {
+                        argmax_f64(&run.p)
+                    } else {
+                        let probs: Vec<f64> = run.p.iter().map(|x| x.max(0.0) / total).collect();
+                        rng.choice(&probs)?
+                    };
+                    temp_pick = None;
                 }
             }
             mv = Some(run.legal[rep].clone());
