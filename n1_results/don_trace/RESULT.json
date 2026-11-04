@@ -1,0 +1,21 @@
+{
+ "wp": "don-trace",
+ "section": "§7.76",
+ "date": "2026-11-04",
+ "report": "docs/reports/2026-11-04_don_trace.md",
+ "tool": "tests/scripts/don_trace.py",
+ "materials": {"wave": "n82j (claude/n82j-w01..w16)", "nets": ["n1_results/don_jitter/nets/nrel_dja82.ep1.npz (claude/don-jitter)", "opcg_sim/data/learned/nrel_r28x4.npz"], "rows_turn3_6": 140276, "jitter_rows_turn3_6": [957, 985]},
+ "invariant": {"outcome": 0.542, "r28x4": 0.282, "dja82_ep0": 0.301, "dja82_ep1": 0.315, "djt_ep1": 0.295, "r29f4": 0.301, "matches_7_75": true},
+ "stage1_input": {"pairs": 200, "don_active_me_shift": 1.0, "don_deck_me_shift": -0.1, "don_next_turn_shift": 0.083, "net_value_per_don_pairs": {"r28x4": 0.178, "dja82_ep1": 0.191}, "lost_here": false},
+ "stage2_linear": {"all_cols": 0.40, "drop_don_moved_cols": 0.03, "fit_without_shifted_rows": 0.32, "plus_shift_sign": 0.46, "lost_here": false},
+ "stage3_repr": {"probe": {"r28x4": {"input_bundle": 0.395, "hidden1": 0.338, "shared": 0.286}, "dja82_ep1": {"input_bundle": 0.392, "hidden1": 0.359, "shared": 0.323}},
+                 "exit_refit": {"r28x4": [0.300, 0.275], "dja82_ep1": [0.337, 0.315]}, "lost_here": "between input bundle and shared representation (two hidden layers)"},
+ "stage4_weights": {"no_weight_decay_no_clip_in_training": true,
+                    "refit_two_layers_value_only_lr2e-4": {"r28x4": {"ep2": [0.380, 0.703], "ep12": [0.479, 0.784]}, "dja82_ep1": {"ep2": [0.377, 0.725], "ep12": [0.467, 0.813]}},
+                    "aux_0.1_effect": "none (±0.004)", "tanh_removed": "no recovery", "scratch_ep30": {"r28x4": [0.549, 1.124], "dja82_ep1": [0.539, 1.164]},
+                    "net_holdout_mse": {"r28x4": 0.691, "dja82_ep1": 0.710}, "note": "pairs are [group diff, holdout mse on turn 3-6 rows]"},
+ "forecast": {"stage1_moves": "hit", "stage2_ge_0.40": "hit (borderline 0.40)", "stage3i_ge_0.40": "miss", "stage3ii_ge_0.45": "miss", "miss_shape_repr_0.30": "hit", "invariant": "hit"},
+ "conclusion": "The one-DON difference is in the input and survives the input bundle (0.39) but shrinks through the two hidden layers to the shared representation (0.29-0.32 = the net). The exit does not shrink it. The two layers can carry it (0.47-0.55 with more fitting) but only as held-out error worsens: the DON direction is learned slower than per-game memorisation, so stopping at best held-out error leaves it at ~60%. Fix candidate: paired before/after-DON-shift difference teacher.",
+ "unchanged": ["training recipe", "engine", "shipping net"],
+ "gate": "make test"
+}
