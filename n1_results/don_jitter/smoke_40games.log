@@ -1,0 +1,5 @@
+  10/40局 行1826（main 742） 棄却0 91s
+  20/40局 行3823（main 1632） 棄却0 185s
+  30/40局 行5593（main 2430） 棄却0 247s
+  40/40局 行7577（main 3320） 棄却0 338s
+N_RECORD_DONE {"rows": 7577, "main_rows": 3320, "dropped": 0, "forced": {"play": 21, "hold": 1, "target": 10}, "removal_legal_rows": 1131}

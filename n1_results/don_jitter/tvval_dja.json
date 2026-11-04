@@ -1,0 +1,94 @@
+{
+ "points": 24,
+ "truth": 0.338,
+ "nets": {
+  "nrel_dja82.ep0.npz": {
+   "a_head": {
+    "mean": 0.1819,
+    "ratio": 0.538,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.102,
+    "ratio": 0.302,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1032,
+    "ratio": 0.305,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1763,
+    "ratio": 0.522,
+    "n": 24
+   }
+  },
+  "nrel_dja82.ep1.npz": {
+   "a_head": {
+    "mean": 0.1903,
+    "ratio": 0.563,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0924,
+    "ratio": 0.273,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.0976,
+    "ratio": 0.289,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2004,
+    "ratio": 0.593,
+    "n": 24
+   }
+  },
+  "nrel_dja72.ep0.npz": {
+   "a_head": {
+    "mean": 0.1772,
+    "ratio": 0.524,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0884,
+    "ratio": 0.261,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1038,
+    "ratio": 0.307,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2067,
+    "ratio": 0.611,
+    "n": 24
+   }
+  },
+  "nrel_dja72.ep1.npz": {
+   "a_head": {
+    "mean": 0.1842,
+    "ratio": 0.545,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0881,
+    "ratio": 0.261,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1119,
+    "ratio": 0.331,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2148,
+    "ratio": 0.636,
+    "n": 24
+   }
+  }
+ }
+}
