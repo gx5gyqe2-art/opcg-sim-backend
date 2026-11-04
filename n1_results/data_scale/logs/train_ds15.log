@@ -1,0 +1,33 @@
+z専用 dir 1408 本を合流（π は読まない）
+value 39422461行（val 5630944） policy 4205907点（val 601519） 283s
+warm-start: opcg_sim/data/learned/nrel_r28x4.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 28340772/39422461
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 51957438行 103.8s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5156222242110573, "entropy_q_improved": 1.1035714532504517}
+  ep0 step 5000/188316 mse 0.4887 ce 1.6754 924s
+  ep0 step 10000/188316 mse 0.4865 ce 1.6768 1427s
+  ep0 step 15000/188316 mse 0.4855 ce 1.6756 1927s
+  ep0 step 20000/188316 mse 0.4847 ce 1.6767 2423s
+  ep0 step 25000/188316 mse 0.4842 ce 1.6748 2932s
+  ep0 step 30000/188316 mse 0.4838 ce 1.6755 3437s
+  ep0 step 35000/188316 mse 0.4837 ce 1.6751 3942s
+  ep0 step 40000/188316 mse 0.4833 ce 1.6751 4423s
+  ep0 step 45000/188316 mse 0.4829 ce 1.6748 4973s
+  ep0 step 50000/188316 mse 0.4826 ce 1.6753 5509s
+  ep0 step 55000/188316 mse 0.4823 ce 1.6752 6063s
+  ep0 step 60000/188316 mse 0.4820 ce 1.6752 6605s
+  ep0 step 65000/188316 mse 0.4817 ce 1.6752 7138s
+  ep0 step 70000/188316 mse 0.4816 ce 1.6754 7659s
+  ep0 step 75000/188316 mse 0.4814 ce 1.6755 8171s
+  ep0 step 80000/188316 mse 0.4811 ce 1.6754 8666s
+  ep0 step 85000/188316 mse 0.4809 ce 1.6755 9185s
+  ep0 step 90000/188316 mse 0.4807 ce 1.6753 9713s
+  ep0 step 95000/188316 mse 0.4805 ce 1.6754 10263s
+  ep0 step 100000/188316 mse 0.4804 ce 1.6752 10797s
+  ep0 step 105000/188316 mse 0.4803 ce 1.6752 11296s
+  ep0 step 110000/188316 mse 0.4801 ce 1.6751 11784s
+  ep0 step 115000/188316 mse 0.4800 ce 1.6750 12273s
+TRAIN_EXIT 143
+STOPPED_BY_COORDINATOR 17:55:00

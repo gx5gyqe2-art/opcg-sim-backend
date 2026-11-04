@@ -1,0 +1,7 @@
+value 21285977行（val 3040901） policy 8387357点（val 1199136） 806s
+warm-start: opcg_sim/data/learned/nrel_r28x4.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 15386285/21285977
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 103656273行 92.0s）
+TRAIN_EXIT 137
