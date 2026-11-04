@@ -1,0 +1,213 @@
+{
+ "job": "data-scale",
+ "role": "measurement",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.77 (ledger 2+512)",
+ "branch": "claude/data-scale",
+ "report": "docs/reports/2026-11-04_data_scale.md",
+ "verdict": "quantity does not fix it: 8 waves of value data (21.3M rows, 4x the 2-wave arm) keep the DON ratio at window close at 0.33 in epoch 1 (2 waves 0.33, 4 waves 0.34) and the 82j group gap falls to 0.263; the common holdout error does improve (0.4787 -> 0.4749 -> 0.4704, first below r28x4 0.4739)",
+ "arms": {
+  "2": "70f+71f (value-split-b weights, pi=value=2 waves)",
+  "4": "70f-73f (train-r29f4 ep0/ep1 weights)",
+  "8": "pi 70f-73f, value 66x-73f via --z-in (pi-for-8 OOMs on 16GB VM); epoch 1 only, epoch 2 lost to OOM",
+  "15": "stopped by coordinator at ep0 step 115k/188k (value 39.4M rows); no weights"
+ },
+ "rows": {
+  "2": [
+   5353107,
+   2102485
+  ],
+  "4": [
+   10712760,
+   4205907
+  ],
+  "8": [
+   21285977,
+   4205907
+  ],
+  "15": [
+   39422461,
+   4205907
+  ]
+ },
+ "invariants": {
+  "r28x4_b_close": [
+   0.0782,
+   0.231
+  ],
+  "ds2_b_close": [
+   [
+    0.1104,
+    0.327
+   ],
+   [
+    0.0881,
+    0.261
+   ]
+  ],
+  "outcome_gap_82j": 0.5424,
+  "r28x4_gap_82j": 0.2818,
+  "ds4_ep0_equals_r29f4": true
+ },
+ "rocks_ds8_ep0": {
+  "points": 53,
+  "chose_b": 7,
+  "q_diff": -0.16,
+  "share_b": 0.111
+ },
+ "nets": {
+  "nrel_r28x4.npz": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_turn3_6": 0.2818,
+   "jitter_turn3_6_holdout": 0.3058,
+   "band_n74c_v_mse": 0.4739,
+   "band_n74c_v_sign": 0.8299
+  },
+  "nrel_ds2.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.1734,
+     0.513
+    ],
+    "b_close": [
+     0.1104,
+     0.327
+    ],
+    "c_oppend": [
+     0.1163,
+     0.344
+    ],
+    "d_next": [
+     0.174,
+     0.515
+    ]
+   },
+   "jitter_turn3_6": 0.2908,
+   "jitter_turn3_6_holdout": 0.3211,
+   "band_n74c_v_mse": 0.4787,
+   "band_n74c_v_sign": 0.828
+  },
+  "nrel_ds2.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1527,
+     0.452
+    ],
+    "b_close": [
+     0.0881,
+     0.261
+    ],
+    "c_oppend": [
+     0.0983,
+     0.291
+    ],
+    "d_next": [
+     0.1645,
+     0.487
+    ]
+   },
+   "jitter_turn3_6": 0.2776,
+   "jitter_turn3_6_holdout": 0.3074,
+   "band_n74c_v_mse": 0.4772,
+   "band_n74c_v_sign": 0.8287
+  },
+  "nrel_ds4.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.2005,
+     0.593
+    ],
+    "b_close": [
+     0.1134,
+     0.335
+    ],
+    "c_oppend": [
+     0.1225,
+     0.362
+    ],
+    "d_next": [
+     0.2142,
+     0.634
+    ]
+   },
+   "jitter_turn3_6": 0.3009,
+   "jitter_turn3_6_holdout": 0.3227,
+   "band_n74c_v_mse": 0.4749,
+   "band_n74c_v_sign": 0.8297
+  },
+  "nrel_ds4.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1897,
+     0.561
+    ],
+    "b_close": [
+     0.1066,
+     0.315
+    ],
+    "c_oppend": [
+     0.1201,
+     0.355
+    ],
+    "d_next": [
+     0.1999,
+     0.591
+    ]
+   },
+   "jitter_turn3_6": 0.3056,
+   "jitter_turn3_6_holdout": 0.3269,
+   "band_n74c_v_mse": 0.475,
+   "band_n74c_v_sign": 0.8295
+  },
+  "nrel_ds8.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.163,
+     0.482
+    ],
+    "b_close": [
+     0.1099,
+     0.325
+    ],
+    "c_oppend": [
+     0.1069,
+     0.316
+    ],
+    "d_next": [
+     0.1822,
+     0.539
+    ]
+   },
+   "jitter_turn3_6": 0.2633,
+   "jitter_turn3_6_holdout": 0.2902,
+   "band_n74c_v_mse": 0.4704,
+   "band_n74c_v_sign": 0.8318
+  }
+ },
+ "gates": {
+  "code_changed": false,
+  "make_test": "skipped (docs and results only)"
+ },
+ "env": {
+  "pack": "erofs lz4hc image in /dev/shm (byte-identical spot checks)",
+  "swap": "off",
+  "torch": "2.15.0+cu132 from PyPI on CPU"
+ }
+}
