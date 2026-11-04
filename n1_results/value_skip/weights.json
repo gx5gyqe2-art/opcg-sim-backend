@@ -1,0 +1,412 @@
+{
+ "nets": {
+  "nrel_vskip.ep0.npz": {
+   "l2": 0.52506,
+   "abs_sum": 7.92661,
+   "abs_max": 0.09745,
+   "shared_exit_l2": 0.82685,
+   "by_part_abs_sum": {
+    "scalars": 2.49998,
+    "tok_mean": 3.46321,
+    "tok_max": 1.96342
+   },
+   "top20_by_weight_x_spread": [
+    {
+     "col": "c88",
+     "w": -0.05366,
+     "sd": 0.5864,
+     "w_x_sd": -0.03147
+    },
+    {
+     "col": "life_me",
+     "w": 0.02429,
+     "sd": 0.831,
+     "w_x_sd": 0.02018
+    },
+    {
+     "col": "field_opp",
+     "w": -0.02084,
+     "sd": 0.9527,
+     "w_x_sd": -0.01986
+    },
+    {
+     "col": "c75",
+     "w": -0.02224,
+     "sd": 0.7933,
+     "w_x_sd": -0.01764
+    },
+    {
+     "col": "c92",
+     "w": 0.06586,
+     "sd": 0.2578,
+     "w_x_sd": 0.01698
+    },
+    {
+     "col": "c91",
+     "w": 0.07637,
+     "sd": 0.2189,
+     "w_x_sd": 0.01672
+    },
+    {
+     "col": "c80",
+     "w": -0.06129,
+     "sd": 0.2569,
+     "w_x_sd": -0.01575
+    },
+    {
+     "col": "hand_opp",
+     "w": -0.01483,
+     "sd": 1.0584,
+     "w_x_sd": -0.0157
+    },
+    {
+     "col": "life_opp",
+     "w": -0.02087,
+     "sd": 0.7333,
+     "w_x_sd": -0.01531
+    },
+    {
+     "col": "c74",
+     "w": 0.02192,
+     "sd": 0.6315,
+     "w_x_sd": 0.01384
+    },
+    {
+     "col": "c79",
+     "w": -0.05809,
+     "sd": 0.2351,
+     "w_x_sd": -0.01366
+    },
+    {
+     "col": "opp_pool_removal",
+     "w": -0.03477,
+     "sd": 0.3726,
+     "w_x_sd": -0.01295
+    },
+    {
+     "col": "leader_act_avail",
+     "w": -0.02638,
+     "sd": 0.4633,
+     "w_x_sd": -0.01222
+    },
+    {
+     "col": "c72",
+     "w": -0.02433,
+     "sd": 0.4934,
+     "w_x_sd": -0.01201
+    },
+    {
+     "col": "c86",
+     "w": -0.01915,
+     "sd": 0.6139,
+     "w_x_sd": -0.01176
+    },
+    {
+     "col": "c76",
+     "w": 0.01882,
+     "sd": 0.5925,
+     "w_x_sd": 0.01115
+    },
+    {
+     "col": "deck_removal",
+     "w": 0.02886,
+     "sd": 0.3577,
+     "w_x_sd": 0.01032
+    },
+    {
+     "col": "opp_pool_big",
+     "w": -0.03565,
+     "sd": 0.2842,
+     "w_x_sd": -0.01013
+    },
+    {
+     "col": "tok_max.t42",
+     "w": 0.05727,
+     "sd": 0.1733,
+     "w_x_sd": 0.00993
+    },
+    {
+     "col": "tok_max.t18",
+     "w": -0.05202,
+     "sd": 0.1828,
+     "w_x_sd": -0.00951
+    }
+   ],
+   "don_cols": {
+    "don_active_me": {
+     "w": 0.00405,
+     "sd": 1.5589,
+     "rank_w_x_sd": 38,
+     "group_dz": 2.0312,
+     "contrib": 0.00822
+    },
+    "don_rested_me": {
+     "w": -0.00478,
+     "sd": 0.0,
+     "rank_w_x_sd": 415,
+     "group_dz": 0.0,
+     "contrib": -0.0
+    },
+    "leader_don_me": {
+     "w": -0.01125,
+     "sd": 0.0192,
+     "rank_w_x_sd": 349,
+     "group_dz": -0.0012,
+     "contrib": 1e-05
+    },
+    "playable_chars_me": {
+     "w": 0.03401,
+     "sd": 0.2012,
+     "rank_w_x_sd": 30,
+     "group_dz": 0.1765,
+     "contrib": 0.006
+    },
+    "don_deck_me": {
+     "w": -0.02082,
+     "sd": 0.1628,
+     "rank_w_x_sd": 102,
+     "group_dz": -0.197,
+     "contrib": 0.0041
+    },
+    "don_addable": {
+     "w": -0.01556,
+     "sd": 0.2135,
+     "rank_w_x_sd": 106,
+     "group_dz": 0.0497,
+     "contrib": -0.00077
+    },
+    "leader_power_max": {
+     "w": 0.00454,
+     "sd": 0.1569,
+     "rank_w_x_sd": 284,
+     "group_dz": 0.2041,
+     "contrib": 0.00093
+    },
+    "don_next_turn": {
+     "w": 0.01439,
+     "sd": 0.1554,
+     "rank_w_x_sd": 162,
+     "group_dz": 0.2024,
+     "contrib": 0.00291
+    },
+    "max_play_next_turn": {
+     "w": 1e-05,
+     "sd": 0.1736,
+     "rank_w_x_sd": 382,
+     "group_dz": 0.171,
+     "contrib": 0.0
+    }
+   },
+   "skip_logit_group_diff": {
+    "all_cols": 0.0308,
+    "don_cols": 0.0214,
+    "scalars": 0.02169,
+    "tokens": 0.00911
+   }
+  },
+  "nrel_vskip.ep1.npz": {
+   "l2": 0.77619,
+   "abs_sum": 11.48368,
+   "abs_max": 0.16247,
+   "shared_exit_l2": 0.83266,
+   "by_part_abs_sum": {
+    "scalars": 3.41173,
+    "tok_mean": 5.31837,
+    "tok_max": 2.75358
+   },
+   "top20_by_weight_x_spread": [
+    {
+     "col": "c75",
+     "w": -0.04392,
+     "sd": 0.7933,
+     "w_x_sd": -0.03484
+    },
+    {
+     "col": "life_me",
+     "w": 0.03928,
+     "sd": 0.831,
+     "w_x_sd": 0.03264
+    },
+    {
+     "col": "c88",
+     "w": -0.05337,
+     "sd": 0.5864,
+     "w_x_sd": -0.0313
+    },
+    {
+     "col": "field_opp",
+     "w": -0.03266,
+     "sd": 0.9527,
+     "w_x_sd": -0.03111
+    },
+    {
+     "col": "life_opp",
+     "w": -0.03189,
+     "sd": 0.7333,
+     "w_x_sd": -0.02339
+    },
+    {
+     "col": "c92",
+     "w": 0.08575,
+     "sd": 0.2578,
+     "w_x_sd": 0.02211
+    },
+    {
+     "col": "hand_opp",
+     "w": -0.02057,
+     "sd": 1.0584,
+     "w_x_sd": -0.02177
+    },
+    {
+     "col": "opp_pool_removal",
+     "w": -0.05079,
+     "sd": 0.3726,
+     "w_x_sd": -0.01893
+    },
+    {
+     "col": "c91",
+     "w": 0.08641,
+     "sd": 0.2189,
+     "w_x_sd": 0.01892
+    },
+    {
+     "col": "c79",
+     "w": -0.0783,
+     "sd": 0.2351,
+     "w_x_sd": -0.01841
+    },
+    {
+     "col": "c87",
+     "w": 0.02345,
+     "sd": 0.7771,
+     "w_x_sd": 0.01822
+    },
+    {
+     "col": "c74",
+     "w": 0.02757,
+     "sd": 0.6315,
+     "w_x_sd": 0.01741
+    },
+    {
+     "col": "field_me",
+     "w": 0.01944,
+     "sd": 0.7989,
+     "w_x_sd": 0.01553
+    },
+    {
+     "col": "opp_pool_big",
+     "w": -0.05302,
+     "sd": 0.2842,
+     "w_x_sd": -0.01507
+    },
+    {
+     "col": "c70",
+     "w": 0.01386,
+     "sd": 1.076,
+     "w_x_sd": 0.01492
+    },
+    {
+     "col": "tok_mean.c_max23",
+     "w": 0.12545,
+     "sd": 0.1135,
+     "w_x_sd": 0.01423
+    },
+    {
+     "col": "c80",
+     "w": -0.05532,
+     "sd": 0.2569,
+     "w_x_sd": -0.01421
+    },
+    {
+     "col": "deck_removal",
+     "w": 0.03972,
+     "sd": 0.3577,
+     "w_x_sd": 0.01421
+    },
+    {
+     "col": "tok_max.r_max31",
+     "w": -0.03457,
+     "sd": 0.345,
+     "w_x_sd": -0.01193
+    },
+    {
+     "col": "don_deck_opp",
+     "w": 0.08523,
+     "sd": 0.1385,
+     "w_x_sd": 0.01181
+    }
+   ],
+   "don_cols": {
+    "don_active_me": {
+     "w": 0.00674,
+     "sd": 1.5589,
+     "rank_w_x_sd": 25,
+     "group_dz": 2.0312,
+     "contrib": 0.01369
+    },
+    "don_rested_me": {
+     "w": -0.00547,
+     "sd": 0.0,
+     "rank_w_x_sd": 415,
+     "group_dz": 0.0,
+     "contrib": -0.0
+    },
+    "leader_don_me": {
+     "w": -0.01687,
+     "sd": 0.0192,
+     "rank_w_x_sd": 349,
+     "group_dz": -0.0012,
+     "contrib": 2e-05
+    },
+    "playable_chars_me": {
+     "w": 0.04289,
+     "sd": 0.2012,
+     "rank_w_x_sd": 48,
+     "group_dz": 0.1765,
+     "contrib": 0.00757
+    },
+    "don_deck_me": {
+     "w": -0.04058,
+     "sd": 0.1628,
+     "rank_w_x_sd": 71,
+     "group_dz": -0.197,
+     "contrib": 0.00799
+    },
+    "don_addable": {
+     "w": -0.02644,
+     "sd": 0.2135,
+     "rank_w_x_sd": 91,
+     "group_dz": 0.0497,
+     "contrib": -0.00131
+    },
+    "leader_power_max": {
+     "w": 0.00839,
+     "sd": 0.1569,
+     "rank_w_x_sd": 259,
+     "group_dz": 0.2041,
+     "contrib": 0.00171
+    },
+    "don_next_turn": {
+     "w": 0.02591,
+     "sd": 0.1554,
+     "rank_w_x_sd": 138,
+     "group_dz": 0.2024,
+     "contrib": 0.00524
+    },
+    "max_play_next_turn": {
+     "w": 0.00479,
+     "sd": 0.1736,
+     "rank_w_x_sd": 299,
+     "group_dz": 0.171,
+     "contrib": 0.00082
+    }
+   },
+   "skip_logit_group_diff": {
+    "all_cols": 0.03369,
+    "don_cols": 0.03573,
+    "scalars": 0.03352,
+    "tokens": 0.00017
+   }
+  }
+ }
+}
