@@ -608,6 +608,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         prior_pick: match v.get("prior_pick").and_then(Value::as_str) {
             Some("argmax") => 1,
             Some("sample") => 2,
+            Some("sample_all") => 3,
             _ => d.prior_pick,
         },
         box_commit: flag("box_commit", d.box_commit),

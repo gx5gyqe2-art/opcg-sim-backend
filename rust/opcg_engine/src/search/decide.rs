@@ -53,7 +53,9 @@ pub struct DecideOptions {
     /// §7.79 WP `light-rollout`（**測定専用**・既定 0＝無効＝1 ビットも同じ）: メインの判断点の木の手を、
     /// 根の事前分布（ネットの打ち方の割合）から選び直す。1＝割合が最大の手・2＝割合に比例して引く（温度 1）。
     /// 探索の回数（`sims`）は別に決める（0 にすれば木は回らず、根を広げた 1 回の評価だけ）。
-    /// 窓・対話の決め方は変えない。`temp_turns`／`temp_late` より後に掛かる（両方を渡したらこちらが勝つ）。
+    /// 窓・対話の決め方は変えない（1・2）。3＝割合から引く上に、戦闘の窓・効果の対話も根畳みの読み（配り直しの静的な読み）を
+    /// 使わず同じ根の事前分布から引く（木の中の箱畳みと静止探索も切るなら `box_battle`／`box_dialog`／`quiesce` を false で渡す）。
+    /// `temp_turns`／`temp_late` より後に掛かる（両方を渡したらこちらが勝つ）。
     pub prior_pick: u8,
     /// `SERVE_BOX_COMMIT`
     pub box_commit: bool,
@@ -2127,7 +2129,9 @@ fn decide_after_lethal(
         crate::rules::pending::pending_actor_action(&mut real),
         Some((_, "MAIN_ACTION"))
     );
-    if (in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real)) {
+    // §7.79 `prior_pick=3`（測定専用）: 窓も根畳みの読みを使わず、木の根（事前分布）から引く。
+    let windows_by_prior = opts.prior_pick >= 3;
+    if !windows_by_prior && ((in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real))) {
         if let Some(pick) = window_choice(ctx, state, name, opts, rng, st)? {
             // §7.42 の 1: 窓の続きは効果の対話の段・戦闘の応手の段だけ＝既定は積まない（次の判断点で読み直す）。
             if opts.box_commit && opts.window_carry_legacy {

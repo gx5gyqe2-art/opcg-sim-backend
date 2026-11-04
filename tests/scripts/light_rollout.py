@@ -5,6 +5,8 @@
 
 打ち手の段（両席とも同じ・ネット r28x4・窓と対話の決め方は今の既定のまま）:
   L0   … 探索なし・ネットの打ち方の割合から引く（温度 1）＝ `sims=0`＋`prior_pick="sample"`（§7.79 で足した測定専用の口）
+  L0f  … L0 に加えて戦闘の窓・効果の対話も割合から引く（配り直しの読み・木の箱畳み・静止探索を使わない＝`prior_pick="sample_all"`・
+         コーディネータ追加 2026-11-04）
   L1   … 探索なし・割合が最大の手 ＝ `sims=0`＋`prior_pick="argmax"`
   L16  … 読み 16 回・世界 1 本
   L160 … 読み 160 回・世界 1 本（審判と同じ重さ）
@@ -50,6 +52,7 @@ OFFSET = 18000
 NET = os.path.join("opcg_sim", "data", "learned", "nrel_r28x4.npz")
 WAVE = "~/n82j/n_records/n82j_w*_p*"
 LEVELS = {
+    "L0f": {"sims": 0, "prior_pick": "sample_all", "box_battle": False, "box_dialog": False, "quiesce": False},
     "L0": {"sims": 0, "prior_pick": "sample"},
     "L1": {"sims": 0, "prior_pick": "argmax"},
     "L16": {"sims": 16},
@@ -74,7 +77,7 @@ def rollout(g, who, ws, level):
     探索の乱数の seed は `driver.run_game` と同じ（配り方の seed・ターン・席）。L0 だけは引きが 1 ターンの中で
     揃わないように手数も混ぜる（同じ seed だと同じターンの全部の判断が同じ一様乱数で引く）。"""
     spec = _G["specs"][level]
-    sample = LEVELS[level].get("prior_pick") == "sample"
+    sample = str(LEVELS[level].get("prior_pick", "")).startswith("sample")
     carries = {"p1": DR.Carry(), "p2": DR.Carry()}
     steps, t0 = 0, time.time()
     try:
@@ -86,17 +89,32 @@ def rollout(g, who, ws, level):
             turn = int(g.turn_count or 0)
             gs = (int(ws) + steps * 0x9E3779B1) & 0xFFFFFFFFFFFF if sample else int(ws)
             c = carries[name]
+            dialog = bool(g.has_interaction)
+            t1 = time.time()
             out = json.loads(g.decide(name, spec.decide_opts(gs, turn, name, c.get(turn, name))))
+            t2 = time.time()
             c.put(out)
             mv = out.get("move")
             if mv is None:
                 break
+            kind = out.get("kind") or "?"
+            # 内訳: 効果の対話（対話が立っている）・戦闘の窓（kind=window で対話なし）・メインの手（木）・箱の続き・詰み
+            cat = "dialog" if dialog else ("battle" if kind == "window" else kind)
+            if kind == "main" and not dialog and "BATTLE" in str(g.phase).upper():
+                cat = "battle"
+            BREAK[cat] = BREAK.get(cat, 0.0) + (t2 - t1)
+            BREAK["n_" + cat] = BREAK.get("n_" + cat, 0) + 1
             BA.apply(g, name, mv)
+            BREAK["apply"] = BREAK.get("apply", 0.0) + (time.time() - t2)
             steps += 1
     except Exception:  # noqa: BLE001
         return None, steps, round(time.time() - t0, 3)
     w = g.winner()
     return (None if w is None else (1 if w == who else 0)), steps, round(time.time() - t0, 3)
+
+
+#: 打ち続けの時間の内訳（1 局ごとに play_job が読んで空にする）
+BREAK = {}
 
 
 # ---------------------------------------------------------------- 波 82j の行の復元
@@ -320,8 +338,10 @@ def play_job(job):
         g = _jit_game(key)
         ws = MJ.world_seed(key, r["row"], OFFSET + i)
         gw = g.fork_world(r["seat"], "fair", int(ws))
+        BREAK.clear()
         res, st, sec = rollout(gw, r["seat"], ws, level)
-        return dict(base, ok=res is not None, w=res, steps=st, sec=sec, ws=int(ws))
+        brk = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in BREAK.items()}
+        return dict(base, ok=res is not None, w=res, steps=st, sec=sec, ws=int(ws), brk=brk)
     except Exception as exc:  # noqa: BLE001
         return dict(base, ok=False, fail="%s: %s" % (type(exc).__name__, str(exc)[:100]), sec=round(time.time() - t0, 2))
 
@@ -417,6 +437,11 @@ def cmd_summary(a):
                                            "steps_mean": round(float(st.mean()), 1),
                                            "ms_per_step": round(1000 * float(sec.sum() / st.sum()), 2),
                                            "fail": sum(1 for r in sp if r["level"] == lv and r.get("wk", 1) == wk and not r.get("ok"))}
+            bk = [r["brk"] for r in xs if r.get("brk")]
+            if bk:
+                keys = sorted({k for b in bk for k in b})
+                res["speed"][f"{lv}_w{wk}"]["breakdown_sec"] = {k: round(float(np.mean([b.get(k, 0) for b in bk])), 4)
+                                                                for k in keys}
     # 2-(i). 紫カイドウ 24 点
     kd = [r for r in _load(a.out, "kaido") if r.get("ok")]
     res["kaido"] = {}
@@ -529,7 +554,7 @@ def main(argv=None):
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--wave", default=WAVE)
     ap.add_argument("--task", default="speed", choices=["speed", "kaido", "jitter"])
-    ap.add_argument("--levels", default="L0,L1,L16,L160")
+    ap.add_argument("--levels", default="L0f,L0,L1,L16,L160")
     ap.add_argument("--k", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--shard", default=None, help="k/n（k＝1〜n）")
