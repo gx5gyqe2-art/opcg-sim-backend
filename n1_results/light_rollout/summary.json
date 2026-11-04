@@ -1,0 +1,732 @@
+{
+ "offset": 18000,
+ "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+ "levels": {
+  "L0f": {
+   "sims": 0,
+   "prior_pick": "sample_all",
+   "box_battle": false,
+   "box_dialog": false,
+   "quiesce": false
+  },
+  "L0": {
+   "sims": 0,
+   "prior_pick": "sample"
+  },
+  "L1": {
+   "sims": 0,
+   "prior_pick": "argmax"
+  },
+  "L16": {
+   "sims": 16
+  },
+  "L160": {
+   "sims": 160
+  }
+ },
+ "speed": {
+  "L0f_w1": {
+   "games": 100,
+   "sec_mean": 0.034,
+   "sec_median": 0.032,
+   "sec_max": 0.13,
+   "steps_mean": 104.5,
+   "ms_per_step": 0.33,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0032,
+    "battle": 0.0052,
+    "commit": 0.001,
+    "dialog": 0.0059,
+    "main": 0.0167,
+    "n_battle": 24.98,
+    "n_commit": 9.55,
+    "n_dialog": 21.47,
+    "n_main": 48.55
+   }
+  },
+  "L0f_w4": {
+   "games": 100,
+   "sec_mean": 0.032,
+   "sec_median": 0.031,
+   "sec_max": 0.07,
+   "steps_mean": 104.5,
+   "ms_per_step": 0.31,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0029,
+    "battle": 0.005,
+    "commit": 0.0009,
+    "dialog": 0.0055,
+    "main": 0.0157,
+    "n_battle": 24.98,
+    "n_commit": 9.55,
+    "n_dialog": 21.47,
+    "n_main": 48.55
+   }
+  },
+  "L0_w1": {
+   "games": 100,
+   "sec_mean": 0.317,
+   "sec_median": 0.251,
+   "sec_max": 1.16,
+   "steps_mean": 143.2,
+   "ms_per_step": 2.22,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.005,
+    "battle": 0.0995,
+    "commit": 0.0014,
+    "dialog": 0.1849,
+    "main": 0.023,
+    "n_battle": 40.51,
+    "n_commit": 13.89,
+    "n_dialog": 29.68,
+    "n_main": 59.14
+   }
+  },
+  "L0_w4": {
+   "games": 100,
+   "sec_mean": 0.315,
+   "sec_median": 0.255,
+   "sec_max": 1.15,
+   "steps_mean": 143.2,
+   "ms_per_step": 2.2,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0049,
+    "battle": 0.0988,
+    "commit": 0.0014,
+    "dialog": 0.1841,
+    "main": 0.0223,
+    "n_battle": 40.51,
+    "n_commit": 13.89,
+    "n_dialog": 29.68,
+    "n_main": 59.14
+   }
+  },
+  "L1_w1": {
+   "games": 100,
+   "sec_mean": 0.333,
+   "sec_median": 0.243,
+   "sec_max": 1.89,
+   "steps_mean": 134.3,
+   "ms_per_step": 2.48,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0048,
+    "battle": 0.1019,
+    "commit": 0.0009,
+    "dialog": 0.2009,
+    "main": 0.021,
+    "n_battle": 39.5,
+    "n_commit": 9.01,
+    "n_dialog": 29.24,
+    "n_main": 56.57
+   }
+  },
+  "L1_w4": {
+   "games": 100,
+   "sec_mean": 0.329,
+   "sec_median": 0.251,
+   "sec_max": 1.71,
+   "steps_mean": 134.3,
+   "ms_per_step": 2.45,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0047,
+    "battle": 0.1023,
+    "commit": 0.0009,
+    "dialog": 0.1965,
+    "main": 0.021,
+    "n_battle": 39.5,
+    "n_commit": 9.01,
+    "n_dialog": 29.24,
+    "n_main": 56.57
+   }
+  },
+  "L16_w1": {
+   "games": 100,
+   "sec_mean": 0.543,
+   "sec_median": 0.467,
+   "sec_max": 1.72,
+   "steps_mean": 125.5,
+   "ms_per_step": 4.33,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0057,
+    "battle": 0.1143,
+    "commit": 0.001,
+    "dialog": 0.193,
+    "main": 0.2257,
+    "n_battle": 36.67,
+    "n_commit": 8.64,
+    "n_dialog": 28.12,
+    "n_main": 52.02
+   }
+  },
+  "L16_w4": {
+   "games": 100,
+   "sec_mean": 0.502,
+   "sec_median": 0.412,
+   "sec_max": 1.81,
+   "steps_mean": 125.5,
+   "ms_per_step": 4.0,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0051,
+    "battle": 0.1065,
+    "commit": 0.0009,
+    "dialog": 0.179,
+    "main": 0.2072,
+    "n_battle": 36.67,
+    "n_commit": 8.64,
+    "n_dialog": 28.12,
+    "n_main": 52.02
+   }
+  },
+  "L160_w1": {
+   "games": 100,
+   "sec_mean": 2.882,
+   "sec_median": 2.236,
+   "sec_max": 10.78,
+   "steps_mean": 131.8,
+   "ms_per_step": 21.88,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0082,
+    "battle": 0.5212,
+    "commit": 0.0012,
+    "dialog": 0.3088,
+    "main": 2.0385,
+    "n_battle": 38.84,
+    "n_commit": 8.47,
+    "n_dialog": 29.18,
+    "n_main": 55.26
+   }
+  },
+  "L160_w4": {
+   "games": 100,
+   "sec_mean": 2.634,
+   "sec_median": 2.24,
+   "sec_max": 9.57,
+   "steps_mean": 131.8,
+   "ms_per_step": 19.99,
+   "fail": 0,
+   "breakdown_sec": {
+    "apply": 0.0066,
+    "battle": 0.4844,
+    "commit": 0.0011,
+    "dialog": 0.2797,
+    "main": 1.8582,
+    "n_battle": 38.84,
+    "n_commit": 8.47,
+    "n_dialog": 29.18,
+    "n_main": 55.26
+   }
+  }
+ },
+ "kaido": {
+  "L0f": {
+   "points": 24,
+   "games": 1522,
+   "value_diff": 0.0664,
+   "value_diff_ci": 0.087,
+   "win_a": 0.2405,
+   "win_b": 0.2076,
+   "by_why": {
+    "bk_on": -0.0208,
+    "early": 0.1117,
+    "big_next": 0.0852
+   },
+   "per_point": {
+    "0": 0.0,
+    "1": -0.375,
+    "2": 0.0,
+    "3": 0.375,
+    "4": -0.125,
+    "5": -0.062,
+    "6": 0.452,
+    "7": 0.5,
+    "8": 0.062,
+    "9": 0.062,
+    "10": 0.125,
+    "11": 0.125,
+    "12": 0.438,
+    "13": -0.062,
+    "34": 0.0,
+    "35": 0.143,
+    "38": 0.062,
+    "40": 0.25,
+    "41": -0.062,
+    "44": -0.125,
+    "46": -0.125,
+    "47": 0.062,
+    "50": 0.125,
+    "51": -0.25
+   },
+   "sec_game": 0.032,
+   "minus_L160": -0.1901,
+   "minus_L160_ci": 0.1902,
+   "corr_points_L160": 0.439
+  },
+  "L0": {
+   "points": 24,
+   "games": 1508,
+   "value_diff": 0.1139,
+   "value_diff_ci": 0.1182,
+   "win_a": 0.5305,
+   "win_b": 0.4748,
+   "by_why": {
+    "bk_on": -0.0625,
+    "early": 0.2573,
+    "big_next": 0.1189
+   },
+   "per_point": {
+    "0": -0.125,
+    "1": -0.312,
+    "2": -0.312,
+    "3": 0.188,
+    "4": 0.0,
+    "5": -0.125,
+    "6": 0.467,
+    "7": 0.188,
+    "8": -0.188,
+    "9": 0.323,
+    "10": 0.312,
+    "11": 0.312,
+    "12": 0.75,
+    "13": -0.375,
+    "34": -0.067,
+    "35": 0.5,
+    "38": 0.625,
+    "40": 0.125,
+    "41": -0.062,
+    "44": -0.062,
+    "46": 0.125,
+    "47": 0.25,
+    "50": 0.125,
+    "51": 0.074
+   },
+   "sec_game": 1.604,
+   "minus_L160": -0.1447,
+   "minus_L160_ci": 0.1584,
+   "corr_points_L160": 0.664
+  },
+  "L1": {
+   "points": 24,
+   "games": 1518,
+   "value_diff": 0.2031,
+   "value_diff_ci": 0.1552,
+   "win_a": 0.5178,
+   "win_b": 0.4177,
+   "by_why": {
+    "bk_on": -0.0938,
+    "early": 0.4822,
+    "big_next": 0.1875
+   },
+   "per_point": {
+    "0": -0.125,
+    "1": 0.062,
+    "2": -0.188,
+    "3": 0.375,
+    "4": -0.062,
+    "5": 0.312,
+    "6": 1.29,
+    "7": 0.188,
+    "8": 0.125,
+    "9": 0.0,
+    "10": 0.562,
+    "11": 0.0,
+    "12": 0.562,
+    "13": 0.0,
+    "34": 0.0,
+    "35": 0.519,
+    "38": 1.062,
+    "40": 0.25,
+    "41": 0.125,
+    "44": 0.0,
+    "46": -0.062,
+    "47": 0.25,
+    "50": -0.5,
+    "51": 0.129
+   },
+   "sec_game": 1.752,
+   "minus_L160": -0.0539,
+   "minus_L160_ci": 0.1172,
+   "corr_points_L160": 0.839
+  },
+  "L16": {
+   "points": 24,
+   "games": 1522,
+   "value_diff": 0.262,
+   "value_diff_ci": 0.1702,
+   "win_a": 0.6452,
+   "win_b": 0.5151,
+   "by_why": {
+    "bk_on": 0.1042,
+    "early": 0.4856,
+    "big_next": 0.2057
+   },
+   "per_point": {
+    "0": 0.312,
+    "1": -0.062,
+    "2": 0.25,
+    "3": -0.375,
+    "4": -0.188,
+    "5": 0.312,
+    "6": 1.355,
+    "7": 0.0,
+    "8": 0.062,
+    "9": 0.375,
+    "10": 0.312,
+    "11": 0.0,
+    "12": 1.188,
+    "13": 0.625,
+    "34": 0.2,
+    "35": 0.357,
+    "38": 1.062,
+    "40": 0.062,
+    "41": 0.0,
+    "44": 0.0,
+    "46": 0.188,
+    "47": 0.375,
+    "50": -0.125,
+    "51": 0.0
+   },
+   "sec_game": 2.241,
+   "minus_L160": 0.0054,
+   "minus_L160_ci": 0.1038,
+   "corr_points_L160": 0.874
+  },
+  "L160": {
+   "points": 24,
+   "games": 1522,
+   "value_diff": 0.2566,
+   "value_diff_ci": 0.2114,
+   "win_a": 0.6268,
+   "win_b": 0.4993,
+   "by_why": {
+    "bk_on": -0.0312,
+    "early": 0.4779,
+    "big_next": 0.2727
+   },
+   "per_point": {
+    "0": -0.188,
+    "1": 0.125,
+    "2": 0.062,
+    "3": -0.062,
+    "4": -0.062,
+    "5": 0.188,
+    "6": 1.613,
+    "7": 0.0,
+    "8": 0.0,
+    "9": 0.0,
+    "10": 0.812,
+    "11": 0.0,
+    "12": 1.625,
+    "13": 0.188,
+    "34": 0.0,
+    "35": 0.357,
+    "38": 1.312,
+    "40": -0.062,
+    "41": 0.25,
+    "44": 0.0,
+    "46": 0.0,
+    "47": 0.188,
+    "50": -0.125,
+    "51": -0.062
+   },
+   "sec_game": 8.434
+  }
+ },
+ "jitter": {
+  "rows": 400,
+  "fails_replay": {},
+  "z_diff": 0.39,
+  "z_diff_ci": 0.1919,
+  "net_diff": 0.1786,
+  "levels": {
+   "L0f": {
+    "rows": 400,
+    "games": 6400,
+    "games_per_row": 16.0,
+    "mean_value": -0.0338,
+    "group_diff": 0.3625,
+    "group_diff_ci": 0.1128,
+    "se_mean_rms": 0.2057,
+    "sd_one_game_within": 0.8228,
+    "sd_outcome_z": 0.9985,
+    "ratio_se_to_z": 0.206,
+    "sd_between_rows_mean": 0.6035,
+    "noise_share_mean": 0.1162,
+    "noise_share_one_game": 0.6791,
+    "corr_net": 0.428,
+    "corr_z": 0.349,
+    "corr_net_z": 0.633,
+    "sec_game": 0.032,
+    "by_k": {
+     "1": {
+      "rows": 400,
+      "group_diff": 0.35,
+      "sd_between_rows": 0.9985,
+      "corr_z": 0.278,
+      "corr_net": 0.289
+     },
+     "2": {
+      "rows": 400,
+      "group_diff": 0.32,
+      "sd_between_rows": 0.8221,
+      "corr_z": 0.294,
+      "corr_net": 0.333
+     },
+     "4": {
+      "rows": 400,
+      "group_diff": 0.3375,
+      "sd_between_rows": 0.7179,
+      "corr_z": 0.335,
+      "corr_net": 0.388
+     },
+     "8": {
+      "rows": 400,
+      "group_diff": 0.3613,
+      "sd_between_rows": 0.646,
+      "corr_z": 0.357,
+      "corr_net": 0.422
+     },
+     "16": {
+      "rows": 400,
+      "group_diff": 0.3625,
+      "sd_between_rows": 0.6035,
+      "corr_z": 0.349,
+      "corr_net": 0.428
+     }
+    }
+   },
+   "L0": {
+    "rows": 400,
+    "games": 6398,
+    "games_per_row": 15.99,
+    "mean_value": -0.0485,
+    "group_diff": 0.3413,
+    "group_diff_ci": 0.1179,
+    "se_mean_rms": 0.2011,
+    "sd_one_game_within": 0.8043,
+    "sd_outcome_z": 0.9985,
+    "ratio_se_to_z": 0.2014,
+    "sd_between_rows_mean": 0.6254,
+    "noise_share_mean": 0.1034,
+    "noise_share_one_game": 0.6489,
+    "corr_net": 0.81,
+    "corr_z": 0.597,
+    "corr_net_z": 0.633,
+    "sec_game": 0.378,
+    "by_k": {
+     "1": {
+      "rows": 400,
+      "group_diff": 0.3,
+      "sd_between_rows": 0.9982,
+      "corr_z": 0.423,
+      "corr_net": 0.574
+     },
+     "2": {
+      "rows": 400,
+      "group_diff": 0.3,
+      "sd_between_rows": 0.8333,
+      "corr_z": 0.491,
+      "corr_net": 0.647
+     },
+     "4": {
+      "rows": 400,
+      "group_diff": 0.325,
+      "sd_between_rows": 0.7204,
+      "corr_z": 0.547,
+      "corr_net": 0.725
+     },
+     "8": {
+      "rows": 400,
+      "group_diff": 0.34,
+      "sd_between_rows": 0.6596,
+      "corr_z": 0.571,
+      "corr_net": 0.78
+     },
+     "16": {
+      "rows": 398,
+      "group_diff": 0.3423,
+      "sd_between_rows": 0.6269,
+      "corr_z": 0.599,
+      "corr_net": 0.81
+     }
+    }
+   },
+   "L1": {
+    "rows": 400,
+    "games": 6398,
+    "games_per_row": 15.99,
+    "mean_value": -0.0448,
+    "group_diff": 0.4367,
+    "group_diff_ci": 0.1277,
+    "se_mean_rms": 0.1873,
+    "sd_one_game_within": 0.7489,
+    "sd_outcome_z": 0.9985,
+    "ratio_se_to_z": 0.1876,
+    "sd_between_rows_mean": 0.6872,
+    "noise_share_mean": 0.0743,
+    "noise_share_one_game": 0.5625,
+    "corr_net": 0.809,
+    "corr_z": 0.606,
+    "corr_net_z": 0.633,
+    "sec_game": 0.388,
+    "by_k": {
+     "1": {
+      "rows": 400,
+      "group_diff": 0.37,
+      "sd_between_rows": 0.9955,
+      "corr_z": 0.437,
+      "corr_net": 0.54
+     },
+     "2": {
+      "rows": 400,
+      "group_diff": 0.305,
+      "sd_between_rows": 0.8498,
+      "corr_z": 0.481,
+      "corr_net": 0.627
+     },
+     "4": {
+      "rows": 400,
+      "group_diff": 0.4325,
+      "sd_between_rows": 0.7621,
+      "corr_z": 0.57,
+      "corr_net": 0.721
+     },
+     "8": {
+      "rows": 400,
+      "group_diff": 0.4425,
+      "sd_between_rows": 0.7127,
+      "corr_z": 0.599,
+      "corr_net": 0.771
+     },
+     "16": {
+      "rows": 398,
+      "group_diff": 0.4405,
+      "sd_between_rows": 0.6886,
+      "corr_z": 0.61,
+      "corr_net": 0.812
+     }
+    }
+   },
+   "L16": {
+    "rows": 400,
+    "games": 6400,
+    "games_per_row": 16.0,
+    "mean_value": -0.0541,
+    "group_diff": 0.4806,
+    "group_diff_ci": 0.135,
+    "se_mean_rms": 0.176,
+    "sd_one_game_within": 0.7041,
+    "sd_outcome_z": 0.9985,
+    "ratio_se_to_z": 0.1763,
+    "sd_between_rows_mean": 0.7296,
+    "noise_share_mean": 0.0582,
+    "noise_share_one_game": 0.4972,
+    "corr_net": 0.836,
+    "corr_z": 0.654,
+    "corr_net_z": 0.633,
+    "sec_game": 0.626,
+    "by_k": {
+     "1": {
+      "rows": 400,
+      "group_diff": 0.6,
+      "sd_between_rows": 0.9982,
+      "corr_z": 0.493,
+      "corr_net": 0.629
+     },
+     "2": {
+      "rows": 400,
+      "group_diff": 0.54,
+      "sd_between_rows": 0.8758,
+      "corr_z": 0.574,
+      "corr_net": 0.711
+     },
+     "4": {
+      "rows": 400,
+      "group_diff": 0.52,
+      "sd_between_rows": 0.793,
+      "corr_z": 0.598,
+      "corr_net": 0.776
+     },
+     "8": {
+      "rows": 400,
+      "group_diff": 0.495,
+      "sd_between_rows": 0.7445,
+      "corr_z": 0.63,
+      "corr_net": 0.811
+     },
+     "16": {
+      "rows": 400,
+      "group_diff": 0.4806,
+      "sd_between_rows": 0.7296,
+      "corr_z": 0.654,
+      "corr_net": 0.836
+     }
+    }
+   },
+   "L160": {
+    "rows": 400,
+    "games": 6395,
+    "games_per_row": 15.99,
+    "mean_value": -0.0381,
+    "group_diff": 0.485,
+    "group_diff_ci": 0.1301,
+    "se_mean_rms": 0.1824,
+    "sd_one_game_within": 0.7296,
+    "sd_outcome_z": 0.9985,
+    "ratio_se_to_z": 0.1827,
+    "sd_between_rows_mean": 0.7068,
+    "noise_share_mean": 0.0666,
+    "noise_share_one_game": 0.5339,
+    "corr_net": 0.831,
+    "corr_z": 0.665,
+    "corr_net_z": 0.633,
+    "sec_game": 3.033,
+    "by_k": {
+     "1": {
+      "rows": 400,
+      "group_diff": 0.55,
+      "sd_between_rows": 0.9972,
+      "corr_z": 0.518,
+      "corr_net": 0.61
+     },
+     "2": {
+      "rows": 400,
+      "group_diff": 0.49,
+      "sd_between_rows": 0.8643,
+      "corr_z": 0.547,
+      "corr_net": 0.663
+     },
+     "4": {
+      "rows": 400,
+      "group_diff": 0.54,
+      "sd_between_rows": 0.7864,
+      "corr_z": 0.601,
+      "corr_net": 0.742
+     },
+     "8": {
+      "rows": 400,
+      "group_diff": 0.525,
+      "sd_between_rows": 0.7329,
+      "corr_z": 0.633,
+      "corr_net": 0.792
+     },
+     "16": {
+      "rows": 397,
+      "group_diff": 0.4841,
+      "sd_between_rows": 0.7056,
+      "corr_z": 0.662,
+      "corr_net": 0.829
+     }
+    }
+   }
+  }
+ }
+}

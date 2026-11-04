@@ -518,6 +518,10 @@ def cmd_summary(a):
             "sd_outcome_z": round(float(zz.std()), 4),
             "ratio_se_to_z": round(float(np.sqrt((se ** 2).mean()) / zz.std()), 4),
             "sd_between_rows_mean": round(float(m.std()), 4),
+            # 16 局の平均のばらつきのうち打ち続けの雑音の占める割合（平均の標準誤差の 2 乗 ÷ 平均の分散）と、
+            # 勝敗 1 局のばらつきのうち同じ打ち手の打ち続けの雑音の占める割合（盤面の中の 1 局の分散 ÷ 1 局の分散）
+            "noise_share_mean": round(float((se ** 2).mean() / m.var()), 4),
+            "noise_share_one_game": round(float((sd1 ** 2).mean() / zz.var()), 4),
             "corr_net": _corr(m, nn), "corr_z": _corr(m, zz),
             "corr_net_z": _corr(nn, zz),
             "sec_game": round(float(np.mean([r["sec"] for r in xs])), 3),
@@ -525,11 +529,13 @@ def cmd_summary(a):
         # 16 局の平均の、局数ごとの見え方（先頭 1・2・4・8・16 局）——差とばらつき
         curve = {}
         for kk in (1, 2, 4, 8, 16, 32):
-            if nk.min() < kk:
+            mm = nk >= kk                                   # その局数が揃った行だけ（打ち切りの数局を除く）
+            if mm.sum() < 0.95 * len(keep):
                 continue
-            mk = np.array([np.mean(sorted_by_i(xs, s)[:kk]) for s in keep])
-            curve[kk] = {"group_diff": round(float(mk[sg == 1].mean() - mk[sg == -1].mean()), 4),
-                         "sd_between_rows": round(float(mk.std()), 4), "corr_z": _corr(mk, zz), "corr_net": _corr(mk, nn)}
+            mk = np.array([np.mean(sorted_by_i(xs, s)[:kk]) for s, ok in zip(keep, mm) if ok])
+            sk, zk, nk2 = sg[mm], zz[mm], nn[mm]
+            curve[kk] = {"rows": int(mm.sum()), "group_diff": round(float(mk[sk == 1].mean() - mk[sk == -1].mean()), 4),
+                         "sd_between_rows": round(float(mk.std()), 4), "corr_z": _corr(mk, zk), "corr_net": _corr(mk, nk2)}
         res["jitter"]["levels"][lv]["by_k"] = curve
     os.makedirs(a.out, exist_ok=True)
     json.dump(res, open(os.path.join(a.out, "summary.json"), "w"), ensure_ascii=False, indent=1)

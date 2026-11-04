@@ -1,0 +1,113 @@
+{
+ "job": "light-rollout",
+ "role": "measure",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.79",
+ "report": "docs/reports/2026-11-04_light_rollout.md",
+ "branch": "claude/light-rollout",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+  "wave": "claude/n82j-w01..w16",
+  "offset": 18000,
+  "levels": {
+   "L0f": {
+    "sims": 0,
+    "prior_pick": "sample_all",
+    "box_battle": false,
+    "box_dialog": false,
+    "quiesce": false
+   },
+   "L0": {
+    "sims": 0,
+    "prior_pick": "sample"
+   },
+   "L1": {
+    "sims": 0,
+    "prior_pick": "argmax"
+   },
+   "L16": {
+    "sims": 16
+   },
+   "L160": {
+    "sims": 160
+   }
+  },
+  "rows": 400,
+  "games_per_row": 16,
+  "kaido_worlds": 32,
+  "speed_positions": 100
+ },
+ "metrics": {
+  "speed_sec_per_game_1core": {
+   "L0f": 0.034,
+   "L0": 0.317,
+   "L1": 0.333,
+   "L16": 0.543,
+   "L160": 2.882
+  },
+  "speed_sec_per_game_4par": {
+   "L0f": 0.032,
+   "L0": 0.315,
+   "L1": 0.329,
+   "L16": 0.502,
+   "L160": 2.634
+  },
+  "kaido_value_diff": {
+   "L0f": 0.0664,
+   "L0": 0.1139,
+   "L1": 0.2031,
+   "L16": 0.262,
+   "L160": 0.2566
+  },
+  "kaido_value_diff_ci_half": {
+   "L0f": 0.087,
+   "L0": 0.1182,
+   "L1": 0.1552,
+   "L16": 0.1702,
+   "L160": 0.2114
+  },
+  "jitter_group_diff": {
+   "L0f": 0.3625,
+   "L0": 0.3413,
+   "L1": 0.4367,
+   "L16": 0.4806,
+   "L160": 0.485
+  },
+  "jitter_outcome_diff": 0.39,
+  "jitter_net_diff": 0.1786,
+  "se_of_16_mean_over_one_game": {
+   "L0f": 0.206,
+   "L0": 0.2014,
+   "L1": 0.1876,
+   "L16": 0.1763,
+   "L160": 0.1827
+  },
+  "corr_mean_net": {
+   "L0f": 0.428,
+   "L0": 0.81,
+   "L1": 0.809,
+   "L16": 0.836,
+   "L160": 0.831
+  },
+  "corr_mean_outcome": {
+   "L0f": 0.349,
+   "L0": 0.597,
+   "L1": 0.606,
+   "L16": 0.654,
+   "L160": 0.665
+  }
+ },
+ "recommendation": {
+  "level": "L16",
+  "games_per_position": 16,
+  "positions_per_game": 4,
+  "core_hours_per_100k_positions": 278,
+  "hours_on_30_containers": 2.3
+ },
+ "quality": {
+  "audit_cross_void": 0,
+  "audit_cross_games": 240,
+  "make_test": "green"
+ },
+ "notes": "Rust に測定専用の口 prior_pick（argmax／sample／sample_all・既定 off）を追加。L0f はコーディネータ追加の段。"
+}
