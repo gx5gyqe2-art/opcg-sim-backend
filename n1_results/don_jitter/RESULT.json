@@ -16,7 +16,7 @@
   ],
   "job": "opcg_sim/loop/jobs/gen_n82j.json (16 x 240, seeds 3481000-3488739, claude/n82j-w01..w16)",
   "data": "n1_results/don_jitter/",
-  "nets": "n1_results/don_jitter/nets/nrel_dj{c,t}.ep{0,1}.npz (branch only)"
+  "nets": "n1_results/don_jitter/nets/nrel_dj{c,t}.ep{0,1}.npz, nrel_dja{82,72}.ep{0,1}.npz (branch only)"
  },
  "gates": {
   "make_test": "green (cargo test ok; pytest 899 passed, 14 skipped)",
@@ -87,6 +87,46 @@
     "b_close_ratio": 0.335,
     "c_oppend_ratio": 0.362,
     "d_next_ratio": 0.634
+   },
+   "nrel_dja82.ep0.npz": {
+    "a_head": 0.1819,
+    "b_close": 0.102,
+    "c_oppend": 0.1032,
+    "d_next": 0.1763,
+    "a_head_ratio": 0.538,
+    "b_close_ratio": 0.302,
+    "c_oppend_ratio": 0.305,
+    "d_next_ratio": 0.522
+   },
+   "nrel_dja82.ep1.npz": {
+    "a_head": 0.1903,
+    "b_close": 0.0924,
+    "c_oppend": 0.0976,
+    "d_next": 0.2004,
+    "a_head_ratio": 0.563,
+    "b_close_ratio": 0.273,
+    "c_oppend_ratio": 0.289,
+    "d_next_ratio": 0.593
+   },
+   "nrel_dja72.ep0.npz": {
+    "a_head": 0.1772,
+    "b_close": 0.0884,
+    "c_oppend": 0.1038,
+    "d_next": 0.2067,
+    "a_head_ratio": 0.524,
+    "b_close_ratio": 0.261,
+    "c_oppend_ratio": 0.307,
+    "d_next_ratio": 0.611
+   },
+   "nrel_dja72.ep1.npz": {
+    "a_head": 0.1842,
+    "b_close": 0.0881,
+    "c_oppend": 0.1119,
+    "d_next": 0.2148,
+    "a_head_ratio": 0.545,
+    "b_close_ratio": 0.261,
+    "c_oppend_ratio": 0.331,
+    "d_next_ratio": 0.636
    },
    "nrel_djc.ep0.npz": {
     "a_head": 0.2007,
@@ -165,6 +205,42 @@
     "val_vsign": 0.8685,
     "val_pi_top1": 0.4983,
     "val_p_loss": 1.7128
+   },
+   "dja82_rows": {
+    "value": 664977,
+    "val": 95659
+   },
+   "nrel_dja82.ep0.npz": {
+    "train_mse": 0.444,
+    "val_vmse": 0.3705,
+    "val_vsign": 0.8662,
+    "val_pi_top1": 0.4988,
+    "val_p_loss": 1.6909
+   },
+   "nrel_dja82.ep1.npz": {
+    "train_mse": 0.4216,
+    "val_vmse": 0.3648,
+    "val_vsign": 0.8675,
+    "val_pi_top1": 0.4898,
+    "val_p_loss": 1.6893
+   },
+   "dja72_rows": {
+    "value": 667068,
+    "val": 94769
+   },
+   "nrel_dja72.ep0.npz": {
+    "train_mse": 0.4716,
+    "val_vmse": 0.5483,
+    "val_vsign": 0.8061,
+    "val_pi_top1": 0.5168,
+    "val_p_loss": 1.6356
+   },
+   "nrel_dja72.ep1.npz": {
+    "train_mse": 0.4481,
+    "val_vmse": 0.5701,
+    "val_vsign": 0.8002,
+    "val_pi_top1": 0.516,
+    "val_p_loss": 1.6348
    }
   },
   "rocks": {
@@ -239,6 +315,43 @@
     "corr_total_vs_turn": 0.8083
    }
   },
+  "band_appendix_n70f": {
+   "nrel_r28x4.npz": 0.4734,
+   "nrel_dja82.ep0.npz": 0.4866,
+   "nrel_dja82.ep1.npz": 0.4926,
+   "nrel_dja72.ep0.npz": 0.4889,
+   "nrel_dja72.ep1.npz": 0.4974
+  },
+  "jitter_rows_appendix": {
+   "nrel_dja82.ep0.npz": {
+    "turn3_6": 0.3007,
+    "turn7_10": 0.1274,
+    "all": 0.2145,
+    "turn3_6_holdout": 0.3213,
+    "turn3_6_trained": 0.2973
+   },
+   "nrel_dja82.ep1.npz": {
+    "turn3_6": 0.3147,
+    "turn7_10": 0.1366,
+    "all": 0.2335,
+    "turn3_6_holdout": 0.349,
+    "turn3_6_trained": 0.3089
+   },
+   "nrel_dja72.ep0.npz": {
+    "turn3_6": 0.2813,
+    "turn7_10": 0.1459,
+    "all": 0.214,
+    "turn3_6_holdout": 0.3072,
+    "turn3_6_trained": 0.2772
+   },
+   "nrel_dja72.ep1.npz": {
+    "turn3_6": 0.2789,
+    "turn7_10": 0.1462,
+    "all": 0.2168,
+    "turn3_6_holdout": 0.3064,
+    "turn3_6_trained": 0.2744
+   }
+  },
   "band_common_n70f": {
    "nrel_djc.ep0.npz": 0.4757,
    "nrel_djc.ep1.npz": 0.4733,
@@ -252,5 +365,41 @@
    "nrel_djt.ep0.npz": 0.5415,
    "nrel_djt.ep1.npz": 0.5396
   }
+ },
+ "appendix2": {
+  "question": "is it a lack of quantity? train on 82j only vs 72f-first-part only",
+  "b_close_ratio": {
+   "82j_only": [
+    0.302,
+    0.273
+   ],
+   "72f_p0_only": [
+    0.26,
+    0.26
+   ]
+  },
+  "diff": [
+   0.04,
+   0.01
+  ],
+  "jitter_rows_turn3_6_net_diff": {
+   "82j_only": [
+    0.301,
+    0.315
+   ],
+   "72f_p0_only": [
+    0.281,
+    0.279
+   ],
+   "outcome": 0.542
+  },
+  "common_holdout_n70f": {
+   "nrel_r28x4.npz": 0.4734,
+   "nrel_dja82.ep0.npz": 0.4866,
+   "nrel_dja82.ep1.npz": 0.4926,
+   "nrel_dja72.ep0.npz": 0.4889,
+   "nrel_dja72.ep1.npz": 0.4974
+  },
+  "reading": "not quantity: doubling off-rule rows and training on them alone does not raise the ratio; both overfit"
  }
 }

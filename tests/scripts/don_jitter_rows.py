@@ -67,7 +67,7 @@ def cmd_summary(a):
     for f in sorted(glob.glob(f"{D}/tvval_*.json")):
         for k, v in json.load(open(f))["nets"].items():
             out["tvval"][k] = {t: v[t]["mean"] for t in v} | {t + "_ratio": v[t]["ratio"] for t in v}
-    for name in ("djc", "djt"):
+    for name in [n for n in ("djc", "djt", "dja82", "dja72") if os.path.exists(f"{D}/train_{n}.log")]:
         for line in open(f"{D}/train_{name}.log"):
             if line.startswith("N_REL_TRAIN_EPOCH"):
                 e = json.loads(line.split(" ", 1)[1])
@@ -86,6 +86,10 @@ def cmd_summary(a):
                                                   "q_diff": round(float(np.mean(d)), 4), "q_n": len(d),
                                                   "share_b": round(float(np.mean([x["share_b"] for x in xs])), 4)}
     bf = f"{D}/band_n73f.json"
+    if os.path.exists(f"{D}/band_appendix_n70f.json"):
+        out["band_appendix_n70f"] = {k: round(v["all"]["v_mse"], 4) for k, v in json.load(open(f"{D}/band_appendix_n70f.json"))["nets"].items()}
+    if os.path.exists(f"{D}/jitter_rows_appendix.json"):
+        out["jitter_rows_appendix"] = {k: {g: v[g]["diff"] for g in v} for k, v in json.load(open(f"{D}/jitter_rows_appendix.json"))["nets"].items()}
     out["band_common_n70f"] = {k: round(v["all"]["v_mse"], 4) for k, v in json.load(open(f"{D}/band_common_n70f.json"))["nets"].items()}
     if os.path.exists(bf):
         out["band"] = {k: {"v_mse": round(v["all"]["v_mse"], 4), "v_sign": round(v["all"]["v_sign"], 4)} for k, v in json.load(open(bf))["nets"].items()}; out["band_policy"] = {k: round(v["top1_visits"], 4) for k, v in json.load(open(bf))["policy"]["nets"].items()}
