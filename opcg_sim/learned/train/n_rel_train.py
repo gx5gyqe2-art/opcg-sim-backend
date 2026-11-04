@@ -254,7 +254,7 @@ class NRelNet(NL.NRelNet):
     def __init__(self, tables, hidden=192, seed=13):
         super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
-                      for p in self.params + self.aux_params + self.plan_params}
+                      for p in self.params + self.aux_params + self.plan_params + [NL.SKIP_PARAM]}
         self._t = 0
 
     def _trainable(self):
@@ -263,7 +263,8 @@ class NRelNet(NL.NRelNet):
         `_t` は今までどおり**全パラメータで 1 本**＝補助ヘッドを足しても既存の更新式は動かない。
         """
         return (self.params + (self.aux_params if self.aux else [])
-                + (self.plan_params if self.plan else []))
+                + (self.plan_params if self.plan else [])
+                + ([NL.SKIP_PARAM] if self.value_skip else []))
 
     # --- card_table backward（NEff と同じ） ---
     def card_table_backward(self, k, dtab, g):
@@ -282,13 +283,15 @@ class NRelNet(NL.NRelNet):
         g["ba"] = g.get("ba", 0) + dH.sum((0, 1))
 
     # --- body backward: dE → (dh, gW1/W2) ---
-    def body_backward(self, k, dE, g):
+    def body_backward(self, k, dE, g, dz_extra=None):
         dh2 = dE * (k["h2"] > 0)
         g["W2"] = g.get("W2", 0) + k["r1"].T @ dh2; g["b2"] = g.get("b2", 0) + dh2.sum(0)
         dr1 = dh2 @ self.W2.T
         dh1 = dr1 * (k["h1"] > 0)
         g["W1"] = g.get("W1", 0) + k["z"].T @ dh1; g["b1"] = g.get("b1", 0) + dh1.sum(0)
         dz = dh1 @ self.W1.T
+        if dz_extra is not None:
+            dz = dz + dz_extra             # 価値の出口のまっすぐな道（§7.78）から入力の束へ戻る分
         dmean = dz[:, D_SC:D_SC + D_H]
         dmx = dz[:, D_SC + D_H:]
         present = k["present"]
@@ -438,11 +441,18 @@ class NRelNet(NL.NRelNet):
         tab = self.card_table(k)
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab, k)
         e = self.body(sc, h, present, k)
-        o = (e @ self.Wv + self.bv)[:, 0]
+        if self.value_skip:
+            o = (e @ self.Wv + k["z"] @ self.Wvz + self.bv)[:, 0]     # §7.78 のまっすぐな道
+        else:
+            o = (e @ self.Wv + self.bv)[:, 0]
         v = np.tanh(o)
         B = len(zt)
         do = ((v - zt) / B) * (1.0 - v ** 2)
         g = {"Wv": e.T @ do[:, None], "bv": np.array([do.sum()], np.float32)}
+        dz_skip = None
+        if self.value_skip:
+            g[NL.SKIP_PARAM] = k["z"].T @ do[:, None]
+            dz_skip = do[:, None] @ self.Wvz.T
         dE = do[:, None] @ self.Wv.T
         dh_aux = None
         if self.aux and aux_w > 0.0 and aux_mask is not None:
@@ -457,7 +467,7 @@ class NRelNet(NL.NRelNet):
             dE_u = self.time_backward(e, tm, tm_mask, time_w, g)
             if dE_u is not None:
                 dE = dE + dE_u
-        dh = self.body_backward(k, dE, g)
+        dh = self.body_backward(k, dE, g, dz_skip)
         if dh_aux is not None:
             dh = dh + dh_aux
         dtab = np.zeros_like(tab)
@@ -976,6 +986,13 @@ def train(args):
         if bad:
             raise ValueError(f"--ablate に未知の種類: {sorted(bad)}（{NL.ABLATE_KINDS}）")
         print(f"ablate: {sorted(net.ablate)}", flush=True)
+    # 価値の出口の形の切替（§7.78・WP `value-skip`）: 入力の束からのまっすぐな道を足す。warm-start の
+    # npz に道が無ければ重み 0 で始める＝立てた直後の関数は元と同じ。切（既定）なら何も変えない。
+    if getattr(args, "value_skip", False) and not net.value_skip:
+        net.value_skip = True
+        net.Wvz = np.zeros((NL.D_Z, 1), np.float32)
+    if net.value_skip:
+        print(f"value-skip: on（入力の束 {NL.D_Z} → 価値の出口・|Wvz| {float(np.abs(net.Wvz).sum()):.4g}）", flush=True)
     # 補助教師（§20.8.2）: **λ_aux>0 かつ dump に aux 列がある**ときだけ立てる。どちらかが
     # 欠ければ `net.aux=False`＝補助ヘッドは初期化されたまま触られず、npz にも出ない＝
     # **今までの学習と 1 ビットも変わらない**（v3 の波に --aux-weight を付けても同じ）。
@@ -1313,6 +1330,7 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                                 {"pi_teacher": args.pi_teacher, "pi_n_min": args.pi_n_min,
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
+                             **({"value_skip": True} if getattr(net, "value_skip", False) else {}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
@@ -1412,6 +1430,10 @@ def main(argv=None):
     tr.add_argument("--pair-value-weight", type=float, default=1.0, help="案 B: 対の盤面の価値の損失の重み")
     tr.add_argument("--pair-every", type=int, default=16, help="案 B: 価値の更新この回数ごとに 1 回")
     tr.add_argument("--pair-bs", type=int, default=32, help="案 B: 1 回に引く対の組数")
+    tr.add_argument("--value-skip", action="store_true",
+                    help="§7.78（WP value-skip）: 価値の出口に入力の束（415 次元）からのまっすぐな道を足す"
+                         "（新しい重みは 0 で始める＝warm-start の直後は同じ関数・npz の鍵 skip_Wvz）。"
+                         "**既定は切＝今までと 1 bit も同じ**。Rust の forward はこの道を読まない（診断用）")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")

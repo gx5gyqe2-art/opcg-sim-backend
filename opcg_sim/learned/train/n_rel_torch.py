@@ -80,6 +80,10 @@ class TorchNRel(torch.nn.Module):
         if self.time:
             for p in NL.TIME_PARAMS:
                 setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
+        # 価値の出口のまっすぐな道（§7.78）も同じ流儀（`net.value_skip` のときだけ Parameter）。
+        self.value_skip = bool(getattr(net, "value_skip", False))
+        if self.value_skip:
+            self.Wvz = torch.nn.Parameter(_f32(net.Wvz))
         self.register_buffer("STATS", _f32(net.STATS))
         self.register_buffer("AB", _f32(net.AB))
         self.register_buffer("ABM", _f32(net.ABM))
@@ -202,7 +206,7 @@ class TorchNRel(torch.nn.Module):
         h = torch.zeros(B, N_TOK, D_H).index_copy(1, self.own, h_own).index_copy(1, self.opp, h_opp)
         return h * present[:, :, None], present
 
-    def body(self, sc, h, present):
+    def body(self, sc, h, present, want_z=False):
         if self._sc_masked:
             sc = sc * self.sc_keep
         n = torch.clamp(present.sum(1, keepdim=True), min=1.0)
@@ -215,20 +219,29 @@ class TorchNRel(torch.nn.Module):
             mx = torch.where(mx < -1e8, 0.0, mx)
         z = torch.cat([sc, mean, mx], 1)
         r1 = torch.relu(z @ self.W1 + self.b1)
-        return torch.relu(r1 @ self.W2 + self.b2)
+        e = torch.relu(r1 @ self.W2 + self.b2)
+        return (e, z) if want_z else e
+
+    def body_value(self, sc, h, present):
+        """(e, 価値の出口の tanh の前)。numpy 版 `NRelNet.body_value` と同じ式（切は今までの式そのまま）。"""
+        if not self.value_skip:
+            e = self.body(sc, h, present)
+            return e, (e @ self.Wv + self.bv)[:, 0]
+        e, z = self.body(sc, h, present, want_z=True)
+        return e, (e @ self.Wv + z @ self.Wvz + self.bv)[:, 0]
 
     def value(self, sc, ci, tok, rel_om, rel_oo):
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        return torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        _e, o = self.body_value(sc, h, present)
+        return torch.tanh(o)
 
     def value_with_aux(self, sc, ci, tok, rel_om, rel_oo):
         """(value, aux [B,10], aux_tok [B,6,3])。式は numpy 版 `NRelNet.value_with_aux` と同じ。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = torch.tanh(o)
         a = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
         ho = h[:, self.opp]
         at = torch.relu(ho @ self.Wy1 + self.by1) @ self.Wy2 + self.by2
@@ -248,8 +261,8 @@ class TorchNRel(torch.nn.Module):
         （共有部は 1 回）。`want_e` なら末尾に共有表現 e を足す（WP `value-teach` の案 A の頭が使う）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = torch.tanh(o)
         pa = pt = pq = pu = None
         if aux:
             pa = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
@@ -444,6 +457,8 @@ class TorchTrainer:
             if self.tn.time:
                 for p in NL.TIME_PARAMS:
                     setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
+            if self.tn.value_skip:
+                self.net.Wvz = self.tn.Wvz.detach().numpy().copy()
 
     def _set_lr(self, lr):
         if lr != self._lr:

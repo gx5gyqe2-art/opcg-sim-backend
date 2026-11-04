@@ -18,6 +18,8 @@ serve と訓練で **forward はここが唯一の正本**（訓練器 `tests/sc
   z    = [scalars, mean_i h_i, max_i h_i]（存在する枠だけ） (127+144+144=415)
   e    = relu(relu(z W1 + b1) W2 + b2)                   (64)
   value = tanh(e Wv + bv)
+          （価値の出口の形の切替 `value_skip`〔§7.78〕を立てると tanh(e Wv + z Wvz + bv)＝入力の束 z から
+           出口へのまっすぐな道を足す。Wvz は 0 で始める。既定は切＝上の式のまま 1 ビットも同じ）
   aux     = relu(e Wx1 + bx1) Wx2 + bx2                  (10・補助ヘッド・§20.8.2)
   aux_tok = relu(h_j Wy1 + by1) Wy2 + by2   j∈相手 6 枠  (3)
   policy: 候補 (主体枠 si, 対象枠 ti, 素性 f139, 予算 3) →
@@ -94,6 +96,11 @@ D_TIME = 7
 D_TIME_H = 32
 TIME_PARAMS = ("Wu1", "bu1", "Wu2", "bu2")
 TIME_KEY = "time_"
+# 価値の出口の形の切替（§7.78・WP `value-skip`）: 入力の束 z [B,D_Z] → 価値の出口へのまっすぐな道の重み。
+# **別鍵**（`skip_Wvz`）で置く＝無い npz は切のまま。Rust の読み手は知らない鍵を無視する
+# （＝Rust はこの道を読まない・出荷するなら読み込みの直しが要る）。
+SKIP_KEY = "skip_"
+SKIP_PARAM = "Wvz"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -195,6 +202,11 @@ class NRelNet:
         self.Wu2 = WU(D_TIME_H, D_TIME); self.bu2 = np.zeros(D_TIME, np.float32)
         self.time_params = list(TIME_PARAMS)
         self.time = False                 # 時間軸ヘッドを使うか（訓練器が --time-weight から立てる）
+        # 価値の出口の形の切替（§7.78）: 入力の束からのまっすぐな道。**0 で始める**＝立てた直後も
+        # 関数は同じ。乱数は引かない＝既存の初期値は 1 ビットも動かない。`value_skip` が False の
+        # あいだは forward からも損失からも触られない（保存もしない）。
+        self.Wvz = np.zeros((D_Z, 1), np.float32)
+        self.value_skip = False
         self.vocab_ids = None
         self.meta = {}
         #: このネットが読む符号化の世代（新規は現行＝v15。`load` が npz の meta から入れ直す）。
@@ -349,11 +361,21 @@ class NRelNet:
             keep.update(n=n, h_masked=h_masked, z=z, h1=h1, r1=r1, h2=h2, e=e)
         return e
 
+    def body_value(self, sc, h, present):
+        """(共有表現 e, 価値の出口の tanh の前 o)。切が既定＝`e Wv + bv` そのもの（今までと同じ式）。
+        `value_skip` を立てると入力の束 z からのまっすぐな道 `z Wvz` を足す（§7.78）。"""
+        if not self.value_skip:
+            e = self.body(sc, h, present)
+            return e, (e @ self.Wv + self.bv)[:, 0]
+        k = {}
+        e = self.body(sc, h, present, k)
+        return e, (e @ self.Wv + k["z"] @ self.Wvz + self.bv)[:, 0]
+
     def value(self, sc, ci, tok, rel_om, rel_oo):
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        return np.tanh((e @ self.Wv + self.bv)[:, 0])
+        _e, o = self.body_value(sc, h, present)
+        return np.tanh(o)
 
     # --- 補助ヘッド（§20.8.2・serve は呼ばない） ---
     def aux_head(self, e, keep=None):
@@ -377,8 +399,8 @@ class NRelNet:
         """(value, aux, aux_tok)（評価帯が使う・value は既存の forward と同じ値）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = np.tanh(o)
         return v, self.aux_head(e), self.aux_tok_head(h)
 
     # --- 方針ヘッド（§20.10・serve は呼ばない） ---
@@ -396,8 +418,8 @@ class NRelNet:
         """(value, plan [B,5])（評価・地図の読み出しが使う・value は既存の forward と同じ値）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = np.tanh(o)
         return v, self.plan_head(e)
 
     # --- 時間軸ヘッド（§20.11 の候補 H・serve は呼ばない） ---
@@ -413,8 +435,8 @@ class NRelNet:
         """(value, time [B,7])（評価・読み出しが使う・value は既存の forward と同じ値）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = np.tanh(o)
         return v, self.time_head(e)
 
     # --- 方策 ---
@@ -478,6 +500,10 @@ class NRelNet:
             # 時間軸ヘッド（§20.11 の候補 H）も別鍵（`time_Wu1` …）。Rust は知らない鍵を無視する。
             m["time"] = True
             extra.update({TIME_KEY + p: getattr(self, p) for p in self.time_params})
+        if self.value_skip:
+            # 価値の出口のまっすぐな道（§7.78）も別鍵（`skip_Wvz`）。Rust は知らない鍵を無視する。
+            m["value_skip"] = True
+            extra[SKIP_KEY + SKIP_PARAM] = self.Wvz
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -517,6 +543,10 @@ class NRelNet:
             for p in net.time_params:
                 setattr(net, p, d[TIME_KEY + p])
             net.time = True
+        # 価値の出口のまっすぐな道（§7.78・あれば）。無ければ 0 のまま `value_skip=False`。
+        if SKIP_KEY + SKIP_PARAM in d.files:
+            net.Wvz = np.asarray(d[SKIP_KEY + SKIP_PARAM], np.float32).reshape(D_Z, 1)
+            net.value_skip = True
         return net
 
 
@@ -667,8 +697,8 @@ class NRelValueAdapter:
     def predict_state(self, state, to_move):
         sc, ci, tok, rel_om, rel_oo, _R = self.encode_state(state, to_move)
         h, present = self.net.tokens_forward(ci, tok, rel_om, rel_oo, self.tab)
-        e = self.net.body(sc, h, present)
-        return float(np.tanh((e @ self.net.Wv + self.net.bv)[0, 0]))
+        _e, o = self.net.body_value(sc, h, present)
+        return float(np.tanh(o[0]))
 
     def predict(self, batch):
         if "tokens" not in batch:
