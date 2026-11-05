@@ -1,0 +1,7 @@
+FIT target=mean 訓練の行 85868・取り置き 14132・周 4・1 周 335 回
+  ep- 取り置き 平均に対して／勝敗に対して (0.1239, 0.5357)
+  ep0 訓練 mse 0.1089・取り置き 平均に対して／勝敗に対して (0.1036, 0.5299)・18s → /root/nets/nrel_fit_mean.ep0.npz
+  ep1 訓練 mse 0.1019・取り置き 平均に対して／勝敗に対して (0.1009, 0.5301)・36s → /root/nets/nrel_fit_mean.ep1.npz
+  ep2 訓練 mse 0.0985・取り置き 平均に対して／勝敗に対して (0.1004, 0.5297)・54s → /root/nets/nrel_fit_mean.ep2.npz
+  ep3 訓練 mse 0.0963・取り置き 平均に対して／勝敗に対して (0.0995, 0.5293)・71s → /root/nets/nrel_fit_mean.ep3.npz
+FIT_DONE

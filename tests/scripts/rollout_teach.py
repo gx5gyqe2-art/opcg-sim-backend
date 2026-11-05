@@ -11,6 +11,7 @@
   ``play``     ``--shard i/30``: 自分の局だけ当て直して打ち続け、`rows_sKK.jsonl` に 1 盤面 1 行で追記（再開できる）。
   ``sidecar``  集めた行（`--rows` の glob）から記録の隣に `n_record_XXXXX.roll.npz`（`opcg_sim.learned.train.rollout_labels`）を書く。
   ``bench``    教師を付けた行での当てはまり（ネットの値を平均・勝敗に対して・訓練側と取り置き〔seed%7==0〕に分けて）。
+  ``fit``      教師を付けた行（訓練側）だけで価値だけを当て直す（``--target mean``／``z``＝対照・4 周・各周保存）。
   ``check``    不変量: §7.79 の 400 行（`n1_results/light_rollout/rows.json`）の一部を、同じ世界（ずらし 18000）で
                この道具の打ち続けで打ち直し、`jitter_local.jsonl` の読み 16 回の勝敗と 1 局ずつ一致するかを見る。
 
@@ -410,9 +411,60 @@ def cmd_bench(a):
     json.dump(res, open(os.path.join(a.out, f"bench_{a.tag}.json"), "w"), ensure_ascii=False, indent=1)
 
 
+# ---------------------------------------------------------------- 教師の行だけの価値の当て直し（コーディネータの追加の 1 組）
+
+def cmd_fit(a):
+    """教師を付けた行（訓練側＝seed%7!=0 だけ）**だけ**で、warm-start のネットから価値だけを学ぶ（方策の重みは勾配が来ない＝凍結）。
+    ``--target mean``＝打ち続けの平均・``--target z``＝同じ行の勝敗（対照）。torch backend・学習の速さ・1 回の行数は
+    `train_r29f4.json` と同じ（2e-4・256）。補助の頭は学ばない（教師の行に補助の教師を読み込んでいない）。各周の重みを保存する。"""
+    from opcg_sim.learned import n_rel as NL
+    from opcg_sim.learned import n_rel_feat as NR
+    from opcg_sim.learned.train import n_rel_train as NT
+    from opcg_sim.learned.train.n_eff_feat import build_eff_tables
+    from opcg_sim.learned.train.n_rel_torch import TorchTrainer
+    from opcg_sim.learned.vocab import load_db
+    sc, ci, tok, mean, z, hold, _turn, _n = _teacher_rows(a.rows)
+    stats, ab, abm, pwr, isl, vocab = build_eff_tables()
+    rt = NR.RelTable(NR.profile_table(load_db(), vocab))
+    net = NL.NRelNet.load(a.warm_start, tables=(stats, ab, abm, pwr, isl))
+    tr = TorchTrainer(net, lr=a.lr, threads=a.threads or None)
+    target = mean if a.target == "mean" else z
+    ix = np.flatnonzero(~hold)
+    hi = np.flatnonzero(hold)
+    rng = np.random.default_rng(a.seed)
+    print(f"FIT target={a.target} 訓練の行 {len(ix)}・取り置き {len(hi)}・周 {a.epochs}・1 周 {len(ix) // a.bs} 回", flush=True)
+
+    def ev():
+        tr.sync_to_numpy()
+        v = []
+        for s0 in range(0, len(hi), 1024):
+            b = hi[s0:s0 + 1024]
+            c_ = ci[b].astype(np.int64)
+            v.append(net.value(sc[b].astype(np.float32), c_, tok[b].astype(np.float32), *NT.relations_or_zeros(net, c_, tok[b], rt)))
+        v = np.concatenate(v)
+        return round(float(np.mean((v - mean[hi]) ** 2)), 4), round(float(np.mean((v - z[hi]) ** 2)), 4)
+
+    print("  ep- 取り置き 平均に対して／勝敗に対して", ev(), flush=True)
+    t0 = time.time()
+    for ep in range(a.epochs):
+        order = ix[rng.permutation(len(ix))]
+        tot = 0.0
+        nb = len(order) // a.bs
+        for k in range(nb):
+            b = np.sort(order[k * a.bs:(k + 1) * a.bs])
+            c_ = ci[b].astype(np.int64)
+            tot += tr.value_step(sc[b].astype(np.float32), c_, tok[b].astype(np.float32),
+                                 *NT.relations_or_zeros(net, c_, tok[b], rt), target[b].astype(np.float32), a.lr)
+        hm = ev()
+        out = a.out_net.replace(".npz", f".ep{ep}.npz")
+        net.save(out, meta=dict(net.meta or {}, fit_rows=int(len(ix)), fit_target=a.target, fit_epoch=ep))
+        print(f"  ep{ep} 訓練 mse {tot / nb:.4f}・取り置き 平均に対して／勝敗に対して {hm}・{time.time() - t0:.0f}s → {out}", flush=True)
+    print("FIT_DONE", flush=True)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["plan", "play", "sidecar", "check", "bench"])
+    ap.add_argument("cmd", choices=["plan", "play", "sidecar", "check", "bench", "fit"])
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--positions", default=POSITIONS)
     ap.add_argument("--games", type=int, default=N_GAMES)
@@ -424,8 +476,16 @@ def main(argv=None):
     ap.add_argument("--n", type=int, default=12, help="check: 打ち直す行の数")
     ap.add_argument("--k", type=int, default=K, help="check: 1 行の局数")
     ap.add_argument("--nets", nargs="*", default=[], help="bench: ネットの npz")
+    ap.add_argument("--target", choices=["mean", "z"], default="mean", help="fit: 教師（平均／勝敗）")
+    ap.add_argument("--warm-start", default=NET, help="fit: 出発のネット")
+    ap.add_argument("--out-net", default="nrel_fit.npz", help="fit: 出力（各周 .ep{k}.npz）")
+    ap.add_argument("--epochs", type=int, default=4)
+    ap.add_argument("--lr", type=float, default=2e-4)
+    ap.add_argument("--bs", type=int, default=256)
+    ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--threads", type=int, default=0)
     a = ap.parse_args(argv)
-    {"plan": cmd_plan, "play": cmd_play, "sidecar": cmd_sidecar, "check": cmd_check, "bench": cmd_bench}[a.cmd](a)
+    {"plan": cmd_plan, "play": cmd_play, "sidecar": cmd_sidecar, "check": cmd_check, "bench": cmd_bench, "fit": cmd_fit}[a.cmd](a)
 
 
 if __name__ == "__main__":

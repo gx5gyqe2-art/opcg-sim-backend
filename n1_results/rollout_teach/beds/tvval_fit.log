@@ -1,0 +1,8 @@
+nrel_fit_mean.ep0.npz a_head 0.217(0.64) b_close 0.105(0.31) c_oppend 0.117(0.35) d_next 0.249(0.74)
+nrel_fit_mean.ep1.npz a_head 0.226(0.67) b_close 0.117(0.34) c_oppend 0.129(0.38) d_next 0.248(0.73)
+nrel_fit_mean.ep2.npz a_head 0.235(0.69) b_close 0.122(0.36) c_oppend 0.137(0.41) d_next 0.260(0.77)
+nrel_fit_mean.ep3.npz a_head 0.231(0.68) b_close 0.130(0.38) c_oppend 0.141(0.42) d_next 0.247(0.73)
+nrel_fit_z.ep0.npz a_head 0.204(0.60) b_close 0.105(0.31) c_oppend 0.115(0.34) d_next 0.215(0.64)
+nrel_fit_z.ep1.npz a_head 0.227(0.67) b_close 0.114(0.34) c_oppend 0.125(0.37) d_next 0.228(0.67)
+nrel_fit_z.ep2.npz a_head 0.225(0.67) b_close 0.120(0.35) c_oppend 0.136(0.40) d_next 0.248(0.73)
+nrel_fit_z.ep3.npz a_head 0.219(0.65) b_close 0.125(0.37) c_oppend 0.139(0.41) d_next 0.222(0.66)
