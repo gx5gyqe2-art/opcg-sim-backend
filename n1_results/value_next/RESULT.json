@@ -1,0 +1,411 @@
+{
+ "job": "value-next",
+ "section": "§7.81",
+ "ledger": "cpu_theory_gap.md 2+521",
+ "status": "done",
+ "branch": "claude/value-next",
+ "report": "docs/reports/2026-11-05_value_next.md",
+ "results_dir": "n1_results/value_next",
+ "verdict": "no effect: teacher = root value at the head of the next own turn (83.3% of value rows replaced, corr with outcome +0.730); epoch-1 DON ratio at window close 0.29 (control r29f4 ep0 0.34, r28x4 0.23), 82j group gap 0.296 (control 0.301); holdout error worse by +0.003 (within 0.005) but calibration gap 0.047 vs 0.026 (1.85x > 1.5x) = the net copies the teacher's optimism (+0.148). Diagnostic on the 82j jitter rows: the teacher itself carries the DON gap (0.487 vs outcome 0.542; own-row root value only 0.342; next-decision root value 0.365) while the net trained on it shows 0.296 = the teacher has the difference, the net does not learn it (fitting side). Epoch 2 and the secondary arm (next_v0_step) were not run (coordinator decision: epoch 2 lost twice to OOM and a worker restart; conclusion unchanged).",
+ "teacher": {
+  "mode": "next_v0",
+  "rows": 10712760,
+  "replaced": 8919161,
+  "kept": 1793599,
+  "replaced_frac": 0.8326,
+  "corr_teacher_z": 0.73,
+  "teacher_mean": 0.148,
+  "teacher_std": 0.766,
+  "same_turn": 0,
+  "later_turn": 8919161,
+  "by_kind": {
+   "main": 3942896,
+   "window": 4171328,
+   "commit": 804937
+  }
+ },
+ "train": {
+  "from": "r28x4",
+  "args": "train_r29f4.json common args + --z-mode next_v0",
+  "epochs_completed": 1,
+  "ep0_val_vs_teacher": {
+   "v_mse": 0.1071,
+   "v_sign": 0.917
+  },
+  "note": "run 1 OOM-killed in epoch 2 (74c band pack build run concurrently); run 2 killed at step 90000/92192 of epoch 1 by a session worker restart; run 3 stopped by the coordinator"
+ },
+ "nets": {
+  "r28x4": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.2818,
+    0.3058
+   ],
+   "jitter_t7_10": 0.1432,
+   "band74c_mse_sign_calibw_calibm": [
+    0.4739,
+    0.8299,
+    0.0166,
+    0.0237
+   ],
+   "band70f_mse_sign_calibw_calibm": [
+    0.4734,
+    0.8287,
+    0.0212,
+    0.0281
+   ],
+   "band74c_first100k_mse_sign_calibw_calibm": [
+    0.4846,
+    0.8272,
+    0.0236,
+    0.0322
+   ]
+  },
+  "r29f4_ep0": {
+   "tvval": {
+    "a_head": [
+     0.2005,
+     0.593
+    ],
+    "b_close": [
+     0.1134,
+     0.335
+    ],
+    "c_oppend": [
+     0.1225,
+     0.362
+    ],
+    "d_next": [
+     0.2142,
+     0.634
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3009,
+    0.3227
+   ],
+   "jitter_t7_10": 0.1477,
+   "band74c_mse_sign_calibw_calibm": [
+    0.4749,
+    0.8297,
+    0.0254,
+    0.0311
+   ],
+   "band70f_mse_sign_calibw_calibm": [
+    0.4734,
+    0.83,
+    0.0137,
+    0.0208
+   ],
+   "band74c_first100k_mse_sign_calibw_calibm": [
+    0.4875,
+    0.8256,
+    0.0256,
+    0.0332
+   ],
+   "rocks": [
+    4,
+    -0.0955,
+    0.099
+   ]
+  },
+  "r29f4_ep1": {
+   "tvval": {
+    "a_head": [
+     0.1897,
+     0.561
+    ],
+    "b_close": [
+     0.1066,
+     0.315
+    ],
+    "c_oppend": [
+     0.1201,
+     0.355
+    ],
+    "d_next": [
+     0.1999,
+     0.591
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3056,
+    0.3269
+   ],
+   "jitter_t7_10": 0.1538,
+   "band74c_mse_sign_calibw_calibm": [
+    0.475,
+    0.8295,
+    0.024,
+    0.0313
+   ],
+   "band70f_mse_sign_calibw_calibm": [
+    0.4748,
+    0.8291,
+    0.0249,
+    0.0334
+   ],
+   "band74c_first100k_mse_sign_calibw_calibm": [
+    0.488,
+    0.8251,
+    0.0222,
+    0.0291
+   ]
+  },
+  "vn_run1_ep0": {
+   "tvval": {
+    "a_head": [
+     0.1874,
+     0.554
+    ],
+    "b_close": [
+     0.0985,
+     0.291
+    ],
+    "c_oppend": [
+     0.1102,
+     0.326
+    ],
+    "d_next": [
+     0.2148,
+     0.635
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.2956,
+    0.3265
+   ],
+   "jitter_t7_10": 0.1534,
+   "band74c_mse_sign_calibw_calibm": [
+    0.4803,
+    0.828,
+    0.0453,
+    0.0594
+   ],
+   "band70f_mse_sign_calibw_calibm": [
+    0.4797,
+    0.8272,
+    0.048,
+    0.0623
+   ],
+   "band74c_first100k_mse_sign_calibw_calibm": [
+    0.4904,
+    0.8254,
+    0.0473,
+    0.0591
+   ],
+   "rocks": [
+    4,
+    -0.0759,
+    0.092
+   ],
+   "file": "n1_results/value_next/nrel_vn_run1.ep0.npz"
+  }
+ },
+ "diagnostic_82j_teacher_rows": {
+  "rows": 3825,
+  "rows_with_teacher": 3679,
+  "turn3_6": {
+   "outcome_z": {
+    "plus": 0.2936,
+    "minus": -0.2487,
+    "diff": 0.5424,
+    "ci95": 0.0856,
+    "n": [
+     957,
+     985
+    ]
+   },
+   "own_root_v0": {
+    "plus": 0.2208,
+    "minus": -0.1209,
+    "diff": 0.3417,
+    "ci95": 0.0515,
+    "n": [
+     957,
+     985
+    ]
+   },
+   "teacher_next_turn_head": {
+    "plus": 0.3038,
+    "minus": -0.1834,
+    "diff": 0.4872,
+    "ci95": 0.0548,
+    "n": [
+     957,
+     985
+    ]
+   },
+   "next_decision_v0": {
+    "plus": 0.2241,
+    "minus": -0.1404,
+    "diff": 0.3645,
+    "ci95": 0.0521,
+    "n": [
+     957,
+     985
+    ]
+   },
+   "outcome_z_rows_with_teacher": {
+    "plus": 0.2936,
+    "minus": -0.2487,
+    "diff": 0.5424,
+    "ci95": 0.0856,
+    "n": [
+     957,
+     985
+    ]
+   }
+  },
+  "turn3_6_holdout": {
+   "outcome_z": {
+    "plus": 0.2727,
+    "minus": -0.2148,
+    "diff": 0.4875,
+    "ci95": 0.2281,
+    "n": [
+     143,
+     135
+    ]
+   },
+   "own_root_v0": {
+    "plus": 0.2428,
+    "minus": -0.1448,
+    "diff": 0.3876,
+    "ci95": 0.1315,
+    "n": [
+     143,
+     135
+    ]
+   },
+   "teacher_next_turn_head": {
+    "plus": 0.3037,
+    "minus": -0.2044,
+    "diff": 0.5081,
+    "ci95": 0.14,
+    "n": [
+     143,
+     135
+    ]
+   },
+   "next_decision_v0": {
+    "plus": 0.2563,
+    "minus": -0.1637,
+    "diff": 0.42,
+    "ci95": 0.1327,
+    "n": [
+     143,
+     135
+    ]
+   },
+   "outcome_z_rows_with_teacher": {
+    "plus": 0.2727,
+    "minus": -0.2148,
+    "diff": 0.4875,
+    "ci95": 0.2281,
+    "n": [
+     143,
+     135
+    ]
+   }
+  },
+  "turn7_10": {
+   "outcome_z": {
+    "plus": 0.0891,
+    "minus": -0.1053,
+    "diff": 0.1944,
+    "ci95": 0.0931,
+    "n": [
+     696,
+     1187
+    ]
+   },
+   "own_root_v0": {
+    "plus": 0.1698,
+    "minus": -0.0001,
+    "diff": 0.1699,
+    "ci95": 0.0648,
+    "n": [
+     696,
+     1186
+    ]
+   },
+   "teacher_next_turn_head": {
+    "plus": 0.2249,
+    "minus": 0.017,
+    "diff": 0.2079,
+    "ci95": 0.0735,
+    "n": [
+     662,
+     1075
+    ]
+   },
+   "next_decision_v0": {
+    "plus": 0.1625,
+    "minus": -0.0153,
+    "diff": 0.1777,
+    "ci95": 0.0658,
+    "n": [
+     696,
+     1186
+    ]
+   },
+   "outcome_z_rows_with_teacher": {
+    "plus": 0.1118,
+    "minus": -0.0847,
+    "diff": 0.1964,
+    "ci95": 0.0963,
+    "n": [
+     662,
+     1075
+    ]
+   }
+  },
+  "corr": {
+   "teacher_vs_z": 0.7097,
+   "own_root_vs_z": 0.6508,
+   "teacher_vs_own_root": 0.8936,
+   "teacher_mean": 0.0753,
+   "own_root_mean": 0.055,
+   "z_mean": -0.0071
+  }
+ },
+ "predictions": {
+  "effective_ratio_ge_0.45": false,
+  "effective_gap_ge_0.40": false,
+  "all_4_times_above_control": false,
+  "drift_holdout_mse_within_0.005": true,
+  "drift_calibration_within_1.5x": false,
+  "no_effect_gain_lt_0.05": true
+ },
+ "invariants": {
+  "default_bit_identical": "tests/test_value_next.py",
+  "controls_match_prior_reports": true,
+  "corr_teacher_z_ge_0.5": true
+ },
+ "not_run": {
+  "epoch2": "lost twice (OOM, worker restart); stopped by coordinator",
+  "secondary_arm_next_v0_step": "not run (coordinator); tool and column kept"
+ },
+ "gates": {
+  "make_test": "green with OPENBLAS_CORETYPE=Haswell",
+  "audit_cross": "not needed (engine untouched)"
+ }
+}
