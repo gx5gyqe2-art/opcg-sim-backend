@@ -1,0 +1,999 @@
+{
+ "rows": 373337,
+ "src": [
+  "/root/n74c/n_records/n74c_w01_p0",
+  "/root/n74c/n_records/n74c_w01_p1",
+  "/root/n74c/n_records/n74c_w01_p2",
+  "/root/n74c/n_records/n74c_w01_p3",
+  "/root/n74c/n_records/n74c_w02_p0",
+  "/root/n74c/n_records/n74c_w02_p1",
+  "/root/n74c/n_records/n74c_w02_p2",
+  "/root/n74c/n_records/n74c_w02_p3",
+  "/root/n74c/n_records/n74c_w03_p0",
+  "/root/n74c/n_records/n74c_w03_p1",
+  "/root/n74c/n_records/n74c_w03_p2",
+  "/root/n74c/n_records/n74c_w03_p3",
+  "/root/n74c/n_records/n74c_w04_p0",
+  "/root/n74c/n_records/n74c_w04_p1",
+  "/root/n74c/n_records/n74c_w04_p2",
+  "/root/n74c/n_records/n74c_w04_p3",
+  "/root/n74c/n_records/n74c_w05_p0",
+  "/root/n74c/n_records/n74c_w05_p1",
+  "/root/n74c/n_records/n74c_w05_p2",
+  "/root/n74c/n_records/n74c_w05_p3",
+  "/root/n74c/n_records/n74c_w06_p0",
+  "/root/n74c/n_records/n74c_w06_p1",
+  "/root/n74c/n_records/n74c_w06_p2",
+  "/root/n74c/n_records/n74c_w06_p3",
+  "/root/n74c/n_records/n74c_w07_p0",
+  "/root/n74c/n_records/n74c_w07_p1",
+  "/root/n74c/n_records/n74c_w07_p2",
+  "/root/n74c/n_records/n74c_w07_p3",
+  "/root/n74c/n_records/n74c_w08_p0",
+  "/root/n74c/n_records/n74c_w08_p1",
+  "/root/n74c/n_records/n74c_w08_p2",
+  "/root/n74c/n_records/n74c_w08_p3",
+  "/root/n74c/n_records/n74c_w09_p0",
+  "/root/n74c/n_records/n74c_w09_p1",
+  "/root/n74c/n_records/n74c_w09_p2",
+  "/root/n74c/n_records/n74c_w09_p3",
+  "/root/n74c/n_records/n74c_w10_p0",
+  "/root/n74c/n_records/n74c_w10_p1",
+  "/root/n74c/n_records/n74c_w10_p2",
+  "/root/n74c/n_records/n74c_w10_p3",
+  "/root/n74c/n_records/n74c_w11_p0",
+  "/root/n74c/n_records/n74c_w11_p1",
+  "/root/n74c/n_records/n74c_w11_p2",
+  "/root/n74c/n_records/n74c_w11_p3",
+  "/root/n74c/n_records/n74c_w12_p0",
+  "/root/n74c/n_records/n74c_w12_p1",
+  "/root/n74c/n_records/n74c_w12_p2",
+  "/root/n74c/n_records/n74c_w12_p3",
+  "/root/n74c/n_records/n74c_w13_p0",
+  "/root/n74c/n_records/n74c_w13_p1",
+  "/root/n74c/n_records/n74c_w13_p2",
+  "/root/n74c/n_records/n74c_w13_p3",
+  "/root/n74c/n_records/n74c_w14_p0",
+  "/root/n74c/n_records/n74c_w14_p1",
+  "/root/n74c/n_records/n74c_w14_p2",
+  "/root/n74c/n_records/n74c_w14_p3",
+  "/root/n74c/n_records/n74c_w15_p0",
+  "/root/n74c/n_records/n74c_w15_p1",
+  "/root/n74c/n_records/n74c_w15_p2",
+  "/root/n74c/n_records/n74c_w15_p3",
+  "/root/n74c/n_records/n74c_w16_p0",
+  "/root/n74c/n_records/n74c_w16_p1",
+  "/root/n74c/n_records/n74c_w16_p2",
+  "/root/n74c/n_records/n74c_w16_p3",
+  "/root/n74c/n_records/n74c_w17_p0",
+  "/root/n74c/n_records/n74c_w17_p1",
+  "/root/n74c/n_records/n74c_w17_p2",
+  "/root/n74c/n_records/n74c_w17_p3",
+  "/root/n74c/n_records/n74c_w18_p0",
+  "/root/n74c/n_records/n74c_w18_p1",
+  "/root/n74c/n_records/n74c_w18_p2",
+  "/root/n74c/n_records/n74c_w18_p3",
+  "/root/n74c/n_records/n74c_w19_p0",
+  "/root/n74c/n_records/n74c_w19_p1",
+  "/root/n74c/n_records/n74c_w19_p2",
+  "/root/n74c/n_records/n74c_w19_p3",
+  "/root/n74c/n_records/n74c_w20_p0",
+  "/root/n74c/n_records/n74c_w20_p1",
+  "/root/n74c/n_records/n74c_w20_p2",
+  "/root/n74c/n_records/n74c_w20_p3",
+  "/root/n74c/n_records/n74c_w21_p0",
+  "/root/n74c/n_records/n74c_w21_p1",
+  "/root/n74c/n_records/n74c_w21_p2",
+  "/root/n74c/n_records/n74c_w21_p3",
+  "/root/n74c/n_records/n74c_w22_p0",
+  "/root/n74c/n_records/n74c_w22_p1",
+  "/root/n74c/n_records/n74c_w22_p2",
+  "/root/n74c/n_records/n74c_w22_p3",
+  "/root/n74c/n_records/n74c_w23_p0",
+  "/root/n74c/n_records/n74c_w23_p1",
+  "/root/n74c/n_records/n74c_w23_p2",
+  "/root/n74c/n_records/n74c_w23_p3",
+  "/root/n74c/n_records/n74c_w24_p0",
+  "/root/n74c/n_records/n74c_w24_p1",
+  "/root/n74c/n_records/n74c_w24_p2",
+  "/root/n74c/n_records/n74c_w24_p3",
+  "/root/n74c/n_records/n74c_w25_p0",
+  "/root/n74c/n_records/n74c_w25_p1",
+  "/root/n74c/n_records/n74c_w25_p2",
+  "/root/n74c/n_records/n74c_w25_p3",
+  "/root/n74c/n_records/n74c_w26_p0",
+  "/root/n74c/n_records/n74c_w26_p1",
+  "/root/n74c/n_records/n74c_w26_p2",
+  "/root/n74c/n_records/n74c_w26_p3",
+  "/root/n74c/n_records/n74c_w27_p0",
+  "/root/n74c/n_records/n74c_w27_p1",
+  "/root/n74c/n_records/n74c_w27_p2",
+  "/root/n74c/n_records/n74c_w27_p3",
+  "/root/n74c/n_records/n74c_w28_p0",
+  "/root/n74c/n_records/n74c_w28_p1",
+  "/root/n74c/n_records/n74c_w28_p2",
+  "/root/n74c/n_records/n74c_w28_p3",
+  "/root/n74c/n_records/n74c_w29_p0",
+  "/root/n74c/n_records/n74c_w29_p1",
+  "/root/n74c/n_records/n74c_w29_p2",
+  "/root/n74c/n_records/n74c_w29_p3",
+  "/root/n74c/n_records/n74c_w30_p0",
+  "/root/n74c/n_records/n74c_w30_p1",
+  "/root/n74c/n_records/n74c_w30_p2",
+  "/root/n74c/n_records/n74c_w30_p3",
+  "/root/n74c/n_records/n74c_w31_p0",
+  "/root/n74c/n_records/n74c_w31_p1",
+  "/root/n74c/n_records/n74c_w31_p2",
+  "/root/n74c/n_records/n74c_w31_p3",
+  "/root/n74c/n_records/n74c_w32_p0",
+  "/root/n74c/n_records/n74c_w32_p1",
+  "/root/n74c/n_records/n74c_w32_p2",
+  "/root/n74c/n_records/n74c_w32_p3"
+ ],
+ "buckets": [
+  "all",
+  "turn1-4",
+  "turn5-8",
+  "turn9-99",
+  "after_removal",
+  "not_removal"
+ ],
+ "nets": {
+  "nrel_r28x4.npz": {
+   "all": {
+    "v_mse": 0.47389063230332823,
+    "v_sign": 0.8298722066122565,
+    "n": 373337,
+    "calib": {
+     "bins": [
+      {
+       "lo": -1.0,
+       "hi": -0.8,
+       "n": 74391,
+       "v_mean": -0.931898261623379,
+       "z_mean": -0.9403960156470541,
+       "win_rate": 0.02980199217647296
+      },
+      {
+       "lo": -0.8,
+       "hi": -0.6,
+       "n": 33996,
+       "v_mean": -0.7049685960580971,
+       "z_mean": -0.7093775738322156,
+       "win_rate": 0.14531121308389222
+      },
+      {
+       "lo": -0.6,
+       "hi": -0.3999999999999999,
+       "n": 26333,
+       "v_mean": -0.5038906920797322,
+       "z_mean": -0.5471841415714123,
+       "win_rate": 0.22640792921429384
+      },
+      {
+       "lo": -0.3999999999999999,
+       "hi": -0.19999999999999996,
+       "n": 23322,
+       "v_mean": -0.3017924125515958,
+       "z_mean": -0.3599176742989452,
+       "win_rate": 0.3200411628505274
+      },
+      {
+       "lo": -0.19999999999999996,
+       "hi": 0.0,
+       "n": 21624,
+       "v_mean": -0.09983221054386017,
+       "z_mean": -0.14252682204957454,
+       "win_rate": 0.4287365889752127
+      },
+      {
+       "lo": 0.0,
+       "hi": 0.20000000000000018,
+       "n": 21823,
+       "v_mean": 0.10018806244980324,
+       "z_mean": 0.05393392292535398,
+       "win_rate": 0.526966961462677
+      },
+      {
+       "lo": 0.20000000000000018,
+       "hi": 0.40000000000000013,
+       "n": 23601,
+       "v_mean": 0.3015251600995144,
+       "z_mean": 0.2806237023854921,
+       "win_rate": 0.640311851192746
+      },
+      {
+       "lo": 0.40000000000000013,
+       "hi": 0.6000000000000001,
+       "n": 26911,
+       "v_mean": 0.5024234465051755,
+       "z_mean": 0.4932927055850767,
+       "win_rate": 0.7466463527925383
+      },
+      {
+       "lo": 0.6000000000000001,
+       "hi": 0.8,
+       "n": 35990,
+       "v_mean": 0.7069414486352454,
+       "z_mean": 0.7084745762711865,
+       "win_rate": 0.8542372881355932
+      },
+      {
+       "lo": 0.8,
+       "hi": 1.0,
+       "n": 85346,
+       "v_mean": 0.9323276751860985,
+       "z_mean": 0.9347362500878775,
+       "win_rate": 0.9673681250439388
+      }
+     ],
+     "gap_weighted": 0.01663395892599992,
+     "gap_mean": 0.023724809523882777
+    },
+    "aux": {
+     "opp_turn_my_life_lost": 0.19514130055904388,
+     "opp_turn_attacks": 0.22502738237380981,
+     "opp_turn_effects": 1.1686452627182007,
+     "my_turn_opp_life_lost": 0.24115897715091705,
+     "my_turn_attacks": 0.34311380982398987,
+     "my_turn_effects": 1.3880019187927246,
+     "next_my_board_power": 0.0850946381688118,
+     "next_opp_board_power": 0.08600053936243057,
+     "next_my_board_n": 0.23991289734840393,
+     "next_opp_board_n": 0.22018900513648987,
+     "tok_attacked": 0.18735669553279877,
+     "tok_life_pushed": 0.02930087223649025,
+     "tok_ability": 0.120546355843544,
+     "n": 267873
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.7013387749079619,
+    "v_sign": 0.7374196886723298,
+    "n": 46382,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12464351207017899,
+     "opp_turn_attacks": 0.11571413278579712,
+     "opp_turn_effects": 1.0043511390686035,
+     "my_turn_opp_life_lost": 0.16397759318351746,
+     "my_turn_attacks": 0.20705445110797882,
+     "my_turn_effects": 1.186979055404663,
+     "next_my_board_power": 0.01764007657766342,
+     "next_opp_board_power": 0.03913057595491409,
+     "next_my_board_n": 0.13123343884944916,
+     "next_opp_board_n": 0.18458357453346252,
+     "tok_attacked": 0.11215262115001678,
+     "tok_life_pushed": 0.018946796655654907,
+     "tok_ability": 0.08186254650354385,
+     "n": 46382
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.5825413178653137,
+    "v_sign": 0.7896676916237543,
+    "n": 107972,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2089071273803711,
+     "opp_turn_attacks": 0.22837631404399872,
+     "opp_turn_effects": 1.1492112874984741,
+     "my_turn_opp_life_lost": 0.2586383819580078,
+     "my_turn_attacks": 0.34617942571640015,
+     "my_turn_effects": 1.368054986000061,
+     "next_my_board_power": 0.06988495588302612,
+     "next_opp_board_power": 0.07741495221853256,
+     "next_my_board_n": 0.23922981321811676,
+     "next_opp_board_n": 0.21462249755859375,
+     "tok_attacked": 0.1751205325126648,
+     "tok_life_pushed": 0.02979111298918724,
+     "tok_ability": 0.12039661407470703,
+     "n": 104193
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.3647665508552564,
+    "v_sign": 0.8723176215662061,
+    "n": 214595,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2188270390033722,
+     "opp_turn_attacks": 0.2753099203109741,
+     "opp_turn_effects": 1.2774404287338257,
+     "my_turn_opp_life_lost": 0.26346421241760254,
+     "my_turn_attacks": 0.4059630334377289,
+     "my_turn_effects": 1.503075122833252,
+     "next_my_board_power": 0.1299293488264084,
+     "next_opp_board_power": 0.11614105105400085,
+     "next_my_board_n": 0.2918884754180908,
+     "next_opp_board_n": 0.24207821488380432,
+     "tok_attacked": 0.23500825464725494,
+     "tok_life_pushed": 0.034119680523872375,
+     "tok_ability": 0.13969147205352783,
+     "n": 112910
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.5380110369278994,
+    "v_sign": 0.8082454458293384,
+    "n": 9387,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2226841151714325,
+     "opp_turn_attacks": 0.31048300862312317,
+     "opp_turn_effects": 1.4318151473999023,
+     "my_turn_opp_life_lost": 0.2671225965023041,
+     "my_turn_attacks": 0.3692518174648285,
+     "my_turn_effects": 1.4512300491333008,
+     "next_my_board_power": 0.09932466596364975,
+     "next_opp_board_power": 0.11697316914796829,
+     "next_my_board_n": 0.28215962648391724,
+     "next_opp_board_n": 0.33167368173599243,
+     "tok_attacked": 0.26150375604629517,
+     "tok_life_pushed": 0.036914512515068054,
+     "tok_ability": 0.13892428576946259,
+     "n": 7461
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.4722368385453646,
+    "v_sign": 0.8304300041214453,
+    "n": 363950,
+    "aux": {
+     "opp_turn_my_life_lost": 0.1943521797657013,
+     "opp_turn_attacks": 0.2225790172815323,
+     "opp_turn_effects": 1.1611052751541138,
+     "my_turn_opp_life_lost": 0.24041509628295898,
+     "my_turn_attacks": 0.34236493706703186,
+     "my_turn_effects": 1.386190414428711,
+     "next_my_board_power": 0.08468694239854813,
+     "next_opp_board_power": 0.08511314541101456,
+     "next_my_board_n": 0.23870250582695007,
+     "next_opp_board_n": 0.21699488162994385,
+     "tok_attacked": 0.18523234128952026,
+     "tok_life_pushed": 0.029082736000418663,
+     "tok_ability": 0.1200198084115982,
+     "n": 260412
+    }
+   }
+  },
+  "nrel_r29f4.ep0.npz": {
+   "all": {
+    "v_mse": 0.47487025920140497,
+    "v_sign": 0.8297356008110635,
+    "n": 373337,
+    "calib": {
+     "bins": [
+      {
+       "lo": -1.0,
+       "hi": -0.8,
+       "n": 74612,
+       "v_mean": -0.9247121188272543,
+       "z_mean": -0.9402508979788774,
+       "win_rate": 0.029874551010561304
+      },
+      {
+       "lo": -0.8,
+       "hi": -0.6,
+       "n": 37969,
+       "v_mean": -0.7057603593716432,
+       "z_mean": -0.708288340488293,
+       "win_rate": 0.14585582975585346
+      },
+      {
+       "lo": -0.6,
+       "hi": -0.3999999999999999,
+       "n": 28607,
+       "v_mean": -0.5036837156170145,
+       "z_mean": -0.5062746880134232,
+       "win_rate": 0.24686265599328835
+      },
+      {
+       "lo": -0.3999999999999999,
+       "hi": -0.19999999999999996,
+       "n": 24673,
+       "v_mean": -0.30195258151582355,
+       "z_mean": -0.28148178170469745,
+       "win_rate": 0.3592591091476513
+      },
+      {
+       "lo": -0.19999999999999996,
+       "hi": 0.0,
+       "n": 22720,
+       "v_mean": -0.0997764329476128,
+       "z_mean": -0.0630281690140845,
+       "win_rate": 0.46848591549295776
+      },
+      {
+       "lo": 0.0,
+       "hi": 0.20000000000000018,
+       "n": 22499,
+       "v_mean": 0.10042464980755607,
+       "z_mean": 0.15462909462642785,
+       "win_rate": 0.577314547313214
+      },
+      {
+       "lo": 0.20000000000000018,
+       "hi": 0.40000000000000013,
+       "n": 23315,
+       "v_mean": 0.3015330611828594,
+       "z_mean": 0.3649581814282651,
+       "win_rate": 0.6824790907141325
+      },
+      {
+       "lo": 0.40000000000000013,
+       "hi": 0.6000000000000001,
+       "n": 26635,
+       "v_mean": 0.5024986554953312,
+       "z_mean": 0.5626806833114323,
+       "win_rate": 0.7813403416557162
+      },
+      {
+       "lo": 0.6000000000000001,
+       "hi": 0.8,
+       "n": 33970,
+       "v_mean": 0.7053734484422828,
+       "z_mean": 0.7463055637327053,
+       "win_rate": 0.8731527818663527
+      },
+      {
+       "lo": 0.8,
+       "hi": 1.0,
+       "n": 78337,
+       "v_mean": 0.9301422206583394,
+       "z_mean": 0.9442664385922361,
+       "win_rate": 0.9721332192961181
+      }
+     ],
+     "gap_weighted": 0.025359512887335893,
+     "gap_mean": 0.03107447225140338
+    },
+    "aux": {
+     "opp_turn_my_life_lost": 0.19467206299304962,
+     "opp_turn_attacks": 0.22533322870731354,
+     "opp_turn_effects": 1.1577197313308716,
+     "my_turn_opp_life_lost": 0.24075870215892792,
+     "my_turn_attacks": 0.34425315260887146,
+     "my_turn_effects": 1.3831391334533691,
+     "next_my_board_power": 0.08397335559129715,
+     "next_opp_board_power": 0.08638548851013184,
+     "next_my_board_n": 0.24158768355846405,
+     "next_opp_board_n": 0.21972455084323883,
+     "tok_attacked": 0.1866670548915863,
+     "tok_life_pushed": 0.029273217543959618,
+     "tok_ability": 0.11888190358877182,
+     "n": 267873
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.701224800499526,
+    "v_sign": 0.7357811219869778,
+    "n": 46382,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12447869777679443,
+     "opp_turn_attacks": 0.11645566672086716,
+     "opp_turn_effects": 1.005858063697815,
+     "my_turn_opp_life_lost": 0.161677747964859,
+     "my_turn_attacks": 0.20474764704704285,
+     "my_turn_effects": 1.1813541650772095,
+     "next_my_board_power": 0.016819635406136513,
+     "next_opp_board_power": 0.04111478105187416,
+     "next_my_board_n": 0.13154885172843933,
+     "next_opp_board_n": 0.18340106308460236,
+     "tok_attacked": 0.11223634332418442,
+     "tok_life_pushed": 0.018929598852992058,
+     "tok_ability": 0.08114247024059296,
+     "n": 46382
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.5823210091820559,
+    "v_sign": 0.7913255288408105,
+    "n": 107972,
+    "aux": {
+     "opp_turn_my_life_lost": 0.20748406648635864,
+     "opp_turn_attacks": 0.22940915822982788,
+     "opp_turn_effects": 1.1376498937606812,
+     "my_turn_opp_life_lost": 0.2579457759857178,
+     "my_turn_attacks": 0.3472933769226074,
+     "my_turn_effects": 1.367246389389038,
+     "next_my_board_power": 0.06941291689872742,
+     "next_opp_board_power": 0.07777993381023407,
+     "next_my_board_n": 0.2406303435564041,
+     "next_opp_board_n": 0.21432843804359436,
+     "tok_attacked": 0.1744241863489151,
+     "tok_life_pushed": 0.029791874811053276,
+     "tok_ability": 0.11810124665498734,
+     "n": 104193
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.36654115826798717,
+    "v_sign": 0.8715999906801184,
+    "n": 214595,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2191503793001175,
+     "opp_turn_attacks": 0.2747410833835602,
+     "opp_turn_effects": 1.2614794969558716,
+     "my_turn_opp_life_lost": 0.26408034563064575,
+     "my_turn_attacks": 0.40844640135765076,
+     "my_turn_effects": 1.4939534664154053,
+     "next_my_board_power": 0.1280699372291565,
+     "next_opp_board_power": 0.11590811610221863,
+     "next_my_board_n": 0.294455349445343,
+     "next_opp_board_n": 0.24174591898918152,
+     "tok_attacked": 0.23383580148220062,
+     "tok_life_pushed": 0.034048330038785934,
+     "tok_ability": 0.13807904720306396,
+     "n": 112910
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.5338161279245338,
+    "v_sign": 0.8061148396718867,
+    "n": 9387,
+    "aux": {
+     "opp_turn_my_life_lost": 0.22138120234012604,
+     "opp_turn_attacks": 0.3134278655052185,
+     "opp_turn_effects": 1.4255778789520264,
+     "my_turn_opp_life_lost": 0.26753443479537964,
+     "my_turn_attacks": 0.37217405438423157,
+     "my_turn_effects": 1.454377293586731,
+     "next_my_board_power": 0.1005123108625412,
+     "next_opp_board_power": 0.11320478469133377,
+     "next_my_board_n": 0.28568536043167114,
+     "next_opp_board_n": 0.3299414813518524,
+     "tok_attacked": 0.2616455852985382,
+     "tok_life_pushed": 0.03694360330700874,
+     "tok_ability": 0.13733232021331787,
+     "n": 7461
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.47334992709615975,
+    "v_sign": 0.8303448275862069,
+    "n": 363950,
+    "aux": {
+     "opp_turn_my_life_lost": 0.19390682876110077,
+     "opp_turn_attacks": 0.22280925512313843,
+     "opp_turn_effects": 1.1500452756881714,
+     "my_turn_opp_life_lost": 0.23999157547950745,
+     "my_turn_attacks": 0.34345316886901855,
+     "my_turn_effects": 1.3810980319976807,
+     "next_my_board_power": 0.08349950611591339,
+     "next_opp_board_power": 0.08561709523200989,
+     "next_my_board_n": 0.2403242588043213,
+     "next_opp_board_n": 0.2165667563676834,
+     "tok_attacked": 0.18451887369155884,
+     "tok_life_pushed": 0.029053455218672752,
+     "tok_ability": 0.11835327744483948,
+     "n": 260412
+    }
+   }
+  },
+  "nrel_r29f4.ep1.npz": {
+   "all": {
+    "v_mse": 0.4750084405017496,
+    "v_sign": 0.8294570321184346,
+    "n": 373337,
+    "calib": {
+     "bins": [
+      {
+       "lo": -1.0,
+       "hi": -0.8,
+       "n": 71692,
+       "v_mean": -0.9273957690235587,
+       "z_mean": -0.9453216537410032,
+       "win_rate": 0.02733917312949841
+      },
+      {
+       "lo": -0.8,
+       "hi": -0.6,
+       "n": 34546,
+       "v_mean": -0.7048127943095505,
+       "z_mean": -0.7247148729230591,
+       "win_rate": 0.13764256353847046
+      },
+      {
+       "lo": -0.6,
+       "hi": -0.3999999999999999,
+       "n": 27322,
+       "v_mean": -0.502579988388582,
+       "z_mean": -0.5546446087402094,
+       "win_rate": 0.2226776956298953
+      },
+      {
+       "lo": -0.3999999999999999,
+       "hi": -0.19999999999999996,
+       "n": 23163,
+       "v_mean": -0.3014117000786251,
+       "z_mean": -0.3498251521823598,
+       "win_rate": 0.3250874239088201
+      },
+      {
+       "lo": -0.19999999999999996,
+       "hi": 0.0,
+       "n": 22176,
+       "v_mean": -0.10017285942666779,
+       "z_mean": -0.16856060606060605,
+       "win_rate": 0.41571969696969696
+      },
+      {
+       "lo": 0.0,
+       "hi": 0.20000000000000018,
+       "n": 22131,
+       "v_mean": 0.10062881158119279,
+       "z_mean": 0.04649586552799241,
+       "win_rate": 0.5232479327639962
+      },
+      {
+       "lo": 0.20000000000000018,
+       "hi": 0.40000000000000013,
+       "n": 23577,
+       "v_mean": 0.3015053827749609,
+       "z_mean": 0.27649828222420153,
+       "win_rate": 0.6382491411121007
+      },
+      {
+       "lo": 0.40000000000000013,
+       "hi": 0.6000000000000001,
+       "n": 26938,
+       "v_mean": 0.5036305888311238,
+       "z_mean": 0.4863018783874081,
+       "win_rate": 0.743150939193704
+      },
+      {
+       "lo": 0.6000000000000001,
+       "hi": 0.8,
+       "n": 35783,
+       "v_mean": 0.7063874124154734,
+       "z_mean": 0.702149065198558,
+       "win_rate": 0.851074532599279
+      },
+      {
+       "lo": 0.8,
+       "hi": 1.0,
+       "n": 86009,
+       "v_mean": 0.9289672672703521,
+       "z_mean": 0.9350300549942447,
+       "win_rate": 0.9675150274971224
+      }
+     ],
+     "gap_weighted": 0.024001589130340954,
+     "gap_mean": 0.0313463674408737
+    },
+    "aux": {
+     "opp_turn_my_life_lost": 0.19480885565280914,
+     "opp_turn_attacks": 0.2229870706796646,
+     "opp_turn_effects": 1.1530187129974365,
+     "my_turn_opp_life_lost": 0.24070271849632263,
+     "my_turn_attacks": 0.343500018119812,
+     "my_turn_effects": 1.3804666996002197,
+     "next_my_board_power": 0.08437301963567734,
+     "next_opp_board_power": 0.08349636197090149,
+     "next_my_board_n": 0.2413003146648407,
+     "next_opp_board_n": 0.21715955436229706,
+     "tok_attacked": 0.18630507588386536,
+     "tok_life_pushed": 0.029252497479319572,
+     "tok_ability": 0.11775698512792587,
+     "n": 267873
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.6964523192115348,
+    "v_sign": 0.7387995343021,
+    "n": 46382,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12388743460178375,
+     "opp_turn_attacks": 0.11416038870811462,
+     "opp_turn_effects": 1.0014806985855103,
+     "my_turn_opp_life_lost": 0.16219212114810944,
+     "my_turn_attacks": 0.2034073919057846,
+     "my_turn_effects": 1.1861114501953125,
+     "next_my_board_power": 0.016896400600671768,
+     "next_opp_board_power": 0.038121163845062256,
+     "next_my_board_n": 0.13156718015670776,
+     "next_opp_board_n": 0.18395231664180756,
+     "tok_attacked": 0.11220142990350723,
+     "tok_life_pushed": 0.018908118829131126,
+     "tok_ability": 0.08031623810529709,
+     "n": 46382
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.5821667772170784,
+    "v_sign": 0.7901585596265699,
+    "n": 107972,
+    "aux": {
+     "opp_turn_my_life_lost": 0.20842258632183075,
+     "opp_turn_attacks": 0.22698451578617096,
+     "opp_turn_effects": 1.1340593099594116,
+     "my_turn_opp_life_lost": 0.2564987540245056,
+     "my_turn_attacks": 0.3453977704048157,
+     "my_turn_effects": 1.3629423379898071,
+     "next_my_board_power": 0.06985950469970703,
+     "next_opp_board_power": 0.07572805136442184,
+     "next_my_board_n": 0.2402069866657257,
+     "next_opp_board_n": 0.21026606857776642,
+     "tok_attacked": 0.1743963062763214,
+     "tok_life_pushed": 0.02973783202469349,
+     "tok_ability": 0.11686646938323975,
+     "n": 104193
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.36797303844284096,
+    "v_sign": 0.8709289592022181,
+    "n": 214595,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2188609093427658,
+     "opp_turn_attacks": 0.2723175585269928,
+     "opp_turn_effects": 1.254976749420166,
+     "my_turn_opp_life_lost": 0.26509517431259155,
+     "my_turn_attacks": 0.4092211127281189,
+     "my_turn_effects": 1.4898877143859863,
+     "next_my_board_power": 0.1286054253578186,
+     "next_opp_board_power": 0.11213213950395584,
+     "next_my_board_n": 0.29423022270202637,
+     "next_opp_board_n": 0.23912373185157776,
+     "tok_attacked": 0.23326028883457184,
+     "tok_life_pushed": 0.03405814617872238,
+     "tok_ability": 0.1369534432888031,
+     "n": 112910
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.534400381461502,
+    "v_sign": 0.8069670821348673,
+    "n": 9387,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2217196524143219,
+     "opp_turn_attacks": 0.3110191226005554,
+     "opp_turn_effects": 1.412688970565796,
+     "my_turn_opp_life_lost": 0.26629018783569336,
+     "my_turn_attacks": 0.37211453914642334,
+     "my_turn_effects": 1.454810619354248,
+     "next_my_board_power": 0.10025632381439209,
+     "next_opp_board_power": 0.11208929866552353,
+     "next_my_board_n": 0.2875947654247284,
+     "next_opp_board_n": 0.3230274021625519,
+     "tok_attacked": 0.2605065405368805,
+     "tok_life_pushed": 0.036948662251234055,
+     "tok_ability": 0.13604600727558136,
+     "n": 7461
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.4734766032994164,
+    "v_sign": 0.8300370930072812,
+    "n": 363950,
+    "aux": {
+     "opp_turn_my_life_lost": 0.19403783977031708,
+     "opp_turn_attacks": 0.22046487033367157,
+     "opp_turn_effects": 1.1455789804458618,
+     "my_turn_opp_life_lost": 0.2399696260690689,
+     "my_turn_attacks": 0.3426801860332489,
+     "my_turn_effects": 1.3783365488052368,
+     "next_my_board_power": 0.08391795307397842,
+     "next_opp_board_power": 0.08267714828252792,
+     "next_my_board_n": 0.23997393250465393,
+     "next_opp_board_n": 0.2141263782978058,
+     "tok_attacked": 0.1841791421175003,
+     "tok_life_pushed": 0.029031995683908463,
+     "tok_ability": 0.11723297834396362,
+     "n": 260412
+    }
+   }
+  },
+  "nrel_vn_run1.ep0.npz": {
+   "all": {
+    "v_mse": 0.4802865764919852,
+    "v_sign": 0.8279570468504327,
+    "n": 373337,
+    "calib": {
+     "bins": [
+      {
+       "lo": -1.0,
+       "hi": -0.8,
+       "n": 66178,
+       "v_mean": -0.9235514132800505,
+       "z_mean": -0.9525522076823113,
+       "win_rate": 0.023723896158844328
+      },
+      {
+       "lo": -0.8,
+       "hi": -0.6,
+       "n": 34885,
+       "v_mean": -0.7053442074436845,
+       "z_mean": -0.7578328794610865,
+       "win_rate": 0.12108356026945678
+      },
+      {
+       "lo": -0.6,
+       "hi": -0.3999999999999999,
+       "n": 26952,
+       "v_mean": -0.5029186427440637,
+       "z_mean": -0.5785099436034432,
+       "win_rate": 0.21074502819827842
+      },
+      {
+       "lo": -0.3999999999999999,
+       "hi": -0.19999999999999996,
+       "n": 23801,
+       "v_mean": -0.3015054860638098,
+       "z_mean": -0.4133019621024327,
+       "win_rate": 0.2933490189487837
+      },
+      {
+       "lo": -0.19999999999999996,
+       "hi": 0.0,
+       "n": 22219,
+       "v_mean": -0.10033257359376622,
+       "z_mean": -0.19528331608083171,
+       "win_rate": 0.40235834195958414
+      },
+      {
+       "lo": 0.0,
+       "hi": 0.20000000000000018,
+       "n": 22483,
+       "v_mean": 0.1002157163014055,
+       "z_mean": 0.018992127385135435,
+       "win_rate": 0.5094960636925677
+      },
+      {
+       "lo": 0.20000000000000018,
+       "hi": 0.40000000000000013,
+       "n": 23816,
+       "v_mean": 0.3010616611600483,
+       "z_mean": 0.23387638562311053,
+       "win_rate": 0.6169381928115553
+      },
+      {
+       "lo": 0.40000000000000013,
+       "hi": 0.6000000000000001,
+       "n": 27516,
+       "v_mean": 0.5030275941131195,
+       "z_mean": 0.4593690943451083,
+       "win_rate": 0.7296845471725542
+      },
+      {
+       "lo": 0.6000000000000001,
+       "hi": 0.8,
+       "n": 36149,
+       "v_mean": 0.7056913846455661,
+       "z_mean": 0.6749011037649727,
+       "win_rate": 0.8374505518824864
+      },
+      {
+       "lo": 0.8,
+       "hi": 1.0,
+       "n": 89338,
+       "v_mean": 0.9314935360751929,
+       "z_mean": 0.924578566791287,
+       "win_rate": 0.9622892833956435
+      }
+     ],
+     "gap_weighted": 0.045311732430496326,
+     "gap_mean": 0.05936006001904489
+    },
+    "aux": {
+     "opp_turn_my_life_lost": 0.194707989692688,
+     "opp_turn_attacks": 0.22645993530750275,
+     "opp_turn_effects": 1.1589486598968506,
+     "my_turn_opp_life_lost": 0.24054335057735443,
+     "my_turn_attacks": 0.34290841221809387,
+     "my_turn_effects": 1.378550410270691,
+     "next_my_board_power": 0.08387134969234467,
+     "next_opp_board_power": 0.08582623302936554,
+     "next_my_board_n": 0.24176225066184998,
+     "next_opp_board_n": 0.21968288719654083,
+     "tok_attacked": 0.18642349541187286,
+     "tok_life_pushed": 0.02927612140774727,
+     "tok_ability": 0.11887548863887787,
+     "n": 267873
+    }
+   },
+   "turn1-4": {
+    "v_mse": 0.69849488526112,
+    "v_sign": 0.7378940106075633,
+    "n": 46382,
+    "aux": {
+     "opp_turn_my_life_lost": 0.12484350800514221,
+     "opp_turn_attacks": 0.11770983785390854,
+     "opp_turn_effects": 1.0047237873077393,
+     "my_turn_opp_life_lost": 0.16170084476470947,
+     "my_turn_attacks": 0.20408442616462708,
+     "my_turn_effects": 1.1753493547439575,
+     "next_my_board_power": 0.016793489456176758,
+     "next_opp_board_power": 0.04119451344013214,
+     "next_my_board_n": 0.13217923045158386,
+     "next_opp_board_n": 0.18464048206806183,
+     "tok_attacked": 0.11208072304725647,
+     "tok_life_pushed": 0.01893591322004795,
+     "tok_ability": 0.08104956150054932,
+     "n": 46382
+    }
+   },
+   "turn5-8": {
+    "v_mse": 0.5826003816424917,
+    "v_sign": 0.7918256585040566,
+    "n": 107972,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2076074779033661,
+     "opp_turn_attacks": 0.2311031073331833,
+     "opp_turn_effects": 1.1414587497711182,
+     "my_turn_opp_life_lost": 0.25769516825675964,
+     "my_turn_attacks": 0.3460976183414459,
+     "my_turn_effects": 1.36318039894104,
+     "next_my_board_power": 0.06962558627128601,
+     "next_opp_board_power": 0.07762740552425385,
+     "next_my_board_n": 0.24129553139209747,
+     "next_opp_board_n": 0.2138413041830063,
+     "tok_attacked": 0.17445671558380127,
+     "tok_life_pushed": 0.02981390617787838,
+     "tok_ability": 0.11835245788097382,
+     "n": 104193
+    }
+   },
+   "turn9-99": {
+    "v_mse": 0.37645726605529656,
+    "v_sign": 0.8677834991495608,
+    "n": 214595,
+    "aux": {
+     "opp_turn_my_life_lost": 0.21897348761558533,
+     "opp_turn_attacks": 0.27535754442214966,
+     "opp_turn_effects": 1.2611980438232422,
+     "my_turn_opp_life_lost": 0.26376742124557495,
+     "my_turn_attacks": 0.4064682424068451,
+     "my_turn_effects": 1.4891537427902222,
+     "next_my_board_power": 0.12764064967632294,
+     "next_opp_board_power": 0.11467548459768295,
+     "next_my_board_n": 0.2940283715724945,
+     "next_opp_board_n": 0.24148185551166534,
+     "tok_attacked": 0.23337925970554352,
+     "tok_life_pushed": 0.03404317796230316,
+     "tok_ability": 0.13790269196033478,
+     "n": 112910
+    }
+   },
+   "after_removal": {
+    "v_mse": 0.5339299787510849,
+    "v_sign": 0.8086715670608288,
+    "n": 9387,
+    "aux": {
+     "opp_turn_my_life_lost": 0.2229079306125641,
+     "opp_turn_attacks": 0.32639092206954956,
+     "opp_turn_effects": 1.4212186336517334,
+     "my_turn_opp_life_lost": 0.2683022618293762,
+     "my_turn_attacks": 0.37139347195625305,
+     "my_turn_effects": 1.4492006301879883,
+     "next_my_board_power": 0.10323004424571991,
+     "next_opp_board_power": 0.11479632556438446,
+     "next_my_board_n": 0.28994011878967285,
+     "next_opp_board_n": 0.329511433839798,
+     "tok_attacked": 0.26171407103538513,
+     "tok_life_pushed": 0.03693486005067825,
+     "tok_ability": 0.13828641176223755,
+     "n": 7461
+    }
+   },
+   "not_removal": {
+    "v_mse": 0.4789030056250909,
+    "v_sign": 0.8284544580299492,
+    "n": 363950,
+    "aux": {
+     "opp_turn_my_life_lost": 0.19390003383159637,
+     "opp_turn_attacks": 0.22359685599803925,
+     "opp_turn_effects": 1.1514345407485962,
+     "my_turn_opp_life_lost": 0.2397480309009552,
+     "my_turn_attacks": 0.3420923054218292,
+     "my_turn_effects": 1.376526117324829,
+     "next_my_board_power": 0.08331669867038727,
+     "next_opp_board_power": 0.08499621599912643,
+     "next_my_board_n": 0.24038192629814148,
+     "next_opp_board_n": 0.21653619408607483,
+     "tok_attacked": 0.18426638841629028,
+     "tok_life_pushed": 0.029056692495942116,
+     "tok_ability": 0.11831936240196228,
+     "n": 260412
+    }
+   }
+  }
+ }
+}

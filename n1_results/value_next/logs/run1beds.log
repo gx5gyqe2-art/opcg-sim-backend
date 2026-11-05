@@ -1,0 +1,29 @@
+nrel_vn_run1.ep0.npz 点 53 戻すを選ぶ 4 根の評価の差（戻す−訪問最多）-0.0759（52 点）戻すの訪問の割合 0.092
+nrel_r29f4.ep0.npz 点 53 戻すを選ぶ 4 根の評価の差（戻す−訪問最多）-0.0955（52 点）戻すの訪問の割合 0.099
+  nrel_r28x4.npz
+    calib gap_weighted 0.0166 gap_mean 0.0237 | [-1.0:74391:-0.94] [-0.8:33996:-0.71] [-0.6:26333:-0.55] [-0.4
+    all                          mse 0.4739 sign 0.830 n 373337 | aux 0.4192 life 0.195 atk 0.225 tok_atk 0.18
+  nrel_r29f4.ep0.npz
+    calib gap_weighted 0.0254 gap_mean 0.0311 | [-1.0:74612:-0.94] [-0.8:37969:-0.71] [-0.6:28607:-0.51] [-0.4
+    all                          mse 0.4749 sign 0.830 n 373337 | aux 0.4178 life 0.195 atk 0.225 tok_atk 0.18
+  nrel_r29f4.ep1.npz
+    calib gap_weighted 0.0240 gap_mean 0.0313 | [-1.0:71692:-0.95] [-0.8:34546:-0.72] [-0.6:27322:-0.55] [-0.4
+    all                          mse 0.4750 sign 0.829 n 373337 | aux 0.4162 life 0.195 atk 0.223 tok_atk 0.18
+  nrel_vn_run1.ep0.npz
+    calib gap_weighted 0.0453 gap_mean 0.0594 | [-1.0:66178:-0.95] [-0.8:34885:-0.76] [-0.6:26952:-0.58] [-0.4
+    all                          mse 0.4803 sign 0.828 n 373337 | aux 0.4173 life 0.195 atk 0.226 tok_atk 0.18
+N_REL_BAND {"rows": 373337, "src": ["/root/n74c/n_records/n74c_w01_p0", "/root/n74c/n_records/n74c_w01_p1", "/
+  nrel_r28x4.npz
+    calib gap_weighted 0.0212 gap_mean 0.0281 | [-1.0:82720:-0.93] [-0.8:32792:-0.72] [-0.6:25466:-0.51] [-0.4
+    all                          mse 0.4734 sign 0.829 n 383858 | aux 0.4236 life 0.190 atk 0.234 tok_atk 0.19
+  nrel_r29f4.ep0.npz
+    calib gap_weighted 0.0137 gap_mean 0.0208 | [-1.0:82559:-0.93] [-0.8:36679:-0.71] [-0.6:27817:-0.47] [-0.4
+    all                          mse 0.4734 sign 0.830 n 383858 | aux 0.4216 life 0.190 atk 0.233 tok_atk 0.19
+  nrel_r29f4.ep1.npz
+    calib gap_weighted 0.0249 gap_mean 0.0334 | [-1.0:80121:-0.93] [-0.8:32978:-0.73] [-0.6:25756:-0.52] [-0.4
+    all                          mse 0.4748 sign 0.829 n 383858 | aux 0.4205 life 0.190 atk 0.231 tok_atk 0.19
+  nrel_vn_run1.ep0.npz
+    calib gap_weighted 0.0480 gap_mean 0.0623 | [-1.0:74350:-0.94] [-0.8:34055:-0.76] [-0.6:25720:-0.55] [-0.4
+    all                          mse 0.4797 sign 0.827 n 383858 | aux 0.4213 life 0.190 atk 0.233 tok_atk 0.19
+N_REL_BAND {"rows": 383858, "src": ["/root/n70f/n_records/n70f_w01_p0", "/root/n70f/n_records/n70f_w01_p1", "/
+RUN1_BEDS_DONE 19:31
