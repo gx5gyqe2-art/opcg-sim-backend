@@ -559,7 +559,10 @@ def rows_frame(sc, tok, ci, who, turn, seed=None, kind=None, step=None):
             "pol_len": np.zeros(n, np.int64), "pol_chosen": -np.ones(n, np.int64), "pol_v0": np.zeros(n, np.float32)}
     pol = {"pol_sig": np.zeros(0, object), "pol_cid": np.zeros(0, object), "pol_tcid": np.zeros(0, object),
            "pol_si": np.zeros(0, np.int64), "pol_ti": np.zeros(0, np.int64), "pol_k": np.zeros(0, np.int64)}
-    ex = {"sc": np.asarray(sc, np.float32), "tok": np.asarray(tok, np.float32), "ci": np.asarray(ci, np.int64)}
+    ci = np.asarray(ci, np.int64)
+    if ci.shape[1] < 24:                 # NRel の 22 枠で来た card_idx は記録の 24 枠（両席のステージ）に 0 で広げる
+        ci = np.concatenate([ci, np.zeros((len(ci), 24 - ci.shape[1]), np.int64)], 1)
+    ex = {"sc": np.asarray(sc, np.float32), "tok": np.asarray(tok, np.float32), "ci": ci}
     return frame_of(rows, pol, ex, np.zeros(n, np.int64), np.zeros(n, np.int64), np.arange(n), u2c={})
 
 

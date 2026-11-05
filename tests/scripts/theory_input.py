@@ -9,7 +9,7 @@
   ``sidecar``  波の記録の全行に列を出し、シャードの隣に `*.theory.npz`（`opcg_sim.learned.train.theory_labels`）を書く。
                ``--shard i/n``（シャードのファイルを i 番目ごとに）・``--workers``・既にあれば飛ばす。
   ``weights``  訓練したネットの足した列の重み（1 段目の重みの列ごとの大きさ・行ごとの散らばりとの積の順位）。
-  ``calib``    取り置きの行で、ネットの値を 10 の帯に切った帯ごとの実際の勝率（較正）＝ `n_rel_band` の出力に無い分。
+  ``calib``    取り置きの行で、ネットの値を 10 の帯に切った帯ごとの実際の勝率（較正）＝ `n_rel_band` の出力に無い分（``--theory-in``）。
 
     OPCG_LOG_SILENT=1 python tests/scripts/theory_input.py bench --in ~/n70f/n_records/n70f_w01_p0 --rows 2000
     OPCG_LOG_SILENT=1 python tests/scripts/theory_input.py sidecar --in '~/n70f/n_records/n70f_w*_p[0-3]' --workers 4
@@ -225,9 +225,53 @@ def cmd_weights(a):
     json.dump(res, open(os.path.join(a.out, f"weights_{a.tag}.json"), "w"), ensure_ascii=False, indent=1)
 
 
+# ---------------------------------------------------------------- calib（較正・取り置きの帯）
+
+def cmd_calib(a):
+    """取り置き（seed%7==0）の行で、ネットの値を 10 の帯（−1〜+1 を 0.2 刻み）に切り、帯ごとの実際の勝率（勝敗の平均）と
+    予測の平均との差（絶対値の平均＝外れ）を出す。理論の列を読むネットには sidecar を足す（`n_rel_band._load(theory=True)`）。"""
+    from opcg_sim.learned import n_rel as NL
+    from opcg_sim.learned import n_rel_feat as NR
+    from opcg_sim.learned.train import n_rel_band as NB
+    from opcg_sim.learned.train.n_eff_feat import build_eff_tables
+    from opcg_sim.learned.vocab import load_db
+    stats, ab, abm, pwr, isl, vocab = build_eff_tables()
+    tables = (stats, ab, abm, pwr, isl)
+    rt = NR.RelTable(NR.profile_table(load_db(), vocab))
+    dirs = [d for pat in a.src for d in sorted(glob.glob(os.path.expanduser(pat)))]
+    D, _keep = NB._load(dirs, 7, 0, None, theory=a.theory_in)
+    z = D["z"].astype(np.float64)
+    edges = np.linspace(-1, 1, 11)
+    res = {"rows": int(len(z)), "edges": edges.tolist(), "nets": {}}
+    for p in a.nets:
+        net = NL.NRelNet.load(p, tables=tables)
+        sc = D["sc"] if getattr(net, "theory_in", False) else D["sc"][:, :NL.D_SC]
+        vs = []
+        for s0 in range(0, len(z), 512):
+            ci = D["ci"][s0:s0 + 512][:, :NL.N_TOK]; tok = D["tok"][s0:s0 + 512]
+            rom, roo = NR.relations_batch(ci, tok, rt)
+            vs.append(net.value(sc[s0:s0 + 512], ci, tok, rom, roo))
+        v = np.concatenate(vs).astype(np.float64)
+        b = np.clip(np.digitize(v, edges[1:-1]), 0, 9)
+        bands = []
+        for k in range(10):
+            m = b == k
+            bands.append({"n": int(m.sum()), "pred": round(float(v[m].mean()), 4) if m.any() else None,
+                          "actual": round(float(z[m].mean()), 4) if m.any() else None})
+        gap = float(np.mean([abs(x["pred"] - x["actual"]) for x in bands if x["n"] > 0]))
+        wgap = float(sum(abs(x["pred"] - x["actual"]) * x["n"] for x in bands if x["n"] > 0) / len(z))
+        res["nets"][os.path.basename(p)] = {"bands": bands, "gap_mean_abs": round(gap, 4), "gap_weighted": round(wgap, 4),
+                                            "mse": round(float(np.mean((v - z) ** 2)), 4)}
+        print(os.path.basename(p), f"gap {gap:.4f} weighted {wgap:.4f} mse {res['nets'][os.path.basename(p)]['mse']:.4f}",
+              " ".join(f"{x['pred']:+.2f}->{x['actual']:+.2f}({x['n']})" for x in bands if x["n"]), flush=True)
+    os.makedirs(a.out, exist_ok=True)
+    json.dump(res, open(os.path.join(a.out, f"calib_{a.tag}.json"), "w"), ensure_ascii=False, indent=1)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("cmd", choices=["bench", "sidecar", "weights"])
+    ap.add_argument("cmd", choices=["bench", "sidecar", "weights", "calib"])
+    ap.add_argument("--theory-in", action="store_true", help="calib: 取り置きの行に理論の列（sidecar）を足す")
     ap.add_argument("--in", dest="src", nargs="*", default=[os.path.expanduser("~/n70f/n_records/n70f_w01_p0")])
     ap.add_argument("--rows", type=int, default=2000)
     ap.add_argument("--single", type=int, default=300)
@@ -238,7 +282,7 @@ def main(argv=None):
     ap.add_argument("--shard", default=None)
     ap.add_argument("--out", default=OUT_DIR)
     a = ap.parse_args(argv)
-    return {"bench": cmd_bench, "sidecar": cmd_sidecar, "weights": cmd_weights}[a.cmd](a)
+    return {"bench": cmd_bench, "sidecar": cmd_sidecar, "weights": cmd_weights, "calib": cmd_calib}[a.cmd](a)
 
 
 if __name__ == "__main__":
