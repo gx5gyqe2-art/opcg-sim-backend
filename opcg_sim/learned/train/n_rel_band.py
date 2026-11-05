@@ -79,6 +79,33 @@ def _metrics(v, z):
             "n": int(len(z))}
 
 
+#: 較正の帯の数（§7.81・WP `value-next`）: ネットの値 [−1, 1] を等幅 10 の帯に切る。
+CALIB_BINS = 10
+
+
+def calibration(v, z, nbins=CALIB_BINS):
+    """勝敗に対する較正（§7.81）: ネットの値を `nbins` の等幅の帯に切り、帯ごとの行数・ネットの値の平均・勝敗の平均・
+    実際の勝率（z > 0 の割合）を出す。`gap_weighted`＝帯ごとの |ネットの値の平均 − 勝敗の平均| を行数で重み付けた平均、
+    `gap_mean`＝空でない帯の単純平均（予告の「帯の外れ」は `gap_weighted` で読む・`gap_mean` は参考）。"""
+    v = np.asarray(v, np.float64)
+    z = np.asarray(z, np.float64)
+    edges = np.linspace(-1.0, 1.0, nbins + 1)
+    idx = np.clip(np.digitize(v, edges[1:-1]), 0, nbins - 1)
+    bins = []
+    for b in range(nbins):
+        m = idx == b
+        if not m.any():
+            bins.append({"lo": float(edges[b]), "hi": float(edges[b + 1]), "n": 0})
+            continue
+        bins.append({"lo": float(edges[b]), "hi": float(edges[b + 1]), "n": int(m.sum()),
+                     "v_mean": float(v[m].mean()), "z_mean": float(z[m].mean()),
+                     "win_rate": float(np.mean(z[m] > 0))})
+    gaps = np.array([abs(b["v_mean"] - b["z_mean"]) for b in bins if b["n"]])
+    ns = np.array([b["n"] for b in bins if b["n"]], np.float64)
+    return {"bins": bins, "gap_weighted": float((gaps * ns).sum() / ns.sum()) if ns.sum() else float("nan"),
+            "gap_mean": float(gaps.mean()) if len(gaps) else float("nan")}
+
+
 def aux_errors(pred, pred_tok, aux, aux_tok, mask):
     """aux の**列ごと**の誤差（0〜9 は Huber・aux_tok は [BCE, Huber, BCE] を枠平均）。"""
     m = mask > 0
@@ -393,6 +420,8 @@ def main(argv=None):
     res = {}
     for name, v in preds.items():
         res[name] = {b: _metrics(v[m], z[m]) for b, m in buckets if m.any()}
+        if "all" in res[name]:                       # 較正の帯（§7.81）は全行だけ
+            res[name]["all"]["calib"] = calibration(v, z)
         ap_ = aux_pred.get(name)
         if ap_ is not None:
             for b, m in buckets:
@@ -403,6 +432,10 @@ def main(argv=None):
                 if e:
                     res[name][b]["aux"] = e
         print(f"  {name}")
+        if "all" in res[name]:
+            c = res[name]["all"]["calib"]
+            print(f"    calib gap_weighted {c['gap_weighted']:.4f} gap_mean {c['gap_mean']:.4f} | "
+                  + " ".join(f"[{b['lo']:+.1f}:{b['n']}:{b['z_mean']:+.2f}]" for b in c["bins"] if b["n"]), flush=True)
         for b, r in res[name].items():
             line = f"    {b:28s} mse {r['v_mse']:.4f} sign {r['v_sign']:.3f} n {r['n']:6d}"
             if "aux" in r:
