@@ -42,14 +42,32 @@ def write_sidecar(shard_path, th, seed, step):
     return out
 
 
-def load_theory(src_dirs, z_dirs, n_rows):
+def load_theory(src_dirs, z_dirs, n_rows, cache_dir=None):
     """`dump_io.load_dump` の V と**同じ行の並び**で sidecar を読む → 列 [N, D_TH] float16。
 
     並びは pack と同じ（`--in` の後に `--z-in`・各ディレクトリの `shard_files` の順）。sidecar の無いシャードが
-    あれば ValueError（列 0 で埋めない）。行の seed・step がシャードと合わなければ ValueError。"""
+    あれば ValueError（列 0 で埋めない）。行の seed・step がシャードと合わなければ ValueError。
+    `cache_dir` を渡すと列をそこの `.npy`（memmap）に置いて返す＝RAM に 10.7M 行 × 25 列を持たない（訓練の
+    メモリ上限 14GB の余裕のため・2026-11-05 の 2 周目の OOM）。鍵は sidecar の一覧とサイズと mtime。"""
     dirs = [d for d in list(src_dirs) + list(z_dirs) if DIO.shard_files(d)]
     files = [f for d in dirs for f in DIO.shard_files(d)]
-    th = np.zeros((n_rows, D_TH), np.float16)
+    if cache_dir:
+        import hashlib
+        h = hashlib.sha1()
+        for f in files:
+            sp = sidecar_path(f)
+            if os.path.exists(sp):
+                st = os.stat(sp)
+                h.update(f"{sp}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
+        os.makedirs(cache_dir, exist_ok=True)
+        path = os.path.join(cache_dir, f"theory_{n_rows}_{h.hexdigest()[:16]}.npy")
+        if os.path.exists(path):
+            m = np.load(path, mmap_mode="r")
+            if m.shape == (n_rows, D_TH):
+                return m
+        th = np.lib.format.open_memmap(path + ".tmp.npy", mode="w+", dtype=np.float16, shape=(n_rows, D_TH))
+    else:
+        th = np.zeros((n_rows, D_TH), np.float16)
     off = 0
     missing = []
     for f in files:
@@ -76,6 +94,11 @@ def load_theory(src_dirs, z_dirs, n_rows):
         raise ValueError(f"sidecar の並びが V と合わない（{off} != {n_rows}）")
     if missing:
         raise ValueError(f"sidecar（*.theory.npz）の無いシャードが {len(missing)} 本（例 {missing[0]}）＝使う波を揃える")
+    if cache_dir:
+        th.flush()
+        del th
+        os.replace(path + ".tmp.npy", path)
+        return np.load(path, mmap_mode="r")
     return th
 
 
@@ -87,7 +110,7 @@ class ScTheory(DIO._Waves):
 
     def __init__(self, sc, th):
         self.base = sc
-        self.th = np.asarray(th, np.float16)
+        self.th = th if isinstance(th, np.memmap) else np.asarray(th, np.float16)
         if len(self.th) != len(sc):
             raise ValueError(f"行数が合わない {len(self.th)} != {len(sc)}")
         self.parts = []
@@ -112,7 +135,7 @@ class ScTheory(DIO._Waves):
         if isinstance(key, (int, np.integer)):
             return np.concatenate([np.asarray(self.base[key], np.float16), self.th[key]])
         a = np.asarray(self.base[key], np.float16)
-        return np.concatenate([a, self.th[key]], 1)
+        return np.concatenate([a, np.asarray(self.th[key], np.float16)], 1)
 
 
 def attach(V, th):

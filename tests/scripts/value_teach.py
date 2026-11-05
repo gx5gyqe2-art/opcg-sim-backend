@@ -454,7 +454,7 @@ def _tv_theory(f, d):
 
 
 def cmd_tvval(a):
-    files = sorted(glob.glob(os.path.join(a.out, "tv_states", "pid*.npz")))
+    files = sorted(f for f in glob.glob(os.path.join(a.out, "tv_states", "pid*.npz")) if not f.endswith(".theory.npz"))
     res = {"points": len(files), "truth": TV_TRUTH, "nets": {}}
     for net in a.nets:
         per = {t: [] for t in TV_TIMES}

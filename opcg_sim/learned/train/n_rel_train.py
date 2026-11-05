@@ -991,7 +991,7 @@ def train(args):
     # 差し替える（切＝既定なら何も読まない＝今までと 1 ビットも同じ）。sidecar の無いシャードがあれば止める。
     if getattr(args, "theory_in", False):
         from opcg_sim.learned.train import theory_labels as TL
-        th = TL.load_theory(_expand(args.src), _expand(args.zsrc), len(V["z"]))
+        th = TL.load_theory(_expand(args.src), _expand(args.zsrc), len(V["z"]), cache_dir=args.cache_dir or DIO.default_cache_dir())
         TL.attach(V, th)
         print(f"theory-in: 理論の列 {TL.D_TH} を入力の束に足した（行 {len(th)}・sc {V['sc'].shape[1]} 列）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
