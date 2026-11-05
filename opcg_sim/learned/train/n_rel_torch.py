@@ -84,6 +84,10 @@ class TorchNRel(torch.nn.Module):
         self.value_skip = bool(getattr(net, "value_skip", False))
         if self.value_skip:
             self.Wvz = torch.nn.Parameter(_f32(net.Wvz))
+        # 理論の列（§7.82）も同じ流儀（`net.theory_in` のときだけ Parameter）。
+        self.theory_in = bool(getattr(net, "theory_in", False))
+        if self.theory_in:
+            self.W1t = torch.nn.Parameter(_f32(net.W1t))
         self.register_buffer("STATS", _f32(net.STATS))
         self.register_buffer("AB", _f32(net.AB))
         self.register_buffer("ABM", _f32(net.ABM))
@@ -207,6 +211,11 @@ class TorchNRel(torch.nn.Module):
         return h * present[:, :, None], present
 
     def body(self, sc, h, present, want_z=False):
+        th = None
+        if self.theory_in:
+            if sc.shape[1] != D_SC + NL.D_TH:
+                raise ValueError(f"theory_in のネットには理論の列つきの sc（{D_SC}+{NL.D_TH} 列）が要る: {sc.shape[1]} 列")
+            sc, th = sc[:, :D_SC], sc[:, D_SC:]
         if self._sc_masked:
             sc = sc * self.sc_keep
         n = torch.clamp(present.sum(1, keepdim=True), min=1.0)
@@ -218,7 +227,10 @@ class TorchNRel(torch.nn.Module):
             mx = h_masked.max(1).values
             mx = torch.where(mx < -1e8, 0.0, mx)
         z = torch.cat([sc, mean, mx], 1)
-        r1 = torch.relu(z @ self.W1 + self.b1)
+        h1 = z @ self.W1 + self.b1
+        if th is not None:
+            h1 = h1 + th @ self.W1t              # 理論の列（§7.82・0 で始める）
+        r1 = torch.relu(h1)
         e = torch.relu(r1 @ self.W2 + self.b2)
         return (e, z) if want_z else e
 
@@ -459,6 +471,8 @@ class TorchTrainer:
                     setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
             if self.tn.value_skip:
                 self.net.Wvz = self.tn.Wvz.detach().numpy().copy()
+            if self.tn.theory_in:
+                self.net.W1t = self.tn.W1t.detach().numpy().copy()
 
     def _set_lr(self, lr):
         if lr != self._lr:

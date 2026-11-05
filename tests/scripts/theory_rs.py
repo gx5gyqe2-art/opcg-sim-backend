@@ -537,3 +537,54 @@ def row_frame(sc, tok, ci, cands=(), who=0, turn=1):
     ex = {"sc": np.asarray(sc, np.float32)[None], "tok": np.asarray(tok, np.float32)[None],
           "ci": np.asarray(ci, np.int64)[None]}
     return frame_of(rows, pol, ex, np.array([n]), np.array([0]), np.array([0]), u2c={})
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# 見える情報だけの理論の列（WP `theory-input` 段 0・§7.82・Rust `core::drv_vis`）
+
+#: 列の名前の正本は Rust（`drv_vis::VIS_COLS`）。Python 側の写しは `n_rel.TH_COLS` 1 か所（`visible_cols` が戻りの `cols` と照合する）。
+VIS_COLS = tuple(__import__("opcg_sim.learned.n_rel", fromlist=["TH_COLS"]).TH_COLS)
+#: 時計の幅（`harm_profile.json` の `sigma_t`／`sigma_rel_whole.curve` の `real` の行＝交点の橋の実デッキの読みと同じ・
+#: `crossing_bridge.sigma_for` が引く値の写し。W は D の単調な関数なので列の情報は幅に依らない）
+VIS_SIGMA_T, VIS_SIGMA_REL = 1.242, 0.3874
+
+
+def rows_frame(sc, tok, ci, who, turn, seed=None, kind=None, step=None):
+    """生の行の束（`sc` [N,127]・`tok` [N,22,22]・`ci` [N,24]・`who`／`turn` [N]）→ 候補の無い N 行の枠。"""
+    n = len(who)
+    z = np.zeros(n, np.int64)
+    rows = {"who": np.asarray(who, np.int64), "turn": np.asarray(turn, np.int64),
+            "seed": z if seed is None else np.asarray(seed, np.int64), "z": np.zeros(n, np.float32),
+            "kind": z if kind is None else np.asarray(kind, np.int64), "step": np.arange(n) if step is None else np.asarray(step, np.int64),
+            "pol_len": np.zeros(n, np.int64), "pol_chosen": -np.ones(n, np.int64), "pol_v0": np.zeros(n, np.float32)}
+    pol = {"pol_sig": np.zeros(0, object), "pol_cid": np.zeros(0, object), "pol_tcid": np.zeros(0, object),
+           "pol_si": np.zeros(0, np.int64), "pol_ti": np.zeros(0, np.int64), "pol_k": np.zeros(0, np.int64)}
+    ex = {"sc": np.asarray(sc, np.float32), "tok": np.asarray(tok, np.float32), "ci": np.asarray(ci, np.int64)}
+    return frame_of(rows, pol, ex, np.zeros(n, np.int64), np.zeros(n, np.int64), np.arange(n), u2c={})
+
+
+PROF = {"hand": 0.0, "me": 0.0, "mirror": 0.0, "opp": 0.0, "next": 0.0, "n": 0}
+
+
+def visible_cols(sc, tok, ci, who, turn, decks, seed=None, kind=None, step=None, profile=False):
+    """見える情報だけの理論の列 [N, len(VIS_COLS)]（float64）。`decks`＝(席 0 のデッキ, 席 1 のデッキ)（card_id の列・無い席は None）。
+    行はすべて同じ局（同じデッキ）のもの。時計の幅は `VIS_SIGMA_*`（この関数の中で立てて戻す）。"""
+    saved = dict(CLOCK)
+    set_sigma_turn(VIS_SIGMA_T)
+    set_sigma_rel(VIS_SIGMA_REL)
+    try:
+        fr = rows_frame(sc, tok, ci, who, turn, seed, kind, step)
+        res = game_call("visible_cols", fr, {"cfg": cfg(), "in": {"decks": deck_list(decks), "rows": None, "profile": bool(profile)},
+                                             "stats": {}, "carry": {}}, counters=False)
+    finally:
+        CLOCK.update(saved)
+    if profile and res.get("prof"):
+        for k, v in res["prof"].items():
+            PROF[k] += float(v)
+        PROF["n"] += len(who)
+    if tuple(res["cols"]) != VIS_COLS:
+        raise RuntimeError("Rust の列の並びが Python の写しと違う: %r" % (res["cols"],))
+    out = np.zeros((len(who), len(VIS_COLS)), np.float64)
+    for k, vals in res["rows"]:
+        out[int(k)] = vals
+    return out

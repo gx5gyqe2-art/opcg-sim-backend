@@ -50,7 +50,7 @@ from opcg_sim.learned.encoder import SCALARS_V12  # noqa: E402
 from opcg_sim.loop import record_gen as RG  # noqa: E402  aux の列名（正本）
 
 
-def _load(dirs, mod, limit, cache_dir=None):
+def _load(dirs, mod, limit, cache_dir=None, theory=False):
     """holdout 行（`seed%mod==0`）だけを float32 で持つ（読みは `dump_io.load_dump`＝memmap）。
 
     帯は holdout（既定 1/7）しか使わないので、**そこだけ切り出して RAM に置く**。dump v2／v3 の
@@ -61,6 +61,11 @@ def _load(dirs, mod, limit, cache_dir=None):
     keep = np.where(V["seed"] % mod == 0)[0]
     if limit:
         keep = keep[:limit]
+    if theory:
+        # 理論の列（§7.82・WP `theory-input`）: 記録の隣の sidecar を同じ並びで読み、取り置きの行だけ後ろに足す
+        from opcg_sim.learned.train import theory_labels as TL
+        th = TL.load_theory(dirs, [], len(V["z"]))
+        V = dict(V, sc=TL.ScTheory(V["sc"], th))
     D = {"sc": np.asarray(V["sc"][keep], np.float32),
          "ci": np.asarray(V["ci"][keep], np.int64),
          "tok": np.asarray(V["tok"][keep], np.float32),
@@ -333,6 +338,8 @@ def main(argv=None):
     ap.add_argument("--policy", action="store_true",
                     help="holdout の方策点でも比べる（目標 visits／q_improved の top1・CE と"
                          "「門」の指標・§20.6.1）。r ネットのみ")
+    ap.add_argument("--theory-in", action="store_true",
+                    help="§7.82（WP theory-input）: 記録の隣の *.theory.npz（理論の列）を取り置きの行に足す（理論の列を読むネットの帯）")
     ap.add_argument("--policy-limit", type=int, default=20000,
                     help="方策指標に使う holdout の方策点の上限（0＝全部・既定 20000）")
     ap.add_argument("--pi-prior-net", default=None,
@@ -347,7 +354,7 @@ def main(argv=None):
     db = load_db()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
     tables = (stats, ab, abm, pwr, isl)
-    D, keep = _load(args.src, args.holdout_mod, args.limit, args.cache_dir)
+    D, keep = _load(args.src, args.holdout_mod, args.limit, args.cache_dir, theory=args.theory_in)
     z = D["z"].astype(np.float64)
     print(f"holdout 行 {len(z)}（seed%{args.holdout_mod}==0・{time.time()-t0:.0f}s）", flush=True)
     preds = {}
@@ -369,6 +376,10 @@ def main(argv=None):
     for p in args.nrel:
         net = NL.NRelNet.load(p, tables=tables)
         want_aux = bool(net.aux and "aux" in D)
+        # 理論の列（§7.82）: 読むネットには列つきの sc・読まないネットには盤面の列だけ
+        sc_net = sc_r if getattr(net, "theory_in", False) else sc_r[:, :NL.D_SC]
+        if getattr(net, "theory_in", False) and not args.theory_in:
+            raise ValueError(f"{p}: 理論の列を読むネット＝--theory-in で sidecar を足す")
         vs, pa, pt = [], [], []
         for s in range(0, len(z), args.bs):
             ci = D["ci"][s:s + args.bs][:, :NL.N_TOK]; tok = D["tok"][s:s + args.bs]
@@ -376,10 +387,10 @@ def main(argv=None):
             if args.zero_rel:
                 rel_om = np.zeros_like(rel_om); rel_oo = np.zeros_like(rel_oo)
             if want_aux:
-                v, a, at = net.value_with_aux(sc_r[s:s + args.bs], ci, tok, rel_om, rel_oo)
+                v, a, at = net.value_with_aux(sc_net[s:s + args.bs], ci, tok, rel_om, rel_oo)
                 pa.append(a); pt.append(at)
             else:
-                v = net.value(sc_r[s:s + args.bs], ci, tok, rel_om, rel_oo)
+                v = net.value(sc_net[s:s + args.bs], ci, tok, rel_om, rel_oo)
             vs.append(v)
         tag = os.path.basename(p) + ("" if not args.zero_rel else "+zero_rel") \
             + ("" if not args.zero_opp_pool else "+zero_opp_pool")

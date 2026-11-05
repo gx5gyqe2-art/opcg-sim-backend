@@ -29,6 +29,7 @@ D = os.path.join("n1_results", "don_jitter")
 def cmd_rows(a):
     nets = a.nets
     sc, ci, tok, sign, early, z, hold = [], [], [], [], [], [], []
+    rseed, rturn, rwho = [], [], []
     for f in sorted(glob.glob(os.path.expanduser(a.wave))):
         d = np.load(f, allow_pickle=True)
         dj, seed, turn, who = d["don_jitter"], d["seed"], d["turn"], d["who"]
@@ -42,7 +43,9 @@ def cmd_rows(a):
                 continue
             i = int(hit[np.argmin(d["step"][hit])])
             sc.append(d["scalars"][i]); ci.append(d["card_idx"][i]); tok.append(d["tokens"][i])
+            rseed.append(int(s)); rturn.append(int(t)); rwho.append(int(seat))
             sign.append(int(sg)); early.append(int(t) <= 6); z.append(float(d["z"][i])); hold.append(int(s) % 7 == 0)
+    ci_full = np.array(ci)
     sc, ci, tok = np.array(sc), np.array(ci)[:, :22], np.array(tok)
     sign, early, z, hold = np.array(sign), np.array(early), np.array(z), np.array(hold)
     res = {"rows": int(len(sign))}
@@ -54,8 +57,16 @@ def cmd_rows(a):
     groups = {"turn3_6": early, "turn7_10": ~early, "all": np.ones(len(sign), bool), "turn3_6_holdout": early & hold, "turn3_6_trained": early & ~hold}
     res["outcome_z"] = {g: diff(z, m) for g, m in groups.items()}
     res["nets"] = {}
+    th = None
+    if any(VT._is_theory_net(n) for n in nets):
+        # 理論の列（§7.82）: 82j の行で見える情報だけから出す（デッキは局 seed と波の decks から・`theory_input.cols_for_rows`）
+        import theory_input as TI
+        import theory_rs as TR
+        TR.ready()
+        mode = TI.decks_mode_of(os.path.dirname(sorted(glob.glob(os.path.expanduser(a.wave)))[0]))
+        th = TI.cols_for_rows(sc, tok, ci_full, rwho, rturn, rseed, mode).astype(np.float32)
     for n in nets:
-        v = VT.net_values(n, sc, ci, tok)
+        v = VT.net_values(n, sc, ci, tok, th=th if VT._is_theory_net(n) else None)
         res["nets"][os.path.basename(n)] = {g: diff(v, m) for g, m in groups.items()}
         print(os.path.basename(n), {g: res["nets"][os.path.basename(n)][g]["diff"] for g in groups}, flush=True)
     print("z", {g: res["outcome_z"][g] for g in groups})
