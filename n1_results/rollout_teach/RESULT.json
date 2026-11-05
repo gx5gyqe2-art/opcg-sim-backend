@@ -1,0 +1,300 @@
+{
+ "job": "rollout-teach",
+ "section": "§7.80",
+ "ledger": "cpu_theory_gap.md 2+518",
+ "status": "done",
+ "branch": "claude/rollout-teach",
+ "report": "docs/reports/2026-11-05_rollout_teach.md",
+ "results_dir": "n1_results/rollout_teach",
+ "verdict": "no effect: 16-sim 16-game play-out means as the value teacher on 100k positions (0.9% of value rows) leave the DON ratio at window close at 0.33/0.32 (control r29f4 0.34/0.32) and the 82j group gap at 0.304/0.305 (control 0.301/0.306); holdout error not worse (74c 0.4749/0.4741 vs 0.4749/0.4750). The net does not even approach the teacher on the teacher rows (train-side mse vs mean 0.1210/0.1181 vs control 0.1222/0.1192, below run-to-run spread 0.0017) => too thin; cannot tell whether teacher noise is the main cause",
+ "teacher": {
+  "positions": 100000,
+  "games": 25000,
+  "holdout_positions": 14132,
+  "waves": [
+   "70f",
+   "71f",
+   "72f",
+   "73f"
+  ],
+  "player": "r28x4 16 sims 1 world both seats",
+  "k": 16,
+  "offset": 19000,
+  "fail": 0,
+  "positions_lt16_games": 106,
+  "min_games": 9,
+  "core_hours": 222.3,
+  "sec_per_position": 8.0,
+  "shards": 30,
+  "shard_minutes": [
+   70,
+   161
+  ],
+  "corr_mean_z": 0.702
+ },
+ "train": {
+  "from": "r28x4",
+  "args": "train_r29f4.json common args + --z-mode rollout",
+  "rows_replaced": 100000,
+  "rows_value": 10712760,
+  "best_ep": 0,
+  "note": "run 1 killed by OOM (concurrent bench) in epoch 2; full 2-epoch rerun is the arm; training not bit-reproducible across runs"
+ },
+ "nets": {
+  "r28x4": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.2818,
+    0.3058
+   ],
+   "band74c": [
+    0.4739,
+    0.8299
+   ],
+   "band70f": [
+    0.4734,
+    0.8287
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1243,
+    "holdout_vs_mean": 0.1239,
+    "holdout_vs_z": 0.5357,
+    "slope_holdout": 0.7849
+   }
+  },
+  "r29f4_ep0": {
+   "rocks": [
+    4,
+    -0.0955,
+    0.099
+   ],
+   "tvval": {
+    "a_head": [
+     0.2005,
+     0.593
+    ],
+    "b_close": [
+     0.1134,
+     0.335
+    ],
+    "c_oppend": [
+     0.1225,
+     0.362
+    ],
+    "d_next": [
+     0.2142,
+     0.634
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3009,
+    0.3227
+   ],
+   "band74c": [
+    0.4749,
+    0.8297
+   ],
+   "band70f": [
+    0.4734,
+    0.83
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1222,
+    "holdout_vs_mean": 0.122,
+    "holdout_vs_z": 0.5247,
+    "slope_holdout": 0.7765
+   }
+  },
+  "r29f4_ep1": {
+   "tvval": {
+    "a_head": [
+     0.1897,
+     0.561
+    ],
+    "b_close": [
+     0.1066,
+     0.315
+    ],
+    "c_oppend": [
+     0.1201,
+     0.355
+    ],
+    "d_next": [
+     0.1999,
+     0.591
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3056,
+    0.3269
+   ],
+   "band74c": [
+    0.475,
+    0.8295
+   ],
+   "band70f": [
+    0.4748,
+    0.8291
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1192,
+    "holdout_vs_mean": 0.1195,
+    "holdout_vs_z": 0.5273,
+    "slope_holdout": 0.7859
+   }
+  },
+  "rt_ep0": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_b_e0.npz",
+   "rocks": [
+    6,
+    -0.1159,
+    0.094
+   ],
+   "tvval": {
+    "a_head": [
+     0.1887,
+     0.558
+    ],
+    "b_close": [
+     0.1125,
+     0.333
+    ],
+    "c_oppend": [
+     0.1209,
+     0.358
+    ],
+    "d_next": [
+     0.2113,
+     0.625
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.304,
+    0.322
+   ],
+   "band74c": [
+    0.4749,
+    0.8299
+   ],
+   "band70f": [
+    0.4734,
+    0.8297
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.121,
+    "holdout_vs_mean": 0.1207,
+    "holdout_vs_z": 0.5246,
+    "slope_holdout": 0.7775
+   }
+  },
+  "rt_ep1": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_b_e1.npz",
+   "tvval": {
+    "a_head": [
+     0.1964,
+     0.581
+    ],
+    "b_close": [
+     0.1081,
+     0.32
+    ],
+    "c_oppend": [
+     0.1181,
+     0.349
+    ],
+    "d_next": [
+     0.2228,
+     0.659
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3046,
+    0.3243
+   ],
+   "band74c": [
+    0.4741,
+    0.8295
+   ],
+   "band70f": [
+    0.4735,
+    0.8299
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1181,
+    "holdout_vs_mean": 0.1182,
+    "holdout_vs_z": 0.526,
+    "slope_holdout": 0.7927
+   }
+  },
+  "rt_run1_ep0": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_a_e0.npz",
+   "note": "first run (killed in epoch 2 by OOM); run-to-run spread",
+   "tvval": {
+    "a_head": [
+     0.2186,
+     0.647
+    ],
+    "b_close": [
+     0.1127,
+     0.333
+    ],
+    "c_oppend": [
+     0.1227,
+     0.363
+    ],
+    "d_next": [
+     0.2355,
+     0.697
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3039,
+    0.3225
+   ],
+   "band74c": [
+    0.4764,
+    0.8292
+   ],
+   "band70f": [
+    0.4752,
+    0.8292
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1227,
+    "holdout_vs_mean": 0.1223,
+    "holdout_vs_z": 0.5252,
+    "slope_holdout": 0.7772
+   }
+  }
+ },
+ "invariants": {
+  "default_bit_identical": "tests/test_rollout_teach.py",
+  "light_rollout_same_world": {
+   "rows": 12,
+   "games": 192,
+   "same": 192
+  },
+  "controls_match_prior_reports": true
+ },
+ "gates": {
+  "make_test": "green with OPENBLAS_CORETYPE=Haswell (one torch grad-vs-numpy test fails on this CPU's AVX-512 kernel by a hair, with and without this change)",
+  "audit_cross": "not needed (engine untouched)"
+ }
+}

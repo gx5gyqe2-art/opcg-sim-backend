@@ -10,6 +10,7 @@
                局の選びは局 seed のハッシュの順に `N_GAMES` 局（決定的）。シャードの割り当ては選んだ局の順位 % 本数。
   ``play``     ``--shard i/30``: 自分の局だけ当て直して打ち続け、`rows_sKK.jsonl` に 1 盤面 1 行で追記（再開できる）。
   ``sidecar``  集めた行（`--rows` の glob）から記録の隣に `n_record_XXXXX.roll.npz`（`opcg_sim.learned.train.rollout_labels`）を書く。
+  ``bench``    教師を付けた行での当てはまり（ネットの値を平均・勝敗に対して・訓練側と取り置き〔seed%7==0〕に分けて）。
   ``check``    不変量: §7.79 の 400 行（`n1_results/light_rollout/rows.json`）の一部を、同じ世界（ずらし 18000）で
                この道具の打ち続けで打ち直し、`jitter_local.jsonl` の読み 16 回の勝敗と 1 局ずつ一致するかを見る。
 
@@ -355,9 +356,63 @@ def cmd_check(a):
     json.dump(res, open(os.path.join(a.out, "check_light_rollout.json"), "w"))
 
 
+# ---------------------------------------------------------------- 教師を付けた行での当てはまり（段 3）
+
+def _teacher_rows(rows_glob):
+    """集めた行 → 盤面の配列（シャードから符号化を読む）と平均・勝敗・取り置きの印。"""
+    by = {}
+    for f in sorted({f for pat in rows_glob for f in glob.glob(pat)}):
+        for r in BA.read_jsonl(f):
+            if r.get("ok") and r.get("n"):
+                by.setdefault(r["file"], {})[r["row"]] = r
+    sc, ci, tok, mean, z, hold, turn, n = [], [], [], [], [], [], [], []
+    for rel, rs in sorted(by.items()):
+        rr = sorted(rs)
+        with np.load(os.path.expanduser(rel), allow_pickle=False) as d:
+            sc.append(d["scalars"][rr]); ci.append(d["card_idx"][rr][:, :22]); tok.append(d["tokens"][rr])
+            zz = d["z"][rr].astype(np.float32)
+        z.append(zz)
+        mean += [rs[i]["mean"] for i in rr]
+        hold += [rs[i]["seed"] % 7 == 0 for i in rr]
+        turn += [rs[i]["turn"] for i in rr]
+        n += [rs[i]["n"] for i in rr]
+    return (np.concatenate(sc), np.concatenate(ci), np.concatenate(tok), np.array(mean, np.float32),
+            np.concatenate(z), np.array(hold), np.array(turn), np.array(n))
+
+
+def _fit(v, t):
+    """ネットの値 v を教師 t に対して: 2 乗誤差・相関・傾き（t が 1 動くと v がどれだけ動くか）。"""
+    c = np.cov(t, v)
+    return {"mse": round(float(np.mean((v - t) ** 2)), 4), "corr": round(float(np.corrcoef(t, v)[0, 1]), 4),
+            "slope": round(float(c[0, 1] / c[0, 0]), 4)}
+
+
+def cmd_bench(a):
+    from value_teach import net_values
+    sc, ci, tok, mean, z, hold, turn, n = _teacher_rows(a.rows)
+    res = {"rows": int(len(mean)), "holdout": int(hold.sum()), "nets": {},
+           "teacher": {g: {"mean_vs_z": _fit(mean[m], z[m]), "sd_mean": round(float(mean[m].std()), 4),
+                           "sd_z": round(float(z[m].std()), 4)}
+                       for g, m in (("train", ~hold), ("holdout", hold))}}
+    for net in a.nets:
+        v = net_values(net, sc, ci, tok)
+        row = {}
+        for g, m in (("train", ~hold), ("holdout", hold)):
+            row[g] = {"vs_mean": _fit(v[m], mean[m]), "vs_z": _fit(v[m], z[m]),
+                      "by_turn": {lab: _fit(v[m & q], mean[m & q])
+                                  for lab, q in (("t3_6", turn <= 6), ("t7_10", (turn >= 7) & (turn <= 10)), ("t11+", turn >= 11))}}
+        res["nets"][os.path.basename(net)] = row
+        h = row["holdout"]
+        print(f"{os.path.basename(net)}: 取り置き 平均に対して mse {h['vs_mean']['mse']} 相関 {h['vs_mean']['corr']} 傾き {h['vs_mean']['slope']}"
+              f"／勝敗に対して mse {h['vs_z']['mse']}・訓練側 平均に対して mse {row['train']['vs_mean']['mse']} 傾き {row['train']['vs_mean']['slope']}",
+              flush=True)
+    os.makedirs(a.out, exist_ok=True)
+    json.dump(res, open(os.path.join(a.out, f"bench_{a.tag}.json"), "w"), ensure_ascii=False, indent=1)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["plan", "play", "sidecar", "check"])
+    ap.add_argument("cmd", choices=["plan", "play", "sidecar", "check", "bench"])
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--positions", default=POSITIONS)
     ap.add_argument("--games", type=int, default=N_GAMES)
@@ -368,8 +423,9 @@ def main(argv=None):
     ap.add_argument("--rows", nargs="*", default=[os.path.join(OUT_DIR, "rows_s*.jsonl")])
     ap.add_argument("--n", type=int, default=12, help="check: 打ち直す行の数")
     ap.add_argument("--k", type=int, default=K, help="check: 1 行の局数")
+    ap.add_argument("--nets", nargs="*", default=[], help="bench: ネットの npz")
     a = ap.parse_args(argv)
-    {"plan": cmd_plan, "play": cmd_play, "sidecar": cmd_sidecar, "check": cmd_check}[a.cmd](a)
+    {"plan": cmd_plan, "play": cmd_play, "sidecar": cmd_sidecar, "check": cmd_check, "bench": cmd_bench}[a.cmd](a)
 
 
 if __name__ == "__main__":

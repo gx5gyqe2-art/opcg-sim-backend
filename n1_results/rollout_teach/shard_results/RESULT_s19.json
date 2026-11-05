@@ -1,0 +1,1 @@
+{"wp": "rollout-teach", "shard": "19/30", "rows": 3332, "fail": 0, "sec": 7282, "files": ["n1_results/rollout_teach/rows_s19.jsonl", "n1_results/rollout_teach/logs/rt_s19.log"]}
