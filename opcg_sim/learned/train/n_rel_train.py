@@ -853,11 +853,15 @@ def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, c
 #: 根の探索が在る行（main・候補 1 つ以上・訪問 > 0）だけ差し替え、窓・コミットの行は z のまま。`--omni-in` は要らない。
 #: rollout＝打ち続けの平均（§7.80・WP `rollout-teach`）: 記録の隣の sidecar `*.roll.npz`（`rollout_labels`）に行がある行だけ
 #: 勝敗を平均に差し替え、残りは z のまま。`--omni-in` は要らない。
-#: next_v0＝**次の自分のメインの判断点の根の値**（§7.81・WP `value-next`）: 各行の教師を「同じ局（seed）・同じ席（who）の、
-#: その行の step より後の最初の、根の推定のある main の行（印は v0mix と同じ）」の `pol_v0` に差し替える。そういう行が
-#: 無い行（その前に局が終わる）は z のまま。相手の手番の行（窓・続き）も、いちばん近い次の自分のメインの判断点の値。
-#: 混ぜる割合は無し（新定数ゼロ）。`pol_v0` は行の手番の視点＝同じ席なら z と同じ視点なので符号は変えない。
-Z_MODES = ("z", "omni", "mix", "v0mix", "rollout", "next_v0")
+#: next_v0＝**次の自分の手番の頭の根の値**（§7.81・WP `value-next`・主の腕）: 各行の教師を「同じ局（seed）・同じ席（who）の、
+#: その行の turn より後の最初の、根の推定のある main の行（印は v0mix と同じ）」の `pol_v0` に差し替える（同じ手番の後の
+#: 判断点は飛ばす＝時間が 1 手番ぶん進む）。そういう行が無い行（その前に局が終わる）は z のまま。相手の手番の行（窓・続き）も、
+#: いちばん近い次の自分の手番の頭の値。混ぜる割合は無し（新定数ゼロ）。`pol_v0` は行の手番の視点＝同じ席なら z と同じ視点
+#: なので符号は変えない。
+#: next_v0_step＝**次の自分のメインの判断点**（副の腕・時間の歩幅が 1 判断点）: 同じ局・同じ席の、その行の step より後の最初の
+#: 根の推定のある main の行の `pol_v0`（同じ手番の数歩先も教師になる）。残りは next_v0 と同じ。
+Z_MODES = ("z", "omni", "mix", "v0mix", "rollout", "next_v0", "next_v0_step")
+NEXT_V0_MODES = ("next_v0", "next_v0_step")
 
 
 def load_root_v0(dirs, z_dirs=()):
@@ -901,23 +905,31 @@ def _root_mask(dd, nr):
     return (np.asarray(dd["kind"][:nr]) == 0) & (pl >= 1) & (ntot > 0)
 
 
-#: `next_v0` の行の鍵（seed・席・step を 1 本の int64 に＝同じ局・同じ席の中で step の順）。step は 1 局 1,000 未満
-#: （`driver.DEFAULT_MAX_STEPS`）・seed は 2^42 未満で収まる。
-_NEXT_KEY_SHIFT = 21
+#: `next_v0` の行の鍵: (局 seed, 席 who, 手番 turn, step) を 1 本の int64 に。turn < 2048・step < 1024
+#: （`driver.DEFAULT_MAX_STEPS`＝1,000）・seed < 2^41 で収まる。
+_NEXT_T, _NEXT_S = 2048, 1024
 
 
-def next_v0_teacher(z, seed, who, step, v0, mask):
-    """§7.81（WP `value-next`）: 行ごとの教師を「同じ局・同じ席の、その行の step より後の最初の印の立つ行」の `v0` にする。
+def next_v0_teacher(z, seed, who, step, v0, mask, turn=None, by="turn"):
+    """§7.81（WP `value-next`）: 行ごとの教師を「同じ局・同じ席の、その行より後の最初の印の立つ行」の `v0` にする。
 
+    `by="turn"`（主の腕・`next_v0`）＝その行の `turn` より後の手番の最初の印の立つ行（同じ手番の後の判断点は飛ばす）。
+    `by="step"`（副の腕・`next_v0_step`）＝その行の `step` より後の最初の印の立つ行（同じ手番の数歩先も可）。
     → (教師 float32, 印 bool＝差し替えた行, 教師の行の index int64＝無い行は −1)。印の無い行は z のまま。
-    印の立つ行（根の推定のある main の行）自身も、**自分の値ではなく次の行の値**を教師にする（§7.72 の `v0mix` と
-    違う点＝時間が 1 判断点ぶん進む）。1 局の行の並びは問わない（鍵で引く）。"""
+    印の立つ行（根の推定のある main の行）自身も、**自分の値ではなく後の行の値**を教師にする（§7.72 の `v0mix` と
+    違う点＝時間が進む）。1 局の行の並びは問わない（鍵で引く）。"""
     seed = np.asarray(seed, np.int64)
     who = np.asarray(who, np.int64)
     step = np.asarray(step, np.int64)
-    if len(step) and (step.min() < 0 or step.max() >= (1 << (_NEXT_KEY_SHIFT - 1))):
-        raise ValueError(f"--z-mode next_v0: step の範囲が鍵に収まらない（{step.min()}〜{step.max()}）")
-    key = (seed << _NEXT_KEY_SHIFT) + (who << (_NEXT_KEY_SHIFT - 1)) + step
+    turn = np.zeros(len(step), np.int64) if turn is None else np.asarray(turn, np.int64)
+    if len(step) and (step.min() < 0 or step.max() >= _NEXT_S or turn.min() < 0 or turn.max() >= _NEXT_T):
+        raise ValueError(f"--z-mode next_v0: step／turn の範囲が鍵に収まらない（step {step.min()}〜{step.max()}・"
+                         f"turn {turn.min()}〜{turn.max()}）")
+    if by not in ("turn", "step"):
+        raise ValueError(f"next_v0_teacher: by は turn か step（{by}）")
+    base = ((seed * 2 + who) * _NEXT_T + turn) * _NEXT_S
+    key = base + step
+    query = key if by == "step" else base + (_NEXT_S - 1)   # turn で引く＝同じ手番の最後より後
     m = np.asarray(mask, bool)
     mi = np.flatnonzero(m)
     order = np.argsort(key[mi], kind="stable")
@@ -925,7 +937,7 @@ def next_v0_teacher(z, seed, who, step, v0, mask):
     out = np.asarray(z, np.float32).copy()
     src = np.full(len(out), -1, np.int64)
     if len(mi):
-        pos = np.searchsorted(mk, key, side="right")         # 最初の「鍵 > 自分の鍵」＝step が後の印の行
+        pos = np.searchsorted(mk, query, side="right")       # 最初の「鍵 > 自分の鍵」＝後の印の行
         ok = pos < len(mi)
         cand = mi[np.minimum(pos, len(mi) - 1)]
         ok &= (seed[cand] == seed) & (who[cand] == who)        # 同じ局・同じ席の中に在る
@@ -934,8 +946,8 @@ def next_v0_teacher(z, seed, who, step, v0, mask):
     return out, src >= 0, src
 
 
-def load_next_v0(dirs, z_dirs=()):
-    """§7.81: pack と同じ行順で (教師 float32, 差し替えた印 bool, 検算の数) を返す（`--z-mode next_v0`）。
+def load_next_v0(dirs, z_dirs=(), by="turn"):
+    """§7.81: pack と同じ行順で (教師 float32, 差し替えた印 bool, 検算の数) を返す（`--z-mode next_v0`＝`by="turn"`／`next_v0_step`＝`by="step"`）。
 
     シャードごとに `seed`・`who`・`step`・`kind`・`turn`・`pol_v0`・`pol_len`・`pol_n` を読み、`next_v0_teacher` を当てる
     （局はシャードをまたがない＝シャードごとで足りる）。検算: 新しい教師と勝敗の相関（同じ席なら正）・差し替えた行数・
@@ -955,7 +967,7 @@ def load_next_v0(dirs, z_dirs=()):
                 step, kind = np.asarray(dd["step"][:nr], np.int64), np.asarray(dd["kind"][:nr], np.int64)
                 turn = np.asarray(dd["turn"][:nr], np.int64)
                 v0 = np.asarray(dd["pol_v0"][:nr], np.float32)
-                t, m, src = next_v0_teacher(z, seed, who, step, v0, _root_mask(dd, nr))
+                t, m, src = next_v0_teacher(z, seed, who, step, v0, _root_mask(dd, nr), turn=turn, by=by)
             outs.append(t), masks.append(m)
             same = turn[src[m]] == turn[m]
             n_same_turn += int(same.sum()); n_later_turn += int((~same).sum())
@@ -965,7 +977,7 @@ def load_next_v0(dirs, z_dirs=()):
         raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
     t, m = np.concatenate(outs), np.concatenate(masks)
     zz, tt = np.concatenate(zz), np.concatenate(tt)
-    info = {"replaced": int(m.sum()), "kept": int((~m).sum()), "rows": int(len(m)),
+    info = {"by": by, "replaced": int(m.sum()), "kept": int((~m).sum()), "rows": int(len(m)),
             "corr_teacher_z": float(np.corrcoef(zz, tt)[0, 1]) if len(zz) > 1 else float("nan"),
             "teacher_mean": float(tt.mean()) if len(tt) else 0.0, "teacher_std": float(tt.std()) if len(tt) else 0.0,
             "same_turn": n_same_turn, "later_turn": n_later_turn,
@@ -1052,18 +1064,19 @@ def train(args):
                 raise ValueError(f"--z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
         V["z"], n_rep = mix_root_v0(V["z"], v0, m0)
         print(f"z-mode v0mix: 根の推定で混ぜた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
-    elif z_mode == "next_v0":
-        t_next, m_next, info = load_next_v0(_expand(args.src), _expand(args.zsrc))
+    elif z_mode in NEXT_V0_MODES:
+        t_next, m_next, info = load_next_v0(_expand(args.src), _expand(args.zsrc),
+                                            by="turn" if z_mode == "next_v0" else "step")
         if len(t_next) != len(V["z"]):
-            raise ValueError(f"next_v0 の行数 {len(t_next)} が value 行 {len(V['z'])} と合わない")
-        print("z-mode next_v0: " + json.dumps(info, ensure_ascii=False), flush=True)
+            raise ValueError(f"{z_mode} の行数 {len(t_next)} が value 行 {len(V['z'])} と合わない")
+        print(f"z-mode {z_mode}: " + json.dumps(info, ensure_ascii=False), flush=True)
         # 視点の検算（§7.81）: 次の自分の判断点の根の値と勝敗は同じ席なら正に相関する（予告: 0.5 以上）
         if not info["replaced"]:
             raise ValueError("--z-mode next_v0: 差し替えられる行が 1 行も無い")
         if not info["corr_teacher_z"] > 0.2:
             raise ValueError(f"--z-mode next_v0: 教師と勝敗の相関 {info['corr_teacher_z']:+.3f} が低すぎる（視点の取り違え？）")
         V["z"], n_rep = t_next, info["replaced"]
-        print(f"z-mode next_v0: 次の自分の判断点の根の値で差し替えた行 {n_rep}/{len(V['z'])}"
+        print(f"z-mode {z_mode}: 次の自分の{'手番の頭' if z_mode == 'next_v0' else '判断点'}の根の値で差し替えた行 {n_rep}/{len(V['z'])}"
               f"（残り {info['kept']} は z のまま・相関 {info['corr_teacher_z']:+.3f}・"
               f"同じ手番 {info['same_turn']}・後の手番 {info['later_turn']}）", flush=True)
     elif z_mode == "rollout":
@@ -1473,7 +1486,8 @@ def main(argv=None):
                          "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま／"
                          "v0mix＝0.5 z + 0.5 pol_v0（記録の生成役の根の推定・§7.72・根の探索が無い行は z のまま）／"
                          "rollout＝打ち続けの平均（§7.80・記録の隣の *.roll.npz に行がある行だけ・残りは z のまま）／"
-                         "next_v0＝同じ局・同じ席の次の根の推定のある main の行の pol_v0（§7.81・無い行は z のまま）")
+                         "next_v0＝同じ局・同じ席の次の自分の手番の頭（turn より後の最初の根の推定のある main の行）の pol_v0"
+                         "（§7.81 主の腕・無い行は z のまま）／next_v0_step＝step より後の最初の根の推定のある main の行（副の腕）")
     tr.add_argument("--omni-in", nargs="*", default=[],
                     help="--z-mode omni|mix の v_omni（omni_value_relabel.py の omni_*.npz・glob 可）")
     tr.add_argument("--epochs", type=int, default=2)
