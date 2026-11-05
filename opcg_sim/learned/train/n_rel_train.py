@@ -851,7 +851,9 @@ def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, c
 #: mix＝0.5 z + 0.5 v_omni。`v_omni` が無い行（根の探索が無い点・復元に失敗した行）は z のまま。
 #: v0mix＝0.5 z + 0.5 pol_v0（記録にある**生成役の根の価値の推定**・公平な配り直しの探索・§7.72・WP `value-mix`）。
 #: 根の探索が在る行（main・候補 1 つ以上・訪問 > 0）だけ差し替え、窓・コミットの行は z のまま。`--omni-in` は要らない。
-Z_MODES = ("z", "omni", "mix", "v0mix")
+#: rollout＝打ち続けの平均（§7.80・WP `rollout-teach`）: 記録の隣の sidecar `*.roll.npz`（`rollout_labels`）に行がある行だけ
+#: 勝敗を平均に差し替え、残りは z のまま。`--omni-in` は要らない。
+Z_MODES = ("z", "omni", "mix", "v0mix", "rollout")
 
 
 def load_root_v0(dirs, z_dirs=()):
@@ -965,6 +967,18 @@ def train(args):
                 raise ValueError(f"--z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
         V["z"], n_rep = mix_root_v0(V["z"], v0, m0)
         print(f"z-mode v0mix: 根の推定で混ぜた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    elif z_mode == "rollout":
+        from opcg_sim.learned.train import rollout_labels as RL
+        rm, rk = RL.load_rollout(_expand(args.src), _expand(args.zsrc), len(V["z"]))
+        if rk.any():   # 視点の検算: 打ち続けの平均と勝敗は同じ視点なら正に相関する（§7.79 で 0.65）
+            r = float(np.corrcoef(np.asarray(V["z"], np.float32)[rk], rm[rk])[0, 1])
+            print(f"z-mode rollout: 平均と勝敗の相関 {r:+.3f}（行 {int(rk.sum())}）", flush=True)
+            if not r > 0.2:
+                raise ValueError(f"--z-mode rollout: 平均と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
+        else:
+            raise ValueError("--z-mode rollout: sidecar（*.roll.npz）が 1 行も無い")
+        V["z"], n_rep = RL.apply_teacher(V["z"], rm, rk)
+        print(f"z-mode rollout: 打ち続けの平均で差し替えた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
     elif z_mode != "z":
         steps = DIO.load_row_col(_expand(args.src), "step", _expand(args.zsrc))
         omni_key, v_omni = load_omni(getattr(args, "omni_in", None) or [])
@@ -1331,6 +1345,8 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
                              **({"value_skip": True} if getattr(net, "value_skip", False) else {}),
+                             # 価値の教師の作り方（§7.80）。既定 z のときは焼かない＝今までの npz と同じ。
+                             **({} if (getattr(args, "z_mode", "z") or "z") == "z" else {"z_mode": args.z_mode}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
@@ -1356,7 +1372,8 @@ def main(argv=None):
     tr.add_argument("--z-mode", choices=Z_MODES, default="z",
                     help="価値の教師（§7.16・WP omni-value）: z＝勝敗（**既定・今までと 1 bit も変わらない**）／"
                          "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま／"
-                         "v0mix＝0.5 z + 0.5 pol_v0（記録の生成役の根の推定・§7.72・根の探索が無い行は z のまま）")
+                         "v0mix＝0.5 z + 0.5 pol_v0（記録の生成役の根の推定・§7.72・根の探索が無い行は z のまま）／"
+                         "rollout＝打ち続けの平均（§7.80・記録の隣の *.roll.npz に行がある行だけ・残りは z のまま）")
     tr.add_argument("--omni-in", nargs="*", default=[],
                     help="--z-mode omni|mix の v_omni（omni_value_relabel.py の omni_*.npz・glob 可）")
     tr.add_argument("--epochs", type=int, default=2)
