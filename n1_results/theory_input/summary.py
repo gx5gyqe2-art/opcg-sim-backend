@@ -15,6 +15,10 @@ for w in ("n74c", "n70f"):
     p = os.path.join(B, f"calib_{w}.json")
     if os.path.exists(p):
         out["calib"][w] = {k: {"gap_mean_abs": v["gap_mean_abs"], "gap_weighted": v["gap_weighted"], "bands": v["bands"]} for k, v in json.load(open(p))["nets"].items()}
+jc = os.path.join(B, "jitter_cols.json")
+if os.path.exists(jc):
+    j = json.load(open(jc))
+    out["jitter_cols"] = {c: {"turn3_6_diff": v["turn3_6"]["diff"], "ci95": v["turn3_6"]["ci95"], "diff_over_std": v["turn3_6_diff_over_std"]} for c, v in j["cols"].items()}
 for k, v in json.load(open(os.path.join(B, "weights_final.json"))).items():
     out["weights"][k] = {kk: vv for kk, vv in v.items() if kk != "rank"} if v.get("theory_in") else v
 for f in sorted(glob.glob(os.path.join(D, "logs", "train_thin*.log"))):

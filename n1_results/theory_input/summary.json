@@ -1374,5 +1374,132 @@
    "val_aux": 0.4348,
    "train_sec": 4776.152
   }
+ },
+ "jitter_cols": {
+  "tau_me": {
+   "turn3_6_diff": -0.0662,
+   "ci95": 0.0202,
+   "diff_over_std": -0.289
+  },
+  "tau_opp": {
+   "turn3_6_diff": 0.0138,
+   "ci95": 0.0211,
+   "diff_over_std": 0.058
+  },
+  "d_clock": {
+   "turn3_6_diff": 0.08,
+   "ci95": 0.0275,
+   "diff_over_std": 0.256
+  },
+  "w_cross": {
+   "turn3_6_diff": 0.0943,
+   "ci95": 0.017,
+   "diff_over_std": 0.478
+  },
+  "theta_me": {
+   "turn3_6_diff": -0.0494,
+   "ci95": 0.0156,
+   "diff_over_std": -0.279
+  },
+  "th_life_me": {
+   "turn3_6_diff": -0.0074,
+   "ci95": 0.0089,
+   "diff_over_std": -0.074
+  },
+  "th_hand_me": {
+   "turn3_6_diff": -0.0466,
+   "ci95": 0.0112,
+   "diff_over_std": -0.364
+  },
+  "th_body_me": {
+   "turn3_6_diff": 0.0046,
+   "ci95": 0.0038,
+   "diff_over_std": 0.107
+  },
+  "theta_opp": {
+   "turn3_6_diff": 0.0038,
+   "ci95": 0.0164,
+   "diff_over_std": 0.021
+  },
+  "th_life_opp": {
+   "turn3_6_diff": 0.0002,
+   "ci95": 0.01,
+   "diff_over_std": 0.002
+  },
+  "th_hand_opp": {
+   "turn3_6_diff": -0.009,
+   "ci95": 0.0128,
+   "diff_over_std": -0.063
+  },
+  "th_body_opp": {
+   "turn3_6_diff": 0.0125,
+   "ci95": 0.0066,
+   "diff_over_std": 0.169
+  },
+  "slope_me": {
+   "turn3_6_diff": 0.0151,
+   "ci95": 0.0038,
+   "diff_over_std": 0.351
+  },
+  "slope_opp": {
+   "turn3_6_diff": -0.0024,
+   "ci95": 0.0041,
+   "diff_over_std": -0.053
+  },
+  "r_hand_opp": {
+   "turn3_6_diff": 0.0,
+   "ci95": 0.0005,
+   "diff_over_std": 0.0
+  },
+  "r_hand_me": {
+   "turn3_6_diff": -0.0001,
+   "ci95": 0.0011,
+   "diff_over_std": -0.008
+  },
+  "don_me": {
+   "turn3_6_diff": 0.0565,
+   "ci95": 0.0029,
+   "diff_over_std": 1.314
+  },
+  "don_opp": {
+   "turn3_6_diff": -0.0004,
+   "ci95": 0.0031,
+   "diff_over_std": -0.012
+  },
+  "hand_me": {
+   "turn3_6_diff": -0.0001,
+   "ci95": 0.0081,
+   "diff_over_std": -0.001
+  },
+  "hand_opp": {
+   "turn3_6_diff": 0.0015,
+   "ci95": 0.0045,
+   "diff_over_std": 0.03
+  },
+  "nu_me": {
+   "turn3_6_diff": -0.0015,
+   "ci95": 0.0065,
+   "diff_over_std": -0.02
+  },
+  "nu_opp": {
+   "turn3_6_diff": 0.0016,
+   "ci95": 0.0089,
+   "diff_over_std": 0.016
+  },
+  "next_me": {
+   "turn3_6_diff": 0.0297,
+   "ci95": 0.0055,
+   "diff_over_std": 0.466
+  },
+  "sched1_me": {
+   "turn3_6_diff": -0.0004,
+   "ci95": 0.0052,
+   "diff_over_std": -0.007
+  },
+  "sched1_opp": {
+   "turn3_6_diff": 0.0041,
+   "ci95": 0.0059,
+   "diff_over_std": 0.062
+  }
  }
 }
