@@ -729,6 +729,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_str)
             .and_then(decide::DefenseDialogTree::from_name)
             .unwrap_or(d.defense_dialog_tree),
+        defense_dialog_fold: flag("defense_dialog_fold", d.defense_dialog_fold),
     }
 }
 

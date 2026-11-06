@@ -3,6 +3,7 @@
 //! (a) opts の鍵 `defense_dialog_tree`（既定 off・"off"／"life1"／"all"・知らない値はエラー）
 //! (b) 相手のアタック時の任意の効果（ラッキー・ルウ OP17-033）の対話: off は今の形（静的な値）と 1 bit も同じ・
 //!     life1 は自分のライフ ≤ 1 だけ木・all はライフを問わず木
+//!     （既定は候補を当てた直後から木・`defense_dialog_fold` は戦闘の終わりまで畳んでから木＝測定専用）
 //! (c) 戦闘の応手（ブロッカー・カウンター）の窓は旗に依らず今の形
 //!
 //! 4462251（受けるに替わり勝ちに戻るか）は本物のネットが要る＝`n1_results/defense_dialog_tree/` の打ち直しで見る。
@@ -67,6 +68,9 @@ fn defense_dialog_tree_is_read_from_opts() {
         assert_eq!(o.defense_dialog_tree, want);
     }
     assert!(super::super::decide_opts_and_carry(&json!({"defense_dialog_tree": "on"})).is_err());
+    assert!(!DecideOptions::default().defense_dialog_fold);
+    let (o, _) = super::super::decide_opts_and_carry(&json!({"defense_dialog_fold": true})).expect("opts");
+    assert!(o.defense_dialog_fold);
 }
 
 /// (b)
@@ -86,6 +90,10 @@ fn opponent_turn_battle_dialog_reads_a_short_tree_by_flag() {
     assert_eq!(l1, run(masters, &mid, &opts(7)), "ライフ 3 の life1 は今の形");
     let all = run(masters, &mid, &with(DefenseDialogTree::All, 7));
     assert_eq!(all["window"]["tree"], json!(true), "all はライフ 3 も木: {all}");
+    // 畳む形（測定専用）も木で読む・off なら畳む旗は効かない
+    let fold = run(masters, &low, &DecideOptions { defense_dialog_fold: true, ..with(DefenseDialogTree::Life1, 7) });
+    assert_eq!(fold["window"]["tree"], json!(true));
+    assert_eq!(base, run(masters, &low, &DecideOptions { defense_dialog_fold: true, ..opts(7) }), "off なら畳む旗は効かない");
     // window_tree_life で life1 の線が動く（戦闘の応手と同じ線）
     let l3 = run(masters, &mid, &DecideOptions { window_tree_life: 3, ..with(DefenseDialogTree::Life1, 7) });
     assert_eq!(l3["window"]["tree"], json!(true));

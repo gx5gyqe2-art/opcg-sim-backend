@@ -186,6 +186,10 @@ pub struct DecideOptions {
     /// 探して選ぶ 等・ブロッカー／カウンターの選択ではないもの）で候補が 2 つ以上なら、戦闘の応手の
     /// 短い木と同じ [`tree_branch_values`]（予算 `sims ÷ 候補の数`・世界は [`DecideOptions::window_tree_worlds`] まで）で比べる。
     pub defense_dialog_tree: DefenseDialogTree,
+    /// 守りの対話の木で、候補を戦闘の終わりまで先に畳んでから木を回す形（`defense_dialog_fold`・§7.85・**測定専用**・既定 false）。
+    /// 既定（false）は候補を当てた直後の盤面から木を回す（対話の続きは木の中で読む）。true は戦闘の応手の木と同じ畳み方
+    /// （指示書の字面）。`defense_dialog_tree` が off なら効かない。
+    pub defense_dialog_fold: bool,
 }
 
 /// 相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85）。
@@ -377,6 +381,7 @@ impl Default for DecideOptions {
             defense_proof_total: DEFENSE_PROOF_TOTAL,
             defense_proof_view: DefenseView::Mine,
             defense_dialog_tree: DefenseDialogTree::Off,
+            defense_dialog_fold: false,
         }
     }
 }
@@ -1181,8 +1186,12 @@ fn window_choice(
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
-    let tree = (!opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life))
-        || defense_dialog_tree_applies(&mut s, name, opts.defense_dialog_tree, opts.window_tree_life);
+    let dialog_tree = defense_dialog_tree_applies(&mut s, name, opts.defense_dialog_tree, opts.window_tree_life);
+    let tree = (!opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life)) || dialog_tree;
+    // 守りの対話の木（§7.85）は既定では候補を当てた直後の盤面から木を回す（戦闘の終わりまで先に畳まない）:
+    // 畳むと、対話の続き（受けた後の「どれをレストにするか」等）を 1 段浅い静的な値で選んでしまい、
+    // 木が間違った続きの先を読む（4462251・`docs/reports/2026-11-06_defense_dialog_tree.md` §2）。
+    let tree_plies = if dialog_tree && !opts.defense_dialog_fold { 0 } else { QUIESCE_MAX_PLIES };
     let k = opts.effective_window_worlds();
     // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
     let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
@@ -1232,7 +1241,7 @@ fn window_choice(
         let vals = if tree {
             let sims = (opts.sims / m).max(1);
             let tseed = window_world_seed(seed0, wi) ^ 0x7EE5_EED0_0000_0001u64;
-            tree_branch_values(ctx, &mut ws, st, name, &wlegal, window, sims, opts.c_puct, tseed)?
+            tree_branch_values(ctx, &mut ws, st, name, &wlegal, window, tree_plies, sims, opts.c_puct, tseed)?
         } else {
             resolved_branch_values(
                 ctx,
@@ -1440,6 +1449,7 @@ fn tree_branch_values(
     name: Seat,
     legal: &[Move],
     window: Window,
+    max_plies: usize,
     sims: usize,
     c_puct: f64,
     seed: u64,
@@ -1450,7 +1460,7 @@ fn tree_branch_values(
         st,
         name,
         legal,
-        QUIESCE_MAX_PLIES,
+        max_plies,
         BOX_RESOLVE_DEPTH,
         window,
         &mut |s, st| {
