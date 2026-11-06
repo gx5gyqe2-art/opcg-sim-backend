@@ -1,0 +1,15 @@
+todo 300 (done 0) -> n1_results/reaudit_r29f4/defense/points_4462000_300.jsonl
+[1/300] seed=4462000 pts=53 sec=94.0 winner=p2 stats={'resp_points_seen': 63, 'resp_points_audited': 43, 'end_turns_seen': 17, 'end_turns_audited': 10}
+[2/300] seed=4462004 pts=39 sec=64.2 winner=p2 stats={'resp_points_seen': 66, 'resp_points_audited': 34, 'end_turns_seen': 15, 'end_turns_audited': 5}
+[3/300] seed=4462002 pts=52 sec=203.0 winner=p1 stats={'resp_points_seen': 56, 'resp_points_audited': 44, 'end_turns_seen': 14, 'end_turns_audited': 8}
+[4/300] seed=4462001 pts=70 sec=290.0 winner=p1 stats={'resp_points_seen': 62, 'resp_points_audited': 60, 'end_turns_seen': 14, 'end_turns_audited': 10}
+[5/300] seed=4462007 pts=26 sec=35.0 winner=p1 stats={'resp_points_seen': 23, 'resp_points_audited': 21, 'end_turns_seen': 8, 'end_turns_audited': 5}
+[6/300] seed=4462003 pts=69 sec=443.6 winner=p2 stats={'resp_points_seen': 64, 'resp_points_audited': 60, 'end_turns_seen': 13, 'end_turns_audited': 9}
+[7/300] seed=4462006 pts=27 sec=276.2 winner=p1 stats={'resp_points_seen': 38, 'resp_points_audited': 23, 'end_turns_seen': 10, 'end_turns_audited': 4}
+[8/300] seed=4462005 pts=47 sec=330.5 winner=p2 stats={'resp_points_seen': 49, 'resp_points_audited': 41, 'end_turns_seen': 11, 'end_turns_audited': 6}
+[9/300] seed=4462010 pts=33 sec=132.7 winner=p1 stats={'resp_points_seen': 34, 'resp_points_audited': 27, 'end_turns_seen': 10, 'end_turns_audited': 6}
+[10/300] seed=4462008 pts=74 sec=335.1 winner=p1 stats={'resp_points_seen': 92, 'resp_points_audited': 71, 'end_turns_seen': 10, 'end_turns_audited': 3}
+[11/300] seed=4462013 pts=36 sec=173.2 winner=p2 stats={'resp_points_seen': 38, 'resp_points_audited': 30, 'end_turns_seen': 9, 'end_turns_audited': 6}
+[12/300] seed=4462011 pts=56 sec=381.3 winner=p1 stats={'resp_points_seen': 60, 'resp_points_audited': 47, 'end_turns_seen': 14, 'end_turns_audited': 9}
+[13/300] seed=4462014 pts=31 sec=51.8 winner=p2 stats={'resp_points_seen': 36, 'resp_points_audited': 25, 'end_turns_seen': 11, 'end_turns_audited': 6}
+[14/300] seed=4462009 pts=47 sec=495.3 winner=p2 stats={'resp_points_seen': 48, 'resp_points_audited': 41, 'end_turns_seen': 11, 'end_turns_audited': 6}

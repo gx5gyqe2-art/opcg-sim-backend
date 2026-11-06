@@ -89,3 +89,35 @@ git add $O && git commit -m "reaudit-r29f4 shard s$KK: blunder judge/recheck/ver
 git push -u origin claude/reaudit-r29f4-s$KK      # 失敗したら 2s・4s・8s・16s で再試行
 ```
 最後にコーディネータへ「s$KK 完了（点・候補・確かめの数）」と知らせる。PR は作らない・マージしない・コミットにモデル名を書かない。
+
+---
+
+# シャード s06: 自分の手番の続き 50 局（§7.84 の 3・`commit_audit.py`）
+
+用意は上の §1 と同じ。4 並列で約 1〜3 時間の見込み（深い読みの比べ込み）。
+
+```bash
+cd /home/user/opcg-sim-backend
+O=n1_results/reaudit_r29f4/commit
+mkdir -p $O
+cat > $O/run.sh <<'EOS'
+#!/bin/sh
+cd /home/user/opcg-sim-backend
+export PYTHONHASHSEED=0 OPCG_LOG_SILENT=1
+O=n1_results/reaudit_r29f4/commit
+python tests/scripts/commit_audit.py run --games 50 --seed-base 4463000 --workers 4 --judge-window-new --out $O > $O/run.log 2>&1
+python tests/scripts/commit_audit.py summary --out $O > $O/summary.log 2>&1
+echo ALL_DONE > $O/ALL_DONE
+EOS
+setsid nohup sh $O/run.sh > /dev/null 2>&1 < /dev/null &
+```
+- ネットは既定（`E.DEFAULT_NET`＝r29f4）・出荷の設定（`E.PLAY_*`）。深い読み（判定役）の窓も今の形（`--judge-window-new`）。
+- 見張り: `tail -2 $O/run.log`（`[k/50]` が進む）。`ALL_DONE` で次へ。
+- 確かめ: `ls $O`（`points_4463000_50.jsonl` と `summary.json`）・`tail -40 $O/summary.log`。
+- push: `points_*.jsonl` が 20MB を超えたら `gzip` してから。RESULT.json は `{"wp": "reaudit-r29f4", "shard": "s06", "games": 50, "summary": "n1_results/reaudit_r29f4/commit/summary.json"}` を `$O/RESULT.json` に。
+
+```bash
+git checkout -b claude/reaudit-r29f4-s06
+git add $O && git commit -m "reaudit-r29f4 shard s06: commit audit of shipped r29f4 (50 games, seed 4463000-4463049)"
+git push -u origin claude/reaudit-r29f4-s06
+```

@@ -1,5 +1,5 @@
 #!/bin/sh
-# WP reaudit-r29f4（§7.84）: このセッションで回す分＝守りの見逃し 300 局 → 自分の手番の続き 50 局（各 4 並列）。
+# WP reaudit-r29f4（§7.84）: このセッションで回す分＝守りの見逃し 300 局 → 自分の手番の続き 50 局（各 4 並列）。※途中で続きの 50 局はシャード s06 へ移した（run_local2.sh が守りを引き継ぐ）。
 cd /home/user/opcg-sim-backend
 D=n1_results/reaudit_r29f4
 export PYTHONHASHSEED=0 OPCG_LOG_SILENT=1
