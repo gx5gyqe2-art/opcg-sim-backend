@@ -1,0 +1,804 @@
+{
+ "games": 100,
+ "void_games": 0,
+ "resp": {
+  "points_seen": 4751,
+  "points": 3450,
+  "turns": 644,
+  "by_action": {
+   "SELECT_COUNTER": 2375,
+   "SELECT_BLOCKER": 440,
+   "SEARCH_AND_SELECT": 271,
+   "CONFIRM_OPTIONAL": 196,
+   "CONFIRM_TRIGGER": 131,
+   "SELECT_RESOURCE": 24,
+   "ARRANGE_DECK": 10,
+   "CHOICE": 3
+  },
+  "threat": {
+   "k": 175,
+   "n": 3450,
+   "rate": 0.0507
+  },
+  "threat_otsu": {
+   "k": 121,
+   "n": 3450,
+   "rate": 0.0351
+  },
+  "unknown_cpu": {
+   "k": 785,
+   "n": 3450,
+   "rate": 0.2275
+  },
+  "unknown_any": {
+   "k": 836,
+   "n": 3450,
+   "rate": 0.2423
+  },
+  "unknown_otsu_among_threat": {
+   "k": 46,
+   "n": 175,
+   "rate": 0.2629
+  },
+  "miss_per_point": {
+   "ko": {
+    "k": 9,
+    "n": 3450,
+    "rate": 0.0026
+   },
+   "otsu": {
+    "k": 3,
+    "n": 3450,
+    "rate": 0.0009
+   }
+  },
+  "miss_given_threat": {
+   "ko": {
+    "k": 9,
+    "n": 175,
+    "rate": 0.0514
+   },
+   "otsu": {
+    "k": 3,
+    "n": 121,
+    "rate": 0.0248
+   }
+  },
+  "miss_per_turn": {
+   "ko": {
+    "k": 8,
+    "n": 644,
+    "rate": 0.0124
+   },
+   "otsu": {
+    "k": 2,
+    "n": 644,
+    "rate": 0.0031
+   },
+   "turns_with_threat": 65,
+   "turns_with_threat_otsu": 54,
+   "ko_given_threat": {
+    "k": 8,
+    "n": 65,
+    "rate": 0.1231
+   },
+   "otsu_given_threat": {
+    "k": 2,
+    "n": 54,
+    "rate": 0.037
+   }
+  },
+  "miss_per_game": {
+   "ko": {
+    "k": 7,
+    "n": 100,
+    "rate": 0.07
+   },
+   "otsu": {
+    "k": 2,
+    "n": 100,
+    "rate": 0.02
+   },
+   "ko_seats": 8,
+   "otsu_seats": 2,
+   "ko_missed_then_lost": 6,
+   "otsu_missed_then_lost": 0,
+   "otsu_missed_lost_this_turn": 0,
+   "ko_missed_lost_this_turn": 3
+  },
+  "miss_ko_by_action": {
+   "SELECT_COUNTER": 5,
+   "CONFIRM_OPTIONAL": 2,
+   "SEARCH_AND_SELECT": 1,
+   "SELECT_BLOCKER": 1
+  },
+  "miss_ko_type": {
+   "SELECT_COUNTER:no_counter->counter": 4,
+   "CONFIRM_OPTIONAL:confirm_no->confirm_yes": 2,
+   "SEARCH_AND_SELECT:target->target": 1,
+   "SELECT_BLOCKER:block->no_block": 1,
+   "SELECT_COUNTER:counter->counter/no_counter": 1
+  },
+  "miss_otsu_type": {
+   "SELECT_COUNTER:no_counter->counter": 3
+  },
+  "threat_by_action": {
+   "SELECT_COUNTER": 139,
+   "SELECT_BLOCKER": 22,
+   "SEARCH_AND_SELECT": 8,
+   "CONFIRM_OPTIONAL": 5,
+   "CONFIRM_TRIGGER": 1
+  },
+  "miss_otsu_my_life": {
+   "1": 2,
+   "2": 1
+  },
+  "miss_otsu_opp_life": {
+   "2": 2,
+   "5": 1
+  },
+  "miss_ko_my_life": {
+   "1": 4,
+   "0": 3,
+   "2": 2
+  },
+  "threat_my_life": {
+   "0": 139,
+   "1": 34,
+   "2": 2
+  },
+  "cands_mean": 3.33,
+  "sec": {
+   "mean": 5.0,
+   "p50": 0.068,
+   "p99": 40.01,
+   "max": 131.469
+  }
+ },
+ "end": {
+  "turns_seen": 1183,
+  "turns": 551,
+  "threat_ko": {
+   "k": 72,
+   "n": 551,
+   "rate": 0.1307
+  },
+  "threat_otsu": {
+   "k": 46,
+   "n": 551,
+   "rate": 0.0835
+  },
+  "unknown_actual": {
+   "k": 365,
+   "n": 551,
+   "rate": 0.6624
+  },
+  "unknown_actual_otsu_among_ko": {
+   "k": 25,
+   "n": 72,
+   "rate": 0.3472
+  },
+  "miss_per_turn": {
+   "k": 0,
+   "n": 551,
+   "rate": 0.0
+  },
+  "miss_strict_per_turn": {
+   "k": 0,
+   "n": 551,
+   "rate": 0.0
+  },
+  "miss_given_threat": {
+   "k": 0,
+   "n": 46,
+   "rate": 0.0
+  },
+  "miss_strict_given_threat": {
+   "k": 0,
+   "n": 46,
+   "rate": 0.0
+  },
+  "unknown_alts_among_threat": {
+   "k": 4,
+   "n": 46,
+   "rate": 0.087
+  },
+  "miss_games": 0,
+  "miss_then_lost": 0,
+  "miss_lost_next_turn": 0,
+  "miss_strict_then_lost": 0,
+  "miss_alt_type": {},
+  "miss_strict_alt_type": {},
+  "miss_my_life": {},
+  "threat_turns_with_own_win_alt": 5,
+  "threat_my_life": {
+   "0": 23,
+   "1": 18,
+   "2": 4,
+   "3": 1
+  },
+  "alts_mean_among_threat": 7.3,
+  "sec": {
+   "mean": 9.372,
+   "p50": 10.001,
+   "p99": 40.215,
+   "max": 243.423
+  }
+ },
+ "verify": {
+  "resp": {
+   "verified": 9,
+   "errors": 0,
+   "playout": {
+    "n": 5,
+    "kept": 1,
+    "kept_otsu": 0,
+    "both": [
+     true
+    ]
+   },
+   "miss_ko_raw": 9,
+   "miss_ko_full": 5,
+   "miss_ko_full_unknown": 4,
+   "miss_otsu_raw": 3,
+   "miss_otsu_full": 1,
+   "miss_otsu_full_unknown": 0,
+   "turns_miss_otsu_full": 1,
+   "turns_miss_ko_full": 5,
+   "games_miss_otsu_full": 1,
+   "otsu_full_then_lost": 0,
+   "otsu_full_lost_this_turn": 0,
+   "miss_given_threat_full": {
+    "ko": {
+     "k": 5,
+     "n": 175,
+     "rate": 0.0286
+    },
+    "otsu": {
+     "k": 1,
+     "n": 121,
+     "rate": 0.0083
+    }
+   },
+   "live_kind_among_miss_ko_full": {
+    "window": 5
+   },
+   "live_kind_among_miss_otsu_full": {
+    "window": 1
+   },
+   "fresh_safe_among_miss_ko_full": {
+    "False": 5
+   },
+   "fresh_safe_among_miss_otsu_full": {
+    "False": 1
+   },
+   "fresh_safe_by_live_kind_otsu_full": {
+    "window:False": 1
+   },
+   "miss_otsu_full_type": {
+    "SELECT_COUNTER:no_counter->counter": 1
+   },
+   "miss_otsu_full_my_life": {
+    "1": 1
+   }
+  },
+  "end": {
+   "verified": 0,
+   "errors": 0,
+   "miss_raw": 0,
+   "miss_full": 0,
+   "miss_strict_full": 0,
+   "miss_full_unknown": 0,
+   "miss_full_then_lost": 0
+  }
+ },
+ "examples": [
+  {
+   "kind": "resp_otsu",
+   "seed": 4462260,
+   "seat": "p1",
+   "turn": 10,
+   "step": 79,
+   "action": "SELECT_COUNTER",
+   "my_life": 1,
+   "opp_life": 5,
+   "cpu_move": "{\"action_type\": \"PASS\"}",
+   "cpu_line": [
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+    "p2:{\"action_type\": \"ATTACK\", \"card\": \"OP07-019\", \"targets\": [\"EB03-001\"]}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-013\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-004\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-004\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-024\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-002\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-012\"}",
+    "p1:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-013\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-004\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-004\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-024\"}"
+   ],
+   "otsu_safe_i": 2,
+   "board": {
+    "me": {
+     "leader": "EB03-001(R)",
+     "field": [
+      "OP04-009(R)+D1",
+      "EB03-024(R)",
+      "EB02-028(R)",
+      "OP13-017(R)",
+      "EB04-023(R)"
+     ],
+     "hand": [
+      "OP15-013",
+      "OP04-004",
+      "OP04-018",
+      "OP04-004",
+      "EB03-024",
+      "OP04-002"
+     ],
+     "life": 1,
+     "deck": 35,
+     "don_active": 0,
+     "don_rested": 8
+    },
+    "opp": {
+     "leader": "OP07-019",
+     "field": [
+      "ST02-009(R)+D3"
+     ],
+     "hand": [
+      "OP07-037",
+      "OP07-023"
+     ],
+     "life": 5,
+     "deck": 35,
+     "don_active": 7,
+     "don_rested": 0
+    }
+   },
+   "game_winner": "p1",
+   "game_turns": 15,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true,
+    "playout": {
+     "real": {
+      "wa": 0.3125,
+      "wb": 0.0625,
+      "diff": -0.25,
+      "ci": [
+       -0.5329,
+       0.0329
+      ],
+      "cpu_lost_this_turn": 0,
+      "safe_lost_this_turn": 0
+     },
+     "fair": {
+      "wa": 0.375,
+      "wb": 0.0,
+      "diff": -0.375,
+      "ci": [
+       -0.62,
+       -0.13
+      ],
+      "cpu_lost_this_turn": 0,
+      "safe_lost_this_turn": 0
+     },
+     "kept": false
+    }
+   }
+  },
+  {
+   "kind": "resp_otsu",
+   "seed": 4462284,
+   "seat": "p2",
+   "turn": 9,
+   "step": 71,
+   "action": "SELECT_COUNTER",
+   "my_life": 2,
+   "opp_life": 2,
+   "cpu_move": "{\"action_type\": \"PASS\"}",
+   "cpu_line": [
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACK\", \"card\": \"OP05-002\", \"targets\": [\"OP16-079\"]}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-088\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-085\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-095\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-091\"}",
+    "p2:{\"action_type\": \"PASS\"}",
+    "p1:{\"action_type\": \"ATTACK\", \"card\": \"OP05-005\", \"targets\": [\"OP16-079\"]}",
+    "p1:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP16-094\"], \"selected_slots\": [2], \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p2:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-088\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-085\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-095\"}"
+   ],
+   "otsu_safe_i": 1,
+   "board": {
+    "opp": {
+     "leader": "OP05-002",
+     "field": [
+      "OP05-016(R)",
+      "OP05-005"
+     ],
+     "hand": [
+      "OP05-006",
+      "OP07-016",
+      "OP13-005",
+      "OP13-005"
+     ],
+     "life": 2,
+     "deck": 37,
+     "don_active": 9,
+     "don_rested": 0
+    },
+    "me": {
+     "leader": "OP16-079(R)+D2",
+     "field": [
+      "OP16-091",
+      "OP16-088",
+      "OP16-094(R)+D2",
+      "OP16-081(R)",
+      "OP16-094"
+     ],
+     "hand": [
+      "OP16-088",
+      "OP16-085",
+      "OP16-095"
+     ],
+     "life": 2,
+     "deck": 32,
+     "don_active": 0,
+     "don_rested": 4
+    }
+   },
+   "game_winner": "p2",
+   "game_turns": 12,
+   "verify": {
+    "miss_ko_full": false,
+    "miss_otsu_full": false
+   }
+  },
+  {
+   "kind": "resp_otsu",
+   "seed": 4462284,
+   "seat": "p2",
+   "turn": 9,
+   "step": 74,
+   "action": "SELECT_COUNTER",
+   "my_life": 1,
+   "opp_life": 2,
+   "cpu_move": "{\"action_type\": \"PASS\"}",
+   "cpu_line": [
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP05-002\"}",
+    "p1:{\"action_type\": \"ATTACK\", \"card\": \"OP05-002\", \"targets\": [\"OP16-079\"]}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-088\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-085\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-095\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-091\"}",
+    "p2:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-088\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-085\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-095\"}",
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP16-091\"}"
+   ],
+   "otsu_safe_i": 1,
+   "board": {
+    "opp": {
+     "leader": "OP05-002",
+     "field": [
+      "OP05-016(R)",
+      "OP05-005(R)"
+     ],
+     "hand": [
+      "OP05-006",
+      "OP07-016",
+      "OP13-005",
+      "OP13-005"
+     ],
+     "life": 2,
+     "deck": 37,
+     "don_active": 9,
+     "don_rested": 0
+    },
+    "me": {
+     "leader": "OP16-079(R)+D2",
+     "field": [
+      "OP16-091",
+      "OP16-088",
+      "OP16-094(R)+D2",
+      "OP16-081(R)",
+      "OP16-094"
+     ],
+     "hand": [
+      "OP16-088",
+      "OP16-085",
+      "OP16-095",
+      "OP16-091"
+     ],
+     "life": 1,
+     "deck": 32,
+     "don_active": 0,
+     "don_rested": 4
+    }
+   },
+   "game_winner": "p2",
+   "game_turns": 12,
+   "verify": {
+    "miss_ko_full": false,
+    "miss_otsu_full": false
+   }
+  },
+  {
+   "kind": "resp_ko_only",
+   "seed": 4462203,
+   "seat": "p2",
+   "turn": 11,
+   "step": 133,
+   "action": "SEARCH_AND_SELECT",
+   "my_life": 0,
+   "opp_life": 2,
+   "cpu_move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP12-044\"], \"selected_slots\": [2], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "cpu_line": [
+    "p2:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-089\"}",
+    "p2:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-089\"}",
+    "p2:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP05-041\"], \"selected_slots\": [3], \"index\": 0, \"position\": \"BOTTOM\"}"
+   ],
+   "otsu_safe_i": null,
+   "board": {
+    "opp": {
+     "leader": "OP05-001(R)+D5",
+     "field": [
+      "OP10-086(R)+D3",
+      "OP05-005(R)+D2",
+      "OP05-015"
+     ],
+     "hand": [
+      "OP12-094",
+      "OP12-098",
+      "OP05-006",
+      "OP05-021"
+     ],
+     "life": 2,
+     "deck": 33,
+     "don_active": 0,
+     "don_rested": 0
+    },
+    "me": {
+     "leader": "OP05-041(R)+D1",
+     "field": [
+      "OP03-089(R)",
+      "EB03-041(R)",
+      "OP12-044(R)"
+     ],
+     "hand": [
+      "OP14-048",
+      "OP07-055",
+      "OP07-055",
+      "OP03-089",
+      "EB01-028",
+      "OP03-089"
+     ],
+     "life": 0,
+     "deck": 23,
+     "don_active": 0,
+     "don_rested": 9
+    }
+   },
+   "game_winner": "p1",
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": false,
+    "playout": {
+     "real": {
+      "wa": 0.0,
+      "wb": 0.0625,
+      "diff": 0.0625,
+      "ci": [
+       -0.06,
+       0.185
+      ],
+      "cpu_lost_this_turn": 16,
+      "safe_lost_this_turn": 0
+     },
+     "fair": {
+      "wa": 0.0,
+      "wb": 0.125,
+      "diff": 0.125,
+      "ci": [
+       -0.0424,
+       0.2924
+      ],
+      "cpu_lost_this_turn": 16,
+      "safe_lost_this_turn": 0
+     },
+     "kept": false
+    }
+   }
+  },
+  {
+   "kind": "resp_ko_only",
+   "seed": 4462251,
+   "seat": "p1",
+   "turn": 14,
+   "step": 172,
+   "action": "CONFIRM_OPTIONAL",
+   "my_life": 0,
+   "opp_life": 0,
+   "cpu_move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "cpu_line": [
+    "p1:{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"OP17-029\"}",
+    "p1:{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-025\"}",
+    "p1:{\"action_type\": \"PASS\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP11-077\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP11-077\"}",
+    "p2:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP11-077\"}",
+    "p2:{\"action_type\": \"ATTACK\", \"card\": \"OP11-077\", \"targets\": [\"OP17-020\"]}",
+    "p1:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p1:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP08-070\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p1:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+   ],
+   "otsu_safe_i": null,
+   "board": {
+    "me": {
+     "leader": "OP17-020(R)+D2",
+     "field": [
+      "OP17-024(R)",
+      "OP17-034(R)+D1",
+      "OP17-029",
+      "OP17-033",
+      "OP17-032"
+     ],
+     "hand": [
+      "OP17-025"
+     ],
+     "life": 0,
+     "deck": 31,
+     "don_active": 0,
+     "don_rested": 7
+    },
+    "opp": {
+     "leader": "OP11-062(R)+D2",
+     "field": [
+      "OP08-062(R)+D3",
+      "OP08-070(R)",
+      "OP11-077"
+     ],
+     "hand": [
+      "ST04-015",
+      "OP08-070",
+      "OP11-077",
+      "ST34-005",
+      "ST34-005"
+     ],
+     "life": 0,
+     "deck": 32,
+     "don_active": 5,
+     "don_rested": 0
+    }
+   },
+   "game_winner": "p2",
+   "game_turns": 14,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": false,
+    "playout": {
+     "real": {
+      "wa": 0.0,
+      "wb": 1.0,
+      "diff": 1.0,
+      "ci": [
+       1.0,
+       1.0
+      ],
+      "cpu_lost_this_turn": 16,
+      "safe_lost_this_turn": 0
+     },
+     "fair": {
+      "wa": 0.0,
+      "wb": 1.0,
+      "diff": 1.0,
+      "ci": [
+       1.0,
+       1.0
+      ],
+      "cpu_lost_this_turn": 16,
+      "safe_lost_this_turn": 0
+     },
+     "kept": true
+    }
+   }
+  },
+  {
+   "kind": "resp_ko_only",
+   "seed": 4462260,
+   "seat": "p2",
+   "turn": 15,
+   "step": 191,
+   "action": "CONFIRM_OPTIONAL",
+   "my_life": 0,
+   "opp_life": 0,
+   "cpu_move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "cpu_line": [
+    "p2:{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"OP01-039\"}",
+    "p2:{\"action_type\": \"PASS\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP04-009\"}",
+    "p1:{\"action_type\": \"ATTACH_DON\", \"card\": \"OP04-009\"}",
+    "p1:{\"action_type\": \"ATTACK\", \"card\": \"OP04-009\", \"targets\": [\"OP07-019\"]}",
+    "p2:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p2:{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"EB04-023\"], \"selected_slots\": [2], \"index\": 0, \"position\": \"BOTTOM\"}",
+    "p2:{\"action_type\": \"PASS\"}"
+   ],
+   "safe_moves": [
+    "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+   ],
+   "otsu_safe_i": null,
+   "board": {
+    "opp": {
+     "leader": "EB03-001(R)+D2",
+     "field": [
+      "OP04-009",
+      "OP13-017(R)",
+      "EB04-023(R)"
+     ],
+     "hand": [
+      "OP04-004",
+      "OP04-018",
+      "EB04-028",
+      "OP05-009"
+     ],
+     "life": 0,
+     "deck": 32,
+     "don_active": 8,
+     "don_rested": 0
+    },
+    "me": {
+     "leader": "OP07-019(R)+D2",
+     "field": [
+      "OP01-039+D1"
+     ],
+     "hand": [],
+     "life": 0,
+     "deck": 31,
+     "don_active": 1,
+     "don_rested": 6
+    }
+   },
+   "game_winner": "p1",
+   "game_turns": 15,
+   "verify": {
+    "miss_ko_full": false,
+    "miss_otsu_full": false
+   }
+  }
+ ]
+}

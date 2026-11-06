@@ -13,6 +13,9 @@ import blunder_audit as BA  # noqa: E402
 NET = "opcg_sim/data/learned/nrel_r29f4.npz"
 BA.NET = NET
 BA.REFS = {"r13d": NET, "r20": "opcg_sim/data/learned/nrel_r28x4.npz"}
+# 器の recheck_point は `_G["verify_both"]`（verify の初期化だけが置く）を出力の札に写すだけ＝recheck では意味が無い。
+# 置かれていないと KeyError で落ちる（§7.50 の取り込みの残り）ので、器を変えずにここで札を置く（recheck は出荷の側を使わない）。
+BA._G.setdefault("verify_both", "n/a(recheck)")
 if __name__ == "__main__":
     argv = sys.argv[1:]
     if argv and argv[0] == "play" and "--net" not in argv:
