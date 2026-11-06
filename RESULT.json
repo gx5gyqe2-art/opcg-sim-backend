@@ -1,7 +1,7 @@
 {
  "job": "arena-ddt-w15",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r29f4.npz + defense_dialog_tree=life1 (main) / all (secondary)",
   "baseline": "nrel_r29f4.npz (defense_dialog_tree off = current shipping)",
