@@ -1,0 +1,36 @@
+{
+ "wp": "world-vote-desk",
+ "spec": "docs/search_efficiency_plan.md §7.86 (stage 0 only)",
+ "report": "docs/reports/2026-11-06_world_vote_desk.md",
+ "base": "2a3cf74",
+ "engine_changed": false,
+ "rust_touched": false,
+ "eight_worlds_via": "existing opts key worlds=8; worlds 0-3 bit-identical to the 4-world read (checked at 171/171 points)",
+ "referee": "r29f4 160 sims, K=32, a-side rollouts reused from reaudit_r29f4 points.jsonl (determinism checked)",
+ "in_sample": {
+  "points": 470, "reproduce": 470, "disagree": 171, "disagree_rate": 0.364,
+  "forms": {
+   "now_sum4": {"changed": 0, "all_diff": 0.0},
+   "mean4": {"changed": 171, "changed_diff": -0.0013, "changed_ci": [-0.0109, 0.0084], "all_diff": -0.0005, "all_ci": [-0.004, 0.003]},
+   "disagree_sum8": {"changed": 20, "changed_diff": 0.0359, "changed_ci": [-0.0329, 0.1048], "all_diff": 0.0015, "all_ci": [-0.0014, 0.0045]},
+   "disagree_mean8": {"changed": 144, "changed_diff": -0.0011, "changed_ci": [-0.0122, 0.0101], "all_diff": -0.0003, "all_ci": [-0.0037, 0.0031]}
+  },
+  "skew_points": {
+   "4461051_163": {"disagree_sum8": "picked up (Sanji = judged b, +0.625)", "mean4": "+0.156", "mean8": "+0.156"},
+   "4461063_108": {"disagree_sum8": "not picked up (TURN_END)", "mean4": "+0.031", "mean8": "+0.031"},
+   "4461015_141": "continuation point; root rule cannot separate (fresh 4/8-world sum reads choose attach-1-then-attack, same first primitive)"
+  }
+ },
+ "out_of_sample_prereg": {
+  "prereg": "n1_results/world_vote_desk/PREREG_ext.md",
+  "points": 5305, "reproduce": 5303, "disagree_rate": 0.3549,
+  "A_disagree_sum8": {"changed": 177, "changed_rate": 0.0334, "changed_diff": 0.012, "changed_ci": [-0.0004, 0.0245], "per_tree_point": 0.0004, "cpu_inc_tree": 0.347},
+  "B_gap005_sum8": {"changed": 20, "changed_rate": 0.0038, "changed_diff": 0.025, "changed_ci": [-0.0246, 0.0746], "per_tree_point": 0.0001, "cpu_inc_tree": 0.0235},
+  "posthoc_gap003_sum8": {"changed": 44, "changed_diff": 0.032, "changed_ci": [0.002, 0.0619], "cpu_inc_tree": 0.0601},
+  "combined_A": {"changed": 197, "changed_diff": 0.0144, "changed_ci": [0.0013, 0.0276], "per_tree_point": 0.0005}
+ },
+ "cost": {"tree_share_of_cpu": 0.973, "tree_cpu_inc_add4": 0.34, "per_move_inc_add4": 0.33, "per_move_inc_reread8": 0.66},
+ "prediction_check": {"disagree_10_20pct": "miss (36%)", "skew_2_of_3": "miss (1 of 3)", "diff_+0.005_+0.02": "miss (+0.0015 in-sample, +0.0004/point out-of-sample)", "cost_+10_20pct": "miss (+33%)"},
+ "verdict": "close (prereg line: CI lower bound > 0 not met for A or B); effect small positive, rough 0..+11 Elo upper-leaning at +33% cost; stage 1 not recommended",
+ "make_test": "see make_test.log"
+}
