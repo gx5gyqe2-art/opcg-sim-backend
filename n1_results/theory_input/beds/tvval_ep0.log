@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/user/opcg-sim-backend/tests/scripts/value_teach.py", line 549, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/opcg-sim-backend/tests/scripts/value_teach.py", line 544, in main
+    {"pairs": cmd_pairs, "merge": cmd_merge, "bench": cmd_bench, "netval": cmd_netval, "rocks": cmd_rocks,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     "tvstates": cmd_tvstates, "tvval": cmd_tvval}[a.cmd](a)
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/value_teach.py", line 464, in cmd_tvval
+    if not len(d["t"]):
+               ~^^^^^
+KeyError: 't'
