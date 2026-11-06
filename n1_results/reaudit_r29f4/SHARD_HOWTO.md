@@ -121,3 +121,38 @@ git checkout -b claude/reaudit-r29f4-s06
 git add $O && git commit -m "reaudit-r29f4 shard s06: commit audit of shipped r29f4 (50 games, seed 4463000-4463049)"
 git push -u origin claude/reaudit-r29f4-s06
 ```
+
+---
+
+# シャード s07・s08: 守りの見逃し 100 局ずつ（§7.84 の 2・`defense_audit.py`・§7.24 の設定・確かめ込み）
+
+用意は上の §1 と同じ。1 局平均 ≈ 108 秒（4 並列の実時間）＝ run 約 3 時間 ＋ verify。
+s07＝seed 4462100〜4462199・s08＝seed 4462200〜4462299（4462000〜099 はコーディネータ側の作業セッションが回す）。
+
+```bash
+cd /home/user/opcg-sim-backend
+KK=07                                     # ← 07 か 08
+BASE=$([ "$KK" = 07 ] && echo 4462100 || echo 4462200)
+O=n1_results/reaudit_r29f4/defense_s$KK
+mkdir -p $O
+cat > $O/run.sh <<EOS
+#!/bin/sh
+cd /home/user/opcg-sim-backend
+export PYTHONHASHSEED=0 OPCG_LOG_SILENT=1
+python tests/scripts/defense_audit.py run --games 100 --seed-base $BASE --workers 4 --out $O > $O/run.log 2>&1
+python tests/scripts/defense_audit.py verify --games 100 --seed-base $BASE --workers 4 --out $O > $O/verify.log 2>&1
+python tests/scripts/defense_audit.py summarize --games 100 --seed-base $BASE --out $O > $O/summary.log 2>&1
+echo ALL_DONE > $O/ALL_DONE
+EOS
+setsid nohup sh $O/run.sh > /dev/null 2>&1 < /dev/null &
+```
+- ネットは既定（r29f4）。設定は器の既定（世界 1 本 × 1,280 回・予算なし・証明 off・random × synth_roles）＝何も足さない。
+- 見張り: `tail -1 $O/run.log`（`[k/100]`）→ verify.log → `ALL_DONE`。再開できる（落ちたら `run.sh` をもう一度）。
+- 確かめ: `ls $O`（`points_${BASE}_100.jsonl`・`verify.jsonl`・`summary.json` 等）・`tail -40 $O/summary.log`。
+- RESULT.json: `{"wp": "reaudit-r29f4", "shard": "s$KK", "seed_base": BASE, "games": 100}` を `$O/RESULT.json` に。
+
+```bash
+git checkout -b claude/reaudit-r29f4-s$KK
+git add $O && git commit -m "reaudit-r29f4 shard s$KK: defense audit of r29f4 (100 games from seed $BASE)"
+git push -u origin claude/reaudit-r29f4-s$KK
+```
