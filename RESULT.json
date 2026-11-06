@@ -11,10 +11,12 @@
  },
  "outputs": {
   "files": [
+   "arena_ddt/ddt_all_real_w28.jsonl",
    "arena_ddt/ddt_life1_real_w28.jsonl"
   ]
  },
  "metrics": {
+  "arena_ddt/ddt_all_real_w28.jsonl": 21,
   "arena_ddt/ddt_life1_real_w28.jsonl": 21
  },
  "notes": "",
