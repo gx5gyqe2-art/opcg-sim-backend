@@ -457,7 +457,7 @@ def recheck_point(job):
     g, row = job
     t0 = time.time()
     seed, step, name = row["seed"], row["step"], row["seat"]
-    out = {"seed": seed, "step": step, "both": _G["verify_both"]}
+    out = {"seed": seed, "step": step, "both": _G.get("verify_both")}
     try:
         game = replay(g, step)
     except Exception as exc:  # noqa: BLE001  エンジンが変わって手の列を当て直せない（記録した wheel と違う）

@@ -82,7 +82,7 @@ fn dialog_window_continuation_is_carried_only_by_the_legacy_flag() {
     assert!(!legacy["commit"].as_array().unwrap().is_empty(), "旧い形は応手の続きを積む: {legacy}");
 }
 
-fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize) -> Value {
+pub(super) fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize) -> Value {
     json!({
         "name": name,
         "leader": card_json(VLDR, &format!("{name}-leader"), name, false),

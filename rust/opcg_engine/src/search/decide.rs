@@ -179,6 +179,36 @@ pub struct DecideOptions {
     pub defense_proof_total: u64,
     /// 配り方を誰の視点で作るか（`defense_proof_view`・既定 [`DefenseView::Mine`]）。
     pub defense_proof_view: DefenseView,
+    /// 相手の手番の戦闘中に自分が答える効果の対話を短い木で読む（`defense_dialog_tree`・§7.85・
+    /// WP `rs-defense-dialog-tree`・**測定用**・既定 [`DefenseDialogTree::Off`]＝今の形と 1 bit も同じ）。
+    /// `Life1` は自分のライフが [`DecideOptions::window_tree_life`] 以下のときだけ、`All` はライフを問わず、
+    /// 相手の手番・戦闘中（`active_battle` が在る）に判断するのが自分の効果の対話（任意の効果の確認・
+    /// 探して選ぶ 等・ブロッカー／カウンターの選択ではないもの）で候補が 2 つ以上なら、戦闘の応手の
+    /// 短い木と同じ [`tree_branch_values`]（予算 `sims ÷ 候補の数`・世界は [`DecideOptions::window_tree_worlds`] まで）で比べる。
+    pub defense_dialog_tree: DefenseDialogTree,
+}
+
+/// 相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DefenseDialogTree {
+    /// 読まない（既定＝今の形・世界 K 本の静的な値）。
+    #[default]
+    Off,
+    /// 自分のライフが `window_tree_life`（既定 1）以下のときだけ短い木（今の戦闘の応手と同じ線）。
+    Life1,
+    /// ライフを問わず全部短い木。
+    All,
+}
+
+impl DefenseDialogTree {
+    pub fn from_name(s: &str) -> Option<DefenseDialogTree> {
+        match s {
+            "off" => Some(DefenseDialogTree::Off),
+            "life1" => Some(DefenseDialogTree::Life1),
+            "all" => Some(DefenseDialogTree::All),
+            _ => None,
+        }
+    }
 }
 
 /// 守りの証明の配り方の視点（§7.51）。
@@ -346,6 +376,7 @@ impl Default for DecideOptions {
             defense_proof_nodes: DEFENSE_PROOF_NODES,
             defense_proof_total: DEFENSE_PROOF_TOTAL,
             defense_proof_view: DefenseView::Mine,
+            defense_dialog_tree: DefenseDialogTree::Off,
         }
     }
 }
@@ -1150,7 +1181,8 @@ fn window_choice(
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
-    let tree = !opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life);
+    let tree = (!opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life))
+        || defense_dialog_tree_applies(&mut s, name, opts.defense_dialog_tree, opts.window_tree_life);
     let k = opts.effective_window_worlds();
     // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
     let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
@@ -1371,6 +1403,27 @@ fn window_tree_applies(s: &mut Session, name: Seat, life_max: i64) -> bool {
                 && (s.state().player(name).life.len() as i64) <= life_max
         }
         _ => false,
+    }
+}
+
+/// 短い木で読む守りの効果の対話か（§7.85・[`DecideOptions::defense_dialog_tree`]）: 相手の手番・戦闘中
+/// （`active_battle` が在る）で、判断するのが `name` の効果の対話（中断スタックの対話＝ブロッカー／
+/// カウンターの選択・メインの手ではない）。`Life1` は `name` のライフ（枚数）が `life_max` 以下のときだけ。
+/// `Off` は常に false（今の形）。候補の数は呼び出し側が見る。
+fn defense_dialog_tree_applies(s: &mut Session, name: Seat, mode: DefenseDialogTree, life_max: i64) -> bool {
+    if mode == DefenseDialogTree::Off {
+        return false;
+    }
+    let st = s.state();
+    if st.active_battle.is_none() || st.turn_player == name || st.winner.is_some() {
+        return false;
+    }
+    if mode == DefenseDialogTree::Life1 && (st.player(name).life.len() as i64) > life_max {
+        return false;
+    }
+    match st.active_interaction() {
+        Some(it) => it.player == name,
+        None => false,
     }
 }
 
@@ -2439,6 +2492,10 @@ mod tests_window_read;
 #[cfg(test)]
 #[path = "tests_defense_proof.rs"]
 mod tests_defense_proof;
+
+#[cfg(test)]
+#[path = "tests_defense_dialog_tree.rs"]
+mod tests_defense_dialog_tree;
 
 #[cfg(test)]
 #[path = "tests_overflow_trigger.rs"]
