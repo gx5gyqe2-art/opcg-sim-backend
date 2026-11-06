@@ -1,0 +1,206 @@
+[
+ {
+  "pt": "4462001:131",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.5625,
+   0.9375,
+   true
+  ],
+  "mover": [
+   0.875,
+   0.875,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462038:81",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.0,
+   0.0625,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0625,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462057:120",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462075:140",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462102:160",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.625,
+   0.375,
+   false
+  ],
+  "mover": [
+   0.6875,
+   0.375,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462106:93",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462121:78",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   14,
+   0
+  ]
+ },
+ {
+  "pt": "4462203:133",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   0.0625,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0625,
+   false,
+   16,
+   0
+  ]
+ },
+ {
+  "pt": "4462251:172",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   1.0,
+   true
+  ],
+  "mover": [
+   0.0,
+   1.0,
+   true,
+   16,
+   0
+  ]
+ },
+ {
+  "pt": "4462260:79",
+  "ko_full_old": true,
+  "otsu_full_old": true,
+  "both": [
+   0.3125,
+   0.0625,
+   false
+  ],
+  "mover": [
+   0.25,
+   0.25,
+   false,
+   0,
+   0
+  ]
+ },
+ {
+  "pt": "4462283:38",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   1,
+   0
+  ]
+ },
+ {
+  "pt": "4462285:97",
+  "ko_full_old": true,
+  "otsu_full_old": false,
+  "both": [
+   0.0,
+   0.0,
+   false
+  ],
+  "mover": [
+   0.0,
+   0.0,
+   false,
+   0,
+   0
+  ]
+ }
+]
