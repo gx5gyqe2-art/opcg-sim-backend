@@ -1,0 +1,242 @@
+{
+ "nets": {
+  "nrel_r28x4.npz": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2818,
+    "turn3_6_holdout": 0.3058,
+    "turn3_6_trained": 0.2779,
+    "turn7_10": 0.1432
+   },
+   "band74c": {
+    "v_mse": 0.4739,
+    "v_sign": 0.8299,
+    "calib_gap_weighted": 0.0166,
+    "calib_gap_mean": 0.0237
+   }
+  },
+  "nrel_djt.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.1785,
+     0.528
+    ],
+    "b_close": [
+     0.1144,
+     0.338
+    ],
+    "c_oppend": [
+     0.1164,
+     0.344
+    ],
+    "d_next": [
+     0.1935,
+     0.572
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2985,
+    "turn3_6_holdout": 0.3088,
+    "turn3_6_trained": 0.2968,
+    "turn7_10": 0.1386
+   },
+   "band74c": {
+    "v_mse": 0.4825,
+    "v_sign": 0.8263,
+    "calib_gap_weighted": 0.0711,
+    "calib_gap_mean": 0.0987
+   }
+  },
+  "nrel_djt.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1671,
+     0.494
+    ],
+    "b_close": [
+     0.086,
+     0.254
+    ],
+    "c_oppend": [
+     0.094,
+     0.278
+    ],
+    "d_next": [
+     0.1884,
+     0.557
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2946,
+    "turn3_6_holdout": 0.3019,
+    "turn3_6_trained": 0.2935,
+    "turn7_10": 0.1325
+   },
+   "band74c": {
+    "v_mse": 0.4788,
+    "v_sign": 0.8281,
+    "calib_gap_weighted": 0.0468,
+    "calib_gap_mean": 0.0651
+   }
+  },
+  "nrel_dw.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.1791,
+     0.53
+    ],
+    "b_close": [
+     0.1015,
+     0.3
+    ],
+    "c_oppend": [
+     0.1112,
+     0.329
+    ],
+    "d_next": [
+     0.1624,
+     0.48
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.3215,
+    "turn3_6_holdout": 0.3371,
+    "turn3_6_trained": 0.3187,
+    "turn7_10": 0.1344
+   },
+   "band74c": {
+    "v_mse": 0.485,
+    "v_sign": 0.8255,
+    "calib_gap_weighted": 0.0449,
+    "calib_gap_mean": 0.0618
+   },
+   "rocks": {
+    "points": 53,
+    "chose_return": 3
+   }
+  },
+  "nrel_dw.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1604,
+     0.475
+    ],
+    "b_close": [
+     0.0617,
+     0.182
+    ],
+    "c_oppend": [
+     0.0627,
+     0.185
+    ],
+    "d_next": [
+     0.1692,
+     0.501
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.3415,
+    "turn3_6_holdout": 0.3792,
+    "turn3_6_trained": 0.3351,
+    "turn7_10": 0.1699
+   },
+   "band74c": {
+    "v_mse": 0.489,
+    "v_sign": 0.8243,
+    "calib_gap_weighted": 0.0479,
+    "calib_gap_mean": 0.0601
+   },
+   "rocks": {
+    "points": 53,
+    "chose_return": 2
+   }
+  }
+ },
+ "outcome_gap": {
+  "turn3_6": 0.5424,
+  "turn3_6_holdout": 0.4875,
+  "turn3_6_trained": 0.5514,
+  "turn7_10": 0.1944
+ },
+ "paired_gap_dw_minus_control": {
+  "turn3_6_holdout_ep0": [
+   0.0283,
+   0.0256
+  ],
+  "turn3_6_holdout_ep1": [
+   0.0772,
+   0.0326
+  ],
+  "turn3_6_trained_ep0": [
+   0.0219,
+   0.0106
+  ],
+  "turn3_6_trained_ep1": [
+   0.0416,
+   0.0145
+  ],
+  "turn7_10_ep0": [
+   -0.0042,
+   0.0098
+  ],
+  "turn7_10_ep1": [
+   0.0374,
+   0.0131
+  ]
+ },
+ "train": {
+  "ep0": {
+   "train_mse": 0.476,
+   "val_vmse": 0.3634,
+   "val_vsign": 0.8707,
+   "val_pi_top1": 0.494,
+   "val_p_loss": 1.71
+  },
+  "ep1": {
+   "train_mse": 0.4729,
+   "val_vmse": 0.3802,
+   "val_vsign": 0.8661,
+   "val_pi_top1": 0.503,
+   "val_p_loss": 1.7111
+  }
+ },
+ "jitter_weight": {
+  "mode": "balanced",
+  "shards_with_don_jitter": 384,
+  "rows_jitter_train": 432044,
+  "rows_other_train": 4725992,
+  "rows_jitter_all": 504473,
+  "ratio": 10.938682171260334,
+  "w_jitter": 5.969341085630166,
+  "w_other": 0.5457093452549221,
+  "mean_w_train": 1.0000001192092896,
+  "rows_jitter_holdout": 72429
+ },
+ "control_train_from_don_jitter_report": {
+  "ep0": {
+   "train_mse": 0.47,
+   "val_vmse": 0.364
+  },
+  "ep1": {
+   "train_mse": 0.4629,
+   "val_vmse": 0.3647
+  }
+ }
+}

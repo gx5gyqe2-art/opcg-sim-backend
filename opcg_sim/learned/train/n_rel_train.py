@@ -988,6 +988,74 @@ def load_next_v0(dirs, z_dirs=(), by="turn"):
     return t, m, info
 
 
+JITTER_WEIGHT_MODES = ("off", "balanced")
+
+
+def jitter_after_mask(seed, who, step, kind, turn, dj):
+    """§7.83（WP `don-weight`）: 1 シャードの「ドンだけが違う行」の印。
+
+    `dj` は record_gen の列 `don_jitter`（行ごとに局の (手番, 席, 符号)・符号 0＝動かしていない局）。動かした局では
+    「その手番の、手番の席の最初の main の行」（ドンを動かした直後の判断点＝`don_jitter_rows.py` と同じ行を main に絞った形）
+    の step を起点に、**その step 以後の行（両席）**に印を立てる。main の行が無い局（手番の前に決着）は印なし。"""
+    seed = np.asarray(seed, np.int64); who = np.asarray(who, np.int64)
+    step = np.asarray(step, np.int64); kind = np.asarray(kind, np.int64); turn = np.asarray(turn, np.int64)
+    dj = np.asarray(dj, np.int64).reshape(len(seed), -1)
+    out = np.zeros(len(seed), bool)
+    for s in np.unique(seed):
+        idx = np.flatnonzero(seed == s)
+        t, seat, sg = (int(x) for x in dj[idx[0], :3])
+        if sg == 0:
+            continue
+        hit = idx[(turn[idx] == t) & (who[idx] == seat) & (kind[idx] == 0)]
+        if not len(hit):
+            continue
+        out[idx[step[idx] >= int(step[hit].min())]] = True
+    return out
+
+
+def load_jitter_mask(dirs, z_dirs=()):
+    """§7.83: pack と同じ行順で「ドンだけが違う行」の印 bool と、シャードごとの数を返す。
+
+    `don_jitter` の列が無いシャード（ふつうの波）は全部 False。局はシャードをまたがない＝シャードごとで足りる。"""
+    ms = []
+    n_shard_dj = 0
+    for d in [d for d in list(dirs) + list(z_dirs) if DIO.shard_files(d)]:
+        for f in DIO.shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                nr = int(dd["z"].shape[0])
+                if "don_jitter" not in dd.files:
+                    ms.append(np.zeros(nr, bool))
+                    continue
+                n_shard_dj += 1
+                ms.append(jitter_after_mask(dd["seed"][:nr], dd["who"][:nr], dd["step"][:nr], dd["kind"][:nr],
+                                            dd["turn"][:nr], dd["don_jitter"][:nr]))
+    if not ms:
+        raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    return np.concatenate(ms), {"shards_with_don_jitter": n_shard_dj}
+
+
+def balanced_weights(mask, train_rows):
+    """§7.83: 価値の損失の行ごとの重み（float32・全行）と検算の数。
+
+    訓練に使う行（`train_rows`）の中で「印の行の重みの合計＝それ以外の行の重みの合計」になるよう、印の行に一律の倍率
+    （＝それ以外の行数 ÷ 印の行数・選ぶ定数なし）を掛ける。そのうえで訓練の行の重みの平均が 1 になるよう全体を一律に
+    縮める（価値の損失の大きさを方策・補助の頭と今までと同じ釣り合いに保つため）。取り置きの行の重みは使わない。"""
+    m = np.asarray(mask, bool)
+    tr = np.zeros(len(m), bool)
+    tr[np.asarray(train_rows, np.int64)] = True
+    n_j = int((m & tr).sum()); n_o = int((~m & tr).sum())
+    if n_j == 0:
+        raise ValueError("--jitter-weight balanced: 訓練の行にドンだけが違う行が 1 行も無い（波 82j を --in に入れたか）")
+    ratio = n_o / n_j
+    norm = (n_j + n_o) / (2.0 * n_o)          # 重みの平均を 1 に（Σw = ratio·n_j + n_o = 2·n_o）
+    w = np.full(len(m), norm, np.float32)
+    w[m] = ratio * norm
+    info = {"rows_jitter_train": n_j, "rows_other_train": n_o, "rows_jitter_all": int(m.sum()),
+            "ratio": ratio, "w_jitter": float(ratio * norm), "w_other": float(norm),
+            "mean_w_train": float(w[tr].mean())}
+    return w, info
+
+
 def load_omni(pats):
     """`omni_*.npz`（`tests/scripts/omni_value_relabel.py` の出力）→ (鍵, v_omni)。
 
@@ -1111,6 +1179,18 @@ def train(args):
     va_p = P["seed"] % args.holdout_mod == 0
     print(f"value {len(V['z'])}行（val {int(va_v.sum())}） policy {len(P['len'])}点（val {int(va_p.sum())}）"
           f" {time.time()-t0:.0f}s", flush=True)
+    # ドンだけが違う行の重み（§7.83・WP `don-weight`）。切（既定）なら何も読まない＝今までと 1 bit も同じ。
+    jw = getattr(args, "jitter_weight", "off") or "off"
+    v_w = None
+    if jw != "off":
+        if args.backend != "torch":
+            raise SystemExit("--jitter-weight は torch backend 専用（WP don-weight）")
+        jm, jinfo = load_jitter_mask(_expand(args.src), _expand(args.zsrc))
+        if len(jm) != len(V["z"]):
+            raise ValueError(f"--jitter-weight の行数 {len(jm)} が value 行 {len(V['z'])} と合わない")
+        v_w, winfo = balanced_weights(jm, np.flatnonzero(~va_v))
+        print("JITTER_WEIGHT " + json.dumps({"mode": jw, **jinfo, **winfo,
+                                              "rows_jitter_holdout": int((jm & va_v).sum())}, ensure_ascii=False), flush=True)
     if args.warm_start:
         net = NRelNet.load(args.warm_start, tables=tables)
         print(f"warm-start: {args.warm_start}（hidden={net.W1.shape[1]}）", flush=True)
@@ -1265,6 +1345,8 @@ def train(args):
                         kw["plan"] = b[9]
                     if len(b) >= 12:
                         kw.update(tm=b[10], tm_mask=b[11])
+                    if v_w is not None:
+                        kw["vw"] = v_w[tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]]
                     if res_on:
                         bi_ = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
                         kw.update(res=np.asarray(V["res"][bi_], np.float32),
@@ -1478,6 +1560,9 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                              **({"theory_in": True} if getattr(net, "theory_in", False) else {}),
                              # 価値の教師の作り方（§7.80）。既定 z のときは焼かない＝今までの npz と同じ。
                              **({} if (getattr(args, "z_mode", "z") or "z") == "z" else {"z_mode": args.z_mode}),
+                             # ドンだけが違う行の重み（§7.83）。既定 off のときは焼かない＝今までの npz と同じ。
+                             **({} if (getattr(args, "jitter_weight", "off") or "off") == "off"
+                                else {"jitter_weight": args.jitter_weight}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
@@ -1588,6 +1673,10 @@ def main(argv=None):
                     help="§7.82（WP theory-input）: 見える情報だけの理論の列（記録の隣の *.theory.npz・27 列）を入力の束の後ろに"
                          "足して 1 段目へ入れる（新しい重み W1t は 0 で始める＝warm-start の直後は同じ関数・npz の鍵 thin_W1t）。"
                          "**既定は切＝今までと 1 bit も同じ**。sidecar の無いシャードがあれば止める。Rust の forward は読まない（診断用）")
+    tr.add_argument("--jitter-weight", choices=JITTER_WEIGHT_MODES, default="off",
+                    help="§7.83（WP don-weight）: balanced＝波 82j のドンを動かした局の、動かした手番の頭以後の行（両席・dump の"
+                         " don_jitter）の価値の損失に一律の倍率を掛け、その行の重みの合計＝それ以外の行の重みの合計にする（倍率は行数の比・"
+                         "重みの平均は 1 に揃える・方策と補助の頭は不変・torch 専用）。**既定は off＝今までと 1 bit も同じ**")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")
