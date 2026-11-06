@@ -17,7 +17,7 @@
  },
  "metrics": {
   "arena_ddt/ddt_all_real_w17.jsonl": 42,
-  "arena_ddt/ddt_life1_real_w17.jsonl": 42
+  "arena_ddt/ddt_life1_real_w17.jsonl": 63
  },
  "notes": "",
  "worker": {
