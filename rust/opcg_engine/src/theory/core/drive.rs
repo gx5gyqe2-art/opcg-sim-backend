@@ -51,6 +51,7 @@ pub fn run(c: &mut Core, g: &Game, p: &V) -> R<V> {
         "lethal_rule" => super::drv_lr::game(c, g, &cfg, p),
         "theory_bridge" => super::drv_tb::game(c, g, &cfg, p),
         "two_curves" | "two_curves_state" | "price_cands" | "live_turn" => super::drv_t18::game(c, g, &cfg, p, &tool),
+        "visible_cols" => super::drv_vis::game(c, g, &cfg, p),
         o => Err(format!("局の駆動が無い器: {o}")),
     };
     c.ctx = super::state::Ctx::default();

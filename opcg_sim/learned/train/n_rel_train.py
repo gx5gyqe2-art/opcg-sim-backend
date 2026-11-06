@@ -254,7 +254,7 @@ class NRelNet(NL.NRelNet):
     def __init__(self, tables, hidden=192, seed=13):
         super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
-                      for p in self.params + self.aux_params + self.plan_params + [NL.SKIP_PARAM]}
+                      for p in self.params + self.aux_params + self.plan_params + [NL.SKIP_PARAM, NL.TH_PARAM]}
         self._t = 0
 
     def _trainable(self):
@@ -264,7 +264,8 @@ class NRelNet(NL.NRelNet):
         """
         return (self.params + (self.aux_params if self.aux else [])
                 + (self.plan_params if self.plan else [])
-                + ([NL.SKIP_PARAM] if self.value_skip else []))
+                + ([NL.SKIP_PARAM] if self.value_skip else [])
+                + ([NL.TH_PARAM] if getattr(self, "theory_in", False) else []))
 
     # --- card_table backward（NEff と同じ） ---
     def card_table_backward(self, k, dtab, g):
@@ -289,6 +290,8 @@ class NRelNet(NL.NRelNet):
         dr1 = dh2 @ self.W2.T
         dh1 = dr1 * (k["h1"] > 0)
         g["W1"] = g.get("W1", 0) + k["z"].T @ dh1; g["b1"] = g.get("b1", 0) + dh1.sum(0)
+        if k.get("th") is not None:          # 理論の列（§7.82）→ 1 段目の新しい重み
+            g[NL.TH_PARAM] = g.get(NL.TH_PARAM, 0) + k["th"].T @ dh1
         dz = dh1 @ self.W1.T
         if dz_extra is not None:
             dz = dz + dz_extra             # 価値の出口のまっすぐな道（§7.78）から入力の束へ戻る分
@@ -1096,6 +1099,13 @@ def train(args):
         omni_key, v_omni = load_omni(getattr(args, "omni_in", None) or [])
         V["z"], n_rep = value_teacher(V["z"], V["seed"], steps, omni_key, v_omni, z_mode)
         print(f"z-mode {z_mode}: v_omni で差し替えた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    # 理論の列（§7.82・WP `theory-input`）: 記録の隣の sidecar（*.theory.npz・全行）を読み、V["sc"] の後ろに足した束に
+    # 差し替える（切＝既定なら何も読まない＝今までと 1 ビットも同じ）。sidecar の無いシャードがあれば止める。
+    if getattr(args, "theory_in", False):
+        from opcg_sim.learned.train import theory_labels as TL
+        th = TL.load_theory(_expand(args.src), _expand(args.zsrc), len(V["z"]), cache_dir=args.cache_dir or DIO.default_cache_dir())
+        TL.attach(V, th)
+        print(f"theory-in: 理論の列 {TL.D_TH} を入力の束に足した（行 {len(th)}・sc {V['sc'].shape[1]} 列）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
     va_v = V["seed"] % args.holdout_mod == 0
     va_p = P["seed"] % args.holdout_mod == 0
@@ -1119,6 +1129,14 @@ def train(args):
         net.Wvz = np.zeros((NL.D_Z, 1), np.float32)
     if net.value_skip:
         print(f"value-skip: on（入力の束 {NL.D_Z} → 価値の出口・|Wvz| {float(np.abs(net.Wvz).sum()):.4g}）", flush=True)
+    # 理論の列（§7.82）: warm-start の npz に無ければ重み 0 で始める。切替なしで理論入りの npz を温めるのは誤り。
+    if getattr(args, "theory_in", False) and not getattr(net, "theory_in", False):
+        net.theory_in = True
+        net.W1t = np.zeros((NL.D_TH, net.W1.shape[1]), np.float32)
+    if getattr(net, "theory_in", False):
+        if not getattr(args, "theory_in", False):
+            raise ValueError("warm-start のネットは理論の列を読む（theory_in）＝--theory-in を付けて sidecar を揃える")
+        print(f"theory-in: on（理論の列 {NL.D_TH} → 1 段目・|W1t| {float(np.abs(net.W1t).sum()):.4g}）", flush=True)
     # 補助教師（§20.8.2）: **λ_aux>0 かつ dump に aux 列がある**ときだけ立てる。どちらかが
     # 欠ければ `net.aux=False`＝補助ヘッドは初期化されたまま触られず、npz にも出ない＝
     # **今までの学習と 1 ビットも変わらない**（v3 の波に --aux-weight を付けても同じ）。
@@ -1457,6 +1475,7 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
                              **({"value_skip": True} if getattr(net, "value_skip", False) else {}),
+                             **({"theory_in": True} if getattr(net, "theory_in", False) else {}),
                              # 価値の教師の作り方（§7.80）。既定 z のときは焼かない＝今までの npz と同じ。
                              **({} if (getattr(args, "z_mode", "z") or "z") == "z" else {"z_mode": args.z_mode}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
@@ -1565,6 +1584,10 @@ def main(argv=None):
                     help="§7.78（WP value-skip）: 価値の出口に入力の束（415 次元）からのまっすぐな道を足す"
                          "（新しい重みは 0 で始める＝warm-start の直後は同じ関数・npz の鍵 skip_Wvz）。"
                          "**既定は切＝今までと 1 bit も同じ**。Rust の forward はこの道を読まない（診断用）")
+    tr.add_argument("--theory-in", action="store_true",
+                    help="§7.82（WP theory-input）: 見える情報だけの理論の列（記録の隣の *.theory.npz・27 列）を入力の束の後ろに"
+                         "足して 1 段目へ入れる（新しい重み W1t は 0 で始める＝warm-start の直後は同じ関数・npz の鍵 thin_W1t）。"
+                         "**既定は切＝今までと 1 bit も同じ**。sidecar の無いシャードがあれば止める。Rust の forward は読まない（診断用）")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")

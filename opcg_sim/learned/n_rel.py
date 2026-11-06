@@ -101,6 +101,20 @@ TIME_KEY = "time_"
 # （＝Rust はこの道を読まない・出荷するなら読み込みの直しが要る）。
 SKIP_KEY = "skip_"
 SKIP_PARAM = "Wvz"
+# 理論の列（§7.82・WP `theory-input`）: 入力の束の後ろに足す「見える情報だけの理論の読み」（Rust `drv_vis::VIS_COLS` の写し・
+# 正本は Rust・`tests/scripts/theory_rs.visible_cols` が照合する）。1 段目へ入る重み `W1t` [D_TH, hidden] は**別鍵**
+# （`thin_W1t`）で置き、**0 で始める**＝立てた直後の関数は元と同じ。無い npz は切のまま（今までと 1 ビットも同じ）。
+# Rust の forward はこの列を読まない（診断用＝出荷するなら段 2 で符号化と読み込みの直しが要る）。
+TH_COLS = ("tau_me", "tau_opp", "d_clock", "w_cross",
+           "theta_me", "th_life_me", "th_hand_me", "th_body_me",
+           "theta_opp", "th_life_opp", "th_hand_opp", "th_body_opp",
+           "slope_me", "slope_opp",
+           "r_hand_opp", "r_hand_me",
+           "don_me", "don_opp", "hand_me", "hand_opp", "nu_me", "nu_opp",
+           "next_me", "sched1_me", "sched1_opp")
+D_TH = len(TH_COLS)                   # 25
+TH_KEY = "thin_"
+TH_PARAM = "W1t"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -207,6 +221,10 @@ class NRelNet:
         # あいだは forward からも損失からも触られない（保存もしない）。
         self.Wvz = np.zeros((D_Z, 1), np.float32)
         self.value_skip = False
+        # 理論の列（§7.82）: 入力の束の後ろの D_TH 列 → 1 段目。**0 で始める**・`theory_in` が False のあいだは
+        # forward からも損失からも触られない（保存もしない）＝今までと 1 ビットも同じ。
+        self.W1t = np.zeros((D_TH, hidden), np.float32)
+        self.theory_in = False
         self.vocab_ids = None
         self.meta = {}
         #: このネットが読む符号化の世代（新規は現行＝v15。`load` が npz の meta から入れ直す）。
@@ -348,17 +366,29 @@ class NRelNet:
             h[0, idx[opp_m]] = np.concatenate([tp, mx_i, mean_i, np.zeros((npp, D_C), np.float32)], 1)
         return h, present
 
+    def split_theory(self, sc):
+        """`theory_in` なら sc [B, D_SC+D_TH] を (盤面の列, 理論の列) に分ける。切なら (sc, None)。"""
+        if not self.theory_in:
+            return sc, None
+        if sc.shape[1] != D_SC + D_TH:
+            raise ValueError(f"theory_in のネットには理論の列つきの sc（{D_SC}+{D_TH} 列）が要る: {sc.shape[1]} 列")
+        return sc[:, :D_SC], sc[:, D_SC:]
+
     def body(self, sc, h, present, keep=None):
+        sc, th = self.split_theory(sc)
         sc = self.mask_sc(sc)
         n = np.maximum(present.sum(1, keepdims=True), 1.0)                      # [B,1]
         mean = h.sum(1) / n
         h_masked = np.where(present[:, :, None] > 0, h, -1e9)
         mx = h_masked.max(1); mx = np.where(mx < -1e8, 0.0, mx)
         z = np.concatenate([sc, mean, mx], 1)                                   # [B,411]
-        h1 = z @ self.W1 + self.b1; r1 = np.maximum(h1, 0.0)
+        h1 = z @ self.W1 + self.b1
+        if th is not None:
+            h1 = h1 + th @ self.W1t                                             # 理論の列（§7.82・0 で始める）
+        r1 = np.maximum(h1, 0.0)
         h2 = r1 @ self.W2 + self.b2; e = np.maximum(h2, 0.0)
         if keep is not None:
-            keep.update(n=n, h_masked=h_masked, z=z, h1=h1, r1=r1, h2=h2, e=e)
+            keep.update(n=n, h_masked=h_masked, z=z, h1=h1, r1=r1, h2=h2, e=e, th=th)
         return e
 
     def body_value(self, sc, h, present):
@@ -504,6 +534,11 @@ class NRelNet:
             # 価値の出口のまっすぐな道（§7.78）も別鍵（`skip_Wvz`）。Rust は知らない鍵を無視する。
             m["value_skip"] = True
             extra[SKIP_KEY + SKIP_PARAM] = self.Wvz
+        if self.theory_in:
+            # 理論の列（§7.82）も別鍵（`thin_W1t`）。列の名前も焼く（読み手が並びを照合する）。
+            m["theory_in"] = True
+            m["theory_cols"] = list(TH_COLS)
+            extra[TH_KEY + TH_PARAM] = self.W1t
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -547,6 +582,13 @@ class NRelNet:
         if SKIP_KEY + SKIP_PARAM in d.files:
             net.Wvz = np.asarray(d[SKIP_KEY + SKIP_PARAM], np.float32).reshape(D_Z, 1)
             net.value_skip = True
+        # 理論の列（§7.82・あれば）。無ければ 0 のまま `theory_in=False`。列の並びが違えば止める。
+        if TH_KEY + TH_PARAM in d.files:
+            cols = tuple(net.meta.get("theory_cols") or ())
+            if cols != TH_COLS:
+                raise ValueError(f"{path}: 理論の列の並びが今の定義と違う（{cols} != {TH_COLS}）")
+            net.W1t = np.asarray(d[TH_KEY + TH_PARAM], np.float32).reshape(D_TH, net.W1.shape[1])
+            net.theory_in = True
         return net
 
 

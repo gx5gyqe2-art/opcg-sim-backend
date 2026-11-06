@@ -115,7 +115,8 @@ def shard_files(d):
     return sorted(f for f in glob.glob(os.path.join(d, "n_record_*.npz"))
                   if not (f.endswith(".plan.npz") or f.endswith(".time.npz")
                           or f.endswith(".res.npz")      # .res＝WP value-teach の案 A の sidecar
-                          or f.endswith(".roll.npz")))   # .roll＝WP rollout-teach の打ち続けの平均の sidecar
+                          or f.endswith(".roll.npz")      # .roll＝WP rollout-teach の打ち続けの平均の sidecar
+                          or f.endswith(".theory.npz")))  # .theory＝WP theory-input の理論の列の sidecar（pack には入れない）
 
 
 def plan_sidecar(f):

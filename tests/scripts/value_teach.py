@@ -289,8 +289,9 @@ def cmd_bench(a):
         print("BENCH", src, "ok", len(keep), "fail", fails, flush=True)
 
 
-def net_values(path, sc, ci, tok, bs=256):
-    """npz のネットの生の価値（numpy の forward・`--ablate` は npz の meta のまま）。"""
+def net_values(path, sc, ci, tok, bs=256, th=None):
+    """npz のネットの生の価値（numpy の forward・`--ablate` は npz の meta のまま）。
+    理論の列を読むネット（§7.82・`theory_in`）には `th` [N, D_TH]（`theory_rs.visible_cols`）を渡す＝無ければ止める。"""
     from opcg_sim.learned import n_rel as NL
     from opcg_sim.learned import n_rel_feat as NR
     from opcg_sim.learned.train import n_rel_train as NT
@@ -301,6 +302,10 @@ def net_values(path, sc, ci, tok, bs=256):
         _G["tables"] = (stats, ab, abm, pwr, isl)
         _G["rt"] = NR.RelTable(NR.profile_table(load_db(), vocab))
     net = NL.NRelNet.load(path, tables=_G["tables"])
+    if getattr(net, "theory_in", False):
+        if th is None:
+            raise ValueError(f"{path}: 理論の列を読むネット＝th（theory_rs.visible_cols の列）が要る")
+        sc = np.concatenate([np.asarray(sc, np.float32), np.asarray(th, np.float32)], 1)
     out = []
     for s in range(0, len(sc), bs):
         a_, c_, t_ = sc[s:s + bs].astype(np.float32), ci[s:s + bs].astype(np.int64), tok[s:s + bs].astype(np.float32)
@@ -417,16 +422,49 @@ TV_TRUTH = 0.338
 TV_TIMES = ("a_head", "b_close", "c_oppend", "d_next")
 
 
+def _is_theory_net(path):
+    with np.load(path, allow_pickle=True) as d:
+        return "thin_W1t" in d.files
+
+
+def _tv_theory(f, d):
+    """紫カイドウ 24 点の保存済みの盤面の理論の列（§7.82・`theory_in` のネットのため・ファイルの隣に覚える）。
+    席は p1（紫カイドウ）固定・手番は盤面の列 10・デッキは点の対面（`kr`＝deck_113 対 deck_112・`m5`＝`matchup_5.MU`）。"""
+    cache = os.path.splitext(f)[0] + ".theory.npz"
+    if os.path.exists(cache):
+        c = dict(np.load(cache))
+        return c["base"], c["less"]
+    import theory_rs as TR
+    import offdist_value as OV
+    import matchup_5 as M5
+    pid = int(os.path.basename(f)[3:6])
+    p = next(x for x in OV.kaido_points() if int(x["pid"]) == pid)
+    if p["src"] == "kr":
+        d0, d1 = KR.deck(KR.KAIDO)[1], KR.deck(KR.ROCKS)[1]
+    else:
+        d0, d1 = M5.deck(M5.MU[p["mu"]][0])[1], M5.deck(M5.MU[p["mu"]][1])[1]
+    TR.ready()
+    out = {}
+    for nm in ("base", "less"):
+        sc = np.asarray(d["sc_" + nm], np.float32)
+        turn = np.rint(sc[:, 10]).astype(np.int64)
+        out[nm] = TR.visible_cols(sc, d["tok_" + nm], d["ci_" + nm], np.zeros(len(sc), np.int64), turn, (d0, d1)).astype(np.float32)
+    np.savez_compressed(cache, **out)
+    return out["base"], out["less"]
+
+
 def cmd_tvval(a):
-    files = sorted(glob.glob(os.path.join(a.out, "tv_states", "pid*.npz")))
+    files = sorted(f for f in glob.glob(os.path.join(a.out, "tv_states", "pid*.npz")) if not f.endswith(".theory.npz"))
     res = {"points": len(files), "truth": TV_TRUTH, "nets": {}}
     for net in a.nets:
         per = {t: [] for t in TV_TIMES}
+        theory = _is_theory_net(net)
         for f in files:
             d = dict(np.load(f, allow_pickle=True))
             if not len(d["t"]):
                 continue
-            dv = net_values(net, d["sc_base"], d["ci_base"], d["tok_base"]) - net_values(net, d["sc_less"], d["ci_less"], d["tok_less"])
+            thb, thl = _tv_theory(f, d) if theory else (None, None)
+            dv = net_values(net, d["sc_base"], d["ci_base"], d["tok_base"], th=thb) - net_values(net, d["sc_less"], d["ci_less"], d["tok_less"], th=thl)
             for t in TV_TIMES:
                 m = d["t"] == t
                 if m.any():

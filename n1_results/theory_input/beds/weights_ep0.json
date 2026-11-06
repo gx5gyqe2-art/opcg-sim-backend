@@ -1,0 +1,72 @@
+{
+ "nrel_r28x4.npz": {
+  "theory_in": false
+ },
+ "nrel_r29f4.ep0.npz": {
+  "theory_in": false
+ },
+ "nrel_r29f4.ep1.npz": {
+  "theory_in": false
+ },
+ "nrel_thin.ep0.npz": {
+  "theory_in": true,
+  "W1t_norm": 2.721145626654953,
+  "W1t_max_abs": 0.5531390905380249,
+  "W1_row_norm_median": 2.333370083059677,
+  "W1_row_norm_don_active": 2.60963519538389,
+  "cols": {
+   "tau_me": 0.4024,
+   "tau_opp": 0.4467,
+   "d_clock": 0.6709,
+   "w_cross": 0.5115,
+   "theta_me": 0.3805,
+   "th_life_me": 0.3471,
+   "th_hand_me": 0.706,
+   "th_body_me": 0.7727,
+   "theta_opp": 0.392,
+   "th_life_opp": 0.3191,
+   "th_hand_opp": 0.9296,
+   "th_body_opp": 0.6057,
+   "slope_me": 0.3745,
+   "slope_opp": 0.4732,
+   "r_hand_opp": 0.4437,
+   "r_hand_me": 0.4081,
+   "don_me": 0.2652,
+   "don_opp": 0.52,
+   "hand_me": 0.3336,
+   "hand_opp": 0.5437,
+   "nu_me": 0.4683,
+   "nu_opp": 0.4374,
+   "next_me": 0.7632,
+   "sched1_me": 0.8997,
+   "sched1_opp": 0.4545
+  },
+  "rank": [
+   "th_hand_opp",
+   "sched1_me",
+   "th_body_me",
+   "next_me",
+   "th_hand_me",
+   "d_clock",
+   "th_body_opp",
+   "hand_opp",
+   "don_opp",
+   "w_cross",
+   "slope_opp",
+   "nu_me",
+   "sched1_opp",
+   "tau_opp",
+   "r_hand_opp",
+   "nu_opp",
+   "r_hand_me",
+   "tau_me",
+   "theta_opp",
+   "theta_me",
+   "slope_me",
+   "th_life_me",
+   "hand_me",
+   "th_life_opp",
+   "don_me"
+  ]
+ }
+}
