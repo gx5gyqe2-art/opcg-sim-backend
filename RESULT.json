@@ -19,7 +19,7 @@
   "arena_ddt/ddt_all_real_w01.jsonl": 84,
   "arena_ddt/ddt_life1_real_w01.jsonl": 84
  },
- "notes": "",
+ "notes": "出どころの照合の needle『7.85 守りの対話の短い木の本番アリーナ』が台帳(docs/n_loop_ops.md)に連続した文字列で無く(行は『WP `rs-defense-dialog-tree` の本番アリーナ』)、既定のジョブ定義では WORKER_JOB_ERROR で止まった。台帳の行(seed 帯 4471000〜・4511000〜の払い出し)は在るため、ledger_grep だけをその文字列に替えた spec(/root/ddt_spec.json)で --spec 実行した。他は定義のまま。コーディネータは台帳の見出し表記かジョブ定義の ledger_grep を直されたい。",
  "worker": {
   "spec": "/root/ddt_spec.json",
   "k": 1,
