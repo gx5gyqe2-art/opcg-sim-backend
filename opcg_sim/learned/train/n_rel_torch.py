@@ -489,7 +489,7 @@ class TorchTrainer:
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
                    aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None,
-                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None):
+                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None, vw=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
@@ -515,7 +515,11 @@ class TorchTrainer:
         # 報告する mse は numpy 版と同じ mean((v-z)²) そのもの（係数 0.5 は損失側だけ）。
         mse = ((v - tz) ** 2).mean()
         out = float(mse.detach())
-        loss = 0.5 * mse
+        if vw is None:
+            loss = 0.5 * mse
+        else:
+            # 行ごとの重み（§7.83・WP `don-weight`）: 損失だけ重みつき平均・報告する mse は重みなしのまま
+            loss = 0.5 * (_f32(vw) * (v - tz) ** 2).mean()
         if use_aux:
             la, lt = aux_loss_terms(pa, pt, _f32(aux), _f32(aux_tok), _f32(aux_mask))
             loss = loss + w * (la + lt)

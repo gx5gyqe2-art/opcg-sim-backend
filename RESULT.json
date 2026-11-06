@@ -1,60 +1,256 @@
 {
- "job": "value-split-b",
- "section": "§7.74",
+ "job": "don-weight",
+ "section": "§7.83",
+ "ledger": "cpu_theory_gap.md 2+525",
  "status": "done",
- "branch": "claude/value-split-b",
- "report": "docs/reports/2026-11-03_value_split_epochs.md",
- "results_dir": "n1_results/value_split",
- "gate": "make test green（2026-11-03 17:48・cargo test 640 passed・pytest 894 passed 14 skipped・付録の道具 1 ファイルを足したため 1 回だけ回した）",
- "what": "r28x4 を土台に波 70f＋71f（535 万行）で α 2e-4・4 周／β 1e-4・4 周を訓練し、各周の重み 8 本＋r28x4＋r29f4 を同じ試験台（ドンの比 tvval・6キング 53 点 rocks・検証の誤差）にかけた。付録: 波 70f のドンの総数の規則からの外れ（don_variation.py）。",
- "invariants": {
-  "r27_tvval_matches_7_71": true,
-  "r27_b_close": 0.115,
-  "r28x4_b_close": 0.078,
-  "r28x4_b_close_ratio": 0.23,
-  "note_r28x4": "§7.73 の『r28x4 0.26』は 2 波の r28x の値（0.088・0.262）。4 波の r28x4 は本計測が初めて＝0.23 を正本にする",
-  "r29f4_b_close": 0.113,
-  "r29f4_b_close_ratio": 0.34
+ "branch": "claude/don-weight",
+ "report": "docs/reports/2026-11-06_don_weight.md",
+ "results_dir": "n1_results/don_weight",
+ "verdict": "mixed: balanced loss weight on DON-jittered rows (x10.94, mean weight 1) raises the 82j group gap on holdout games (turn 3-6: 0.337/0.379 vs control 0.309/0.302, paired +0.028±0.026 / +0.077±0.033; outcome 0.488) but stays below 0.40, and does not transfer: purple Kaido DON ratio at window close falls 0.30/0.18 (control 0.34/0.25, r28x4 0.23). Fit degrades: 74c holdout v_mse +0.0025 (ep1) / +0.0102 (ep2, over the 0.005 watch); calibration within 1.5x. None of the three predictions fits cleanly; fitting weight moves the gap size within the jitter form only.",
+ "jitter_weight": {
+  "mode": "balanced",
+  "shards_with_don_jitter": 384,
+  "rows_jitter_train": 432044,
+  "rows_other_train": 4725992,
+  "rows_jitter_all": 504473,
+  "ratio": 10.938682171260334,
+  "w_jitter": 5.969341085630166,
+  "w_other": 0.5457093452549221,
+  "mean_w_train": 1.0000001192092896,
+  "rows_jitter_holdout": 72429
  },
  "train": {
-  "waves": ["n70f", "n71f"],
-  "rows_value": 5353107, "rows_value_holdout": 764389, "points_policy": 2102485,
-  "common_args": "train_r29f4.json の common_args と同じ（--epochs 4・--save-each-epoch・warm-start r28x4）",
-  "alpha_lr2e-4": {"val_vmse": [0.3594, 0.3473, 0.3581, 0.3570], "val_vsign": [0.870, 0.876, 0.871, 0.873], "val_pi_top1": [0.498, 0.506, 0.497, 0.504], "train_mse": [0.4712, 0.4637, 0.4586, 0.4544], "best_ep": 1, "sec_per_epoch": 1200},
-  "beta_lr1e-4": {"val_vmse": [0.3554, 0.3473, 0.3550, 0.3530], "val_vsign": [0.871, 0.874, 0.873, 0.875], "val_pi_top1": [0.502, 0.505, 0.501, 0.501], "train_mse": [0.4715, 0.4656, 0.4619, 0.4589], "best_ep": 1}
+  "ep0": {
+   "train_mse": 0.476,
+   "val_vmse": 0.3634,
+   "val_vsign": 0.8707,
+   "val_pi_top1": 0.494,
+   "val_p_loss": 1.71
+  },
+  "ep1": {
+   "train_mse": 0.4729,
+   "val_vmse": 0.3802,
+   "val_vsign": 0.8661,
+   "val_pi_top1": 0.503,
+   "val_p_loss": 1.7111
+  }
  },
- "testbeds": {
-  "tvval_b_close_ratio": {"r28x4": 0.23, "r29f4": 0.34, "alpha_ep1_4": [0.33, 0.26, 0.22, 0.18], "beta_ep1_4": [0.30, 0.30, 0.29, 0.23]},
-  "tvval_b_close_diff": {"r28x4": 0.078, "r29f4": 0.113, "alpha_ep1_4": [0.110, 0.088, 0.073, 0.060], "beta_ep1_4": [0.102, 0.103, 0.100, 0.077]},
-  "rocks53_chose_b": {"r28x4": 6, "r29f4": 4, "alpha_ep1_4": [6, 5, 3, 2], "beta_ep1_4": [6, 5, 6, 4]},
-  "rocks53_q_diff": {"r28x4": -0.074, "r29f4": -0.096, "alpha_ep1_4": [-0.130, -0.085, -0.055, -0.059], "beta_ep1_4": [-0.092, -0.132, -0.087, -0.052]},
-  "rocks53_share_b": {"r28x4": 0.101, "r29f4": 0.099, "alpha_ep1_4": [0.078, 0.073, 0.068, 0.048], "beta_ep1_4": [0.099, 0.068, 0.095, 0.066]}
+ "nets": {
+  "nrel_r28x4.npz": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2818,
+    "turn3_6_holdout": 0.3058,
+    "turn3_6_trained": 0.2779,
+    "turn7_10": 0.1432
+   },
+   "band74c": {
+    "v_mse": 0.4739,
+    "v_sign": 0.8299,
+    "calib_gap_weighted": 0.0166,
+    "calib_gap_mean": 0.0237
+   }
+  },
+  "nrel_djt.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.1785,
+     0.528
+    ],
+    "b_close": [
+     0.1144,
+     0.338
+    ],
+    "c_oppend": [
+     0.1164,
+     0.344
+    ],
+    "d_next": [
+     0.1935,
+     0.572
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2985,
+    "turn3_6_holdout": 0.3088,
+    "turn3_6_trained": 0.2968,
+    "turn7_10": 0.1386
+   },
+   "band74c": {
+    "v_mse": 0.4825,
+    "v_sign": 0.8263,
+    "calib_gap_weighted": 0.0711,
+    "calib_gap_mean": 0.0987
+   }
+  },
+  "nrel_djt.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1671,
+     0.494
+    ],
+    "b_close": [
+     0.086,
+     0.254
+    ],
+    "c_oppend": [
+     0.094,
+     0.278
+    ],
+    "d_next": [
+     0.1884,
+     0.557
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.2946,
+    "turn3_6_holdout": 0.3019,
+    "turn3_6_trained": 0.2935,
+    "turn7_10": 0.1325
+   },
+   "band74c": {
+    "v_mse": 0.4788,
+    "v_sign": 0.8281,
+    "calib_gap_weighted": 0.0468,
+    "calib_gap_mean": 0.0651
+   }
+  },
+  "nrel_dw.ep0.npz": {
+   "tvval": {
+    "a_head": [
+     0.1791,
+     0.53
+    ],
+    "b_close": [
+     0.1015,
+     0.3
+    ],
+    "c_oppend": [
+     0.1112,
+     0.329
+    ],
+    "d_next": [
+     0.1624,
+     0.48
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.3215,
+    "turn3_6_holdout": 0.3371,
+    "turn3_6_trained": 0.3187,
+    "turn7_10": 0.1344
+   },
+   "band74c": {
+    "v_mse": 0.485,
+    "v_sign": 0.8255,
+    "calib_gap_weighted": 0.0449,
+    "calib_gap_mean": 0.0618
+   },
+   "rocks": {
+    "points": 53,
+    "chose_return": 3
+   }
+  },
+  "nrel_dw.ep1.npz": {
+   "tvval": {
+    "a_head": [
+     0.1604,
+     0.475
+    ],
+    "b_close": [
+     0.0617,
+     0.182
+    ],
+    "c_oppend": [
+     0.0627,
+     0.185
+    ],
+    "d_next": [
+     0.1692,
+     0.501
+    ]
+   },
+   "jitter_gap": {
+    "turn3_6": 0.3415,
+    "turn3_6_holdout": 0.3792,
+    "turn3_6_trained": 0.3351,
+    "turn7_10": 0.1699
+   },
+   "band74c": {
+    "v_mse": 0.489,
+    "v_sign": 0.8243,
+    "calib_gap_weighted": 0.0479,
+    "calib_gap_mean": 0.0601
+   },
+   "rocks": {
+    "points": 53,
+    "chose_return": 2
+   }
+  }
  },
- "conclusion": {
-  "ratio_vs_epochs": "周を重ねるほど比は単調に縮む（2e-4: 0.33 → 0.18・1e-4: 0.30 → 0.23）。1 周目の 0.33 は土台 0.23 からの過渡で、当てはめが進むと土台を通り越して縮む",
-  "ratio_vs_lr": "速さ半分は縮みを遅らせるだけ（3 周まで 0.29〜0.30・4 周で 0.23）。同じ周数では速さ半分の方が比は大きいが、周を重ねれば同じ向き",
-  "ratio_vs_validation": "検証の誤差の最良（2 周目・0.3473）の後も比は縮み続け、訓練の誤差の低下に連れて動く＝汎化ではなく当てはまりが決める",
-  "prediction_play_cause_pm005": "外れ（周で −0.15 動く）",
-  "prediction_fit_cause_plus01": "外れ（向きが逆・速さ半分は同じ周数でなら字面どおり +0.05 だが周を重ねれば縮む）",
-  "reading": "当てはめの縮みは実在するが訓練の量・速さの不足ではなく、教材に当てはまるほど進む。計測 A の暫定（教材の打ち方でも差は 0.24〜0.35 残る）と合わせ、ドン 1 枚の偏微分が教材から同定されにくい形（付録）が次の候補。直し先は周・速さ・時間の解像度ではない"
+ "outcome_gap": {
+  "turn3_6": 0.5424,
+  "turn3_6_holdout": 0.4875,
+  "turn3_6_trained": 0.5514,
+  "turn7_10": 0.1944
  },
- "appendix_don_variation_n70f": {
-  "rows": 2642087, "sum10_share": 0.975, "nonzero_share_all": 0.128, "nonzero_share_main_my": 0.125, "nonzero_share_window_opp": 0.147,
-  "nonzero_share_purple_leaders": 0.542, "nonzero_share_non_purple_leaders": 0.0034,
-  "diff_me_minus_opp_my_turn": {"+1": 0.481, "0": 0.353}, "diff_minus_rule_diff_zero": 0.769,
-  "corr_total_vs_turn": 0.82, "mode_share_within_seat_turn": 0.87,
-  "reading": "ドンの総数は手番数でほぼ決まり、同じ手番でドンだけ違う行は紫を含むリーダー（教材の 23%）にしか実質的に無い。仮説（同じ盤面でドンだけ違う対が教材にほとんど無い）はこの数えで支持される"
+ "paired_gap_dw_minus_control": {
+  "turn3_6_holdout_ep0": [
+   0.0283,
+   0.0256
+  ],
+  "turn3_6_holdout_ep1": [
+   0.0772,
+   0.0326
+  ],
+  "turn3_6_trained_ep0": [
+   0.0219,
+   0.0106
+  ],
+  "turn3_6_trained_ep1": [
+   0.0416,
+   0.0145
+  ],
+  "turn7_10_ep0": [
+   -0.0042,
+   0.0098
+  ],
+  "turn7_10_ep1": [
+   0.0374,
+   0.0131
+  ]
  },
- "artifacts": {
-  "nets": "n1_results/value_split/nets/nrel_vsb_{a,b}.ep{0..3}.npz（同梱しない・結果ブランチだけ）",
-  "logs": ["n1_results/value_split/train_vsb_a.log", "n1_results/value_split/train_vsb_b.log", "n1_results/value_split/don_variation_n70f.log"],
-  "tvval": "n1_results/value_split/tvval_*.json", "rocks": "n1_results/value_split/rocks_*.jsonl", "summary": "n1_results/value_split/summary.json",
-  "tool": "tests/scripts/don_variation.py（付録・TEST_SPEC §3 に 1 行）"
- },
+ "control": "claude/don-jitter n1_results/don_jitter/nets/nrel_djt.ep{0,1}.npz (§7.75 test arm, same data, equal weight)",
+ "gate": "OPENBLAS_CORETYPE=Haswell make test: cargo 640 passed, pytest 914 passed 16 skipped",
+ "nets_on_branch": [
+  "n1_results/don_weight/nets/nrel_dw.ep0.npz",
+  "n1_results/don_weight/nets/nrel_dw.ep1.npz"
+ ],
+ "code": [
+  "opcg_sim/learned/train/n_rel_train.py (--jitter-weight, load_jitter_mask, jitter_after_mask, balanced_weights)",
+  "opcg_sim/learned/train/n_rel_torch.py (value_step vw)",
+  "tests/test_don_weight.py",
+  "docs/TEST_SPEC.md"
+ ],
  "notes": [
-  "訓練は 2 本を並べず順に回した（1 本の RSS が約 11GB＝cgroup 14GB に 2 本は載らない）。1 周 約 20 分・2 本で約 3 時間",
-  "検証の誤差は同じ 2 波の取り置きに対する値（評価帯では測っていない）",
-  "試験台の列は 1 種・読みの乱数 1 本（前の報告どおり 6キングの列は ±0.05 揺れる）",
-  "コードは付録の道具 1 ファイルだけ（訓練器・試験台・エンジンは変えていない）"
+  "weights normalized to mean 1 over training rows (spec silent; keeps value-loss scale vs policy/aux)",
+  "jitter start row = first main row of the jittered seat in that turn (dump don_jitter has no step)"
  ]
 }
