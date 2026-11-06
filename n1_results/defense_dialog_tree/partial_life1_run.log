@@ -1,0 +1,5 @@
+todo 4 (done 48) -> n1_results/defense_dialog_tree/partial_life1/points_seeds_div_life1.jsonl
+[1/4] seed=4462269 pts=53 sec=137.3 winner=p1 stats={'resp_points_seen': 48, 'resp_points_audited': 48, 'end_turns_seen': 5, 'end_turns_audited': 5}
+[2/4] seed=4462260 pts=31 sec=242.6 winner=p2 stats={'resp_points_seen': 28, 'resp_points_audited': 28, 'end_turns_seen': 3, 'end_turns_audited': 3}
+[3/4] seed=4462243 pts=32 sec=410.3 winner=p2 stats={'resp_points_seen': 30, 'resp_points_audited': 30, 'end_turns_seen': 2, 'end_turns_audited': 2}
+[4/4] seed=4462245 pts=55 sec=590.2 winner=p1 stats={'resp_points_seen': 47, 'resp_points_audited': 47, 'end_turns_seen': 8, 'end_turns_audited': 8}

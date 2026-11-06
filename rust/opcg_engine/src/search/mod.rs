@@ -517,6 +517,17 @@ pub fn decide_opts_and_carry(
             }
         }
     }
+    // `defense_dialog_tree`（§7.85）: "off"／"life1"／"all" のほかは黙って既定へ落とさない。
+    match ov.get("defense_dialog_tree") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(decide::DefenseDialogTree::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: defense_dialog_tree は \"off\"／\"life1\"／\"all\" のどれか（{r}）"
+                )));
+            }
+        }
+    }
     // `lethal_proof`（§7.21）: "off"／"root"／"root_reply" のほかは黙って既定へ落とさない。
     match ov.get("lethal_proof") {
         None | Some(Value::Null) => {}
@@ -712,6 +723,13 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_str)
             .and_then(decide::DefenseView::from_name)
             .unwrap_or(d.defense_proof_view),
+        // 相手の手番の戦闘中の効果の対話を短い木で読む（§7.85・WP `rs-defense-dialog-tree`・測定用・既定 off）。
+        defense_dialog_tree: v
+            .get("defense_dialog_tree")
+            .and_then(Value::as_str)
+            .and_then(decide::DefenseDialogTree::from_name)
+            .unwrap_or(d.defense_dialog_tree),
+        defense_dialog_fold: flag("defense_dialog_fold", d.defense_dialog_fold),
     }
 }
 

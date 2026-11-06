@@ -1,0 +1,191 @@
+{
+ "life1": {
+  "base": {
+   "games": 52,
+   "void": 0,
+   "points": 1156,
+   "threat": 90,
+   "threat_otsu": 67,
+   "miss_ko_raw": 7,
+   "miss_otsu_raw": 4,
+   "miss_ko_full": 6,
+   "miss_otsu_full": 3,
+   "playout_kept": 2,
+   "playout_kept_otsu": 1,
+   "types_otsu": {
+    "SELECT_COUNTER:no_counter->counter": 2,
+    "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1
+   },
+   "kept_points": [
+    [
+     4462001,
+     131
+    ],
+    [
+     4462251,
+     172
+    ]
+   ],
+   "miss_full_points": [
+    [
+     4462001,
+     131
+    ],
+    [
+     4462038,
+     81
+    ],
+    [
+     4462102,
+     160
+    ],
+    [
+     4462106,
+     93
+    ],
+    [
+     4462203,
+     133
+    ],
+    [
+     4462251,
+     172
+    ]
+   ]
+  },
+  "partial": {
+   "games": 52,
+   "void": 0,
+   "points": 1255,
+   "threat": 73,
+   "threat_otsu": 55,
+   "miss_ko_raw": 0,
+   "miss_otsu_raw": 0,
+   "miss_ko_full": 0,
+   "miss_otsu_full": 0,
+   "playout_kept": null,
+   "playout_kept_otsu": null,
+   "types_otsu": {},
+   "kept_points": [],
+   "miss_full_points": []
+  },
+  "partial_r2": {
+   "games": 52,
+   "void": 0,
+   "points": 1255,
+   "threat": 75,
+   "threat_otsu": 55,
+   "miss_ko_raw": 0,
+   "miss_otsu_raw": 0,
+   "miss_ko_full": 0,
+   "miss_otsu_full": 0,
+   "playout_kept": null,
+   "playout_kept_otsu": null,
+   "types_otsu": {},
+   "kept_points": [],
+   "miss_full_points": []
+  }
+ },
+ "all": {
+  "base": {
+   "games": 119,
+   "void": 0,
+   "points": 3843,
+   "threat": 194,
+   "threat_otsu": 142,
+   "miss_ko_raw": 16,
+   "miss_otsu_raw": 5,
+   "miss_ko_full": 9,
+   "miss_otsu_full": 4,
+   "playout_kept": 2,
+   "playout_kept_otsu": 1,
+   "types_otsu": {
+    "SELECT_COUNTER:no_counter->counter": 3,
+    "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1
+   },
+   "kept_points": [
+    [
+     4462001,
+     131
+    ],
+    [
+     4462251,
+     172
+    ]
+   ],
+   "miss_full_points": [
+    [
+     4462001,
+     131
+    ],
+    [
+     4462038,
+     81
+    ],
+    [
+     4462075,
+     140
+    ],
+    [
+     4462102,
+     160
+    ],
+    [
+     4462106,
+     93
+    ],
+    [
+     4462203,
+     133
+    ],
+    [
+     4462251,
+     172
+    ],
+    [
+     4462260,
+     79
+    ],
+    [
+     4462285,
+     97
+    ]
+   ]
+  },
+  "partial": {
+   "games": 119,
+   "void": 0,
+   "points": 4217,
+   "threat": 201,
+   "threat_otsu": 144,
+   "miss_ko_raw": 5,
+   "miss_otsu_raw": 1,
+   "miss_ko_full": 4,
+   "miss_otsu_full": 1,
+   "playout_kept": 0,
+   "playout_kept_otsu": 0,
+   "types_otsu": {
+    "SELECT_COUNTER:counter->counter/no_counter": 1
+   },
+   "kept_points": [],
+   "miss_full_points": [
+    [
+     4462075,
+     140
+    ],
+    [
+     4462116,
+     83
+    ],
+    [
+     4462168,
+     134
+    ],
+    [
+     4462168,
+     138
+    ]
+   ]
+  }
+ }
+}

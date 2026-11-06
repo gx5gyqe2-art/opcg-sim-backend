@@ -437,6 +437,8 @@ def play_one(args) -> List[Dict[str, Any]]:
         kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない＝修正前の打ち方）
     if getattr(a, "defense_proof", False):
         kw["defense_proof"] = True           # §7.51 の前後比較（守りの窓で相手から見た詰みの証明を使う）
+    if getattr(a, "defense_dialog_tree", None):
+        kw["defense_dialog_tree"] = a.defense_dialog_tree  # §7.85（相手の手番の戦闘中の効果の対話を短い木で）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -570,6 +572,8 @@ def replay_to(seed: int, a, seat: str, step: int):
         kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない＝修正前の打ち方）
     if getattr(a, "defense_proof", False):
         kw["defense_proof"] = True           # §7.51 の前後比較（守りの窓で相手から見た詰みの証明を使う）
+    if getattr(a, "defense_dialog_tree", None):
+        kw["defense_dialog_tree"] = a.defense_dialog_tree  # §7.85（相手の手番の戦闘中の効果の対話を短い木で）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -1008,6 +1012,8 @@ def main(argv=None):
             p.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形")
             p.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形")
             p.add_argument("--defense-proof", action="store_true", help="§7.51 の守りの証明を入れた形で打つ")
+            p.add_argument("--defense-dialog-tree", default=None, choices=("off", "life1", "all"),
+                           help="§7.85: 相手の手番の戦闘中の効果の対話を短い木で読む範囲（省略＝既定 off）")
             p.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（省略＝Rust の既定）")
             p.add_argument("--confirm-trigger-legacy", action="store_true",
                            help="両席を、トリガーの発動確認を「発動する」の 1 手だけで打つ旧い形で打たせる（§7.44 の (B) の前後比較・測定専用）")

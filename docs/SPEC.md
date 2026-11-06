@@ -1364,6 +1364,17 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 アリーナは `--cand-defense-proof`（候補席）、器は `defense_audit.py --defense-proof`・`rs_decide_latency.py --extra '{"defense_proof": true}'`。
 計測（守りの再監査の局面・費用）は `docs/reports/2026-10-25_defense_proof.md`。
 
+**相手の手番の戦闘中に自分が答える効果の対話を短い木で読む**（2026-11-06・WP `rs-defense-dialog-tree`・`search_efficiency_plan.md` §7.85・
+opts の `defense_dialog_tree`＝`off`／`life1`／`all`・**測定用・既定 off＝1 bit も変わらない**・`decide.rs::defense_dialog_tree_applies`）:
+相手の手番・戦闘中（`active_battle` が在る）で、判断するのが自分の効果の対話（中断スタックの対話＝相手のアタック時の任意の効果の確認・
+探して選ぶ 等。ブロッカー／カウンターの選択は対象外＝上の 3 のまま）なら、上の 3 と同じ短い木（`sims ÷ 候補の数` 回・世界は
+`min(K, window_tree_worlds)`）で比べる。`life1` は自分のライフが `window_tree_life`（既定 1）以下のときだけ、`all` はライフを問わず。
+**候補を当てた直後の盤面から木を回す**（戦闘の終わりまで先に畳まない）: 畳むと対話の続き（受けた後に「どれをレストにするか」等）を
+1 段浅い静的な値で選び、間違った続きの先を木が読む（守りの再監査 4462251・172: 畳む形は受ける −0.99／断る −0.987 で断る、
+畳まない形は受ける +0.96〜+0.99 で受け、16 局の打ち比べは 0／16 → 16／16）。畳む形は測定専用の旗 `defense_dialog_fold`（既定 false）。
+アリーナは `--cand-defense-dialog-tree`（候補席）・`arena_shard --defense-dialog-tree`（基準席）、器は `defense_audit.py`／
+`rs_decide_latency.py` の `--defense-dialog-tree`・`blunder_audit.py winstab --opts`。計測は `docs/reports/2026-11-06_defense_dialog_tree.md`。
+
 ### 2.5.13 世界の木を同時に回すスレッド（Rust・opts の `world_threads`・2026-10-25〜）
 
 > 正本はコード（`rust/opcg_engine/src/search/decide.rs` の `run_worlds`）。経緯は `docs/search_efficiency_plan.md` §7.55
