@@ -1,0 +1,28 @@
+RECHECK todo 4 (done 0) k=48
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 460, in recheck_point
+    out = {"seed": seed, "step": step, "both": _G["verify_both"]}
+                                               ~~^^^^^^^^^^^^^^^
+KeyError: 'verify_both'
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/opcg-sim-backend/n1_results/reaudit_r29f4/ba.py", line 20, in <module>
+    sys.exit(BA.main(argv))
+             ~~~~~~~^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 790, in main
+    {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "verify": cmd_verify, "winstab": cmd_winstab, "summary": cmd_summary}[a.cmd](a)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/blunder_audit.py", line 488, in cmd_recheck
+    for i, r in enumerate(pool.imap_unordered(recheck_point, jobs, chunksize=1)):
+                ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/multiprocessing/pool.py", line 873, in next
+    raise value
+KeyError: 'verify_both'

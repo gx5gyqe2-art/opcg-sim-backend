@@ -1,0 +1,8 @@
+seed#0: box n=0.022 q=+0.224 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.691 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.897
+seed#1: box n=0.020 q=+0.206 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.705 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.905
+seed#2: box n=0.023 q=+0.305 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.737 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.887
+seed#3: box n=0.907 q=+0.999 | top={"action_type": "DON_BOX", "don_k": 6, "card": "OP15-041"} q=+0.999 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=+1.000
+seed#4: box n=0.895 q=+0.999 | top={"action_type": "DON_BOX", "don_k": 6, "card": "OP15-041"} q=+0.999 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=+1.000
+seed#5: box n=0.020 q=+0.223 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.714 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.904
+seed#6: box n=0.022 q=+0.253 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.722 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.889
+seed#7: box n=0.023 q=+0.239 | top={"action_type": "PLAY", "card": "OP15-047"} q=+0.707 || after box: top={"action_type": "DON_BOX", "don_k": 0, "card": "OP15-041", "targets":  q=-0.889
