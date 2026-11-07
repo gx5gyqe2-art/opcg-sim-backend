@@ -15,15 +15,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n83f_w20_p0"
+   "n_records/n83f_w20_p0",
+   "n_records/n83f_w20_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 20142,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 41562,
   "dropped": 0,
-  "sec_play_mean": 24.26
+  "sec_play_mean": 25.78
  },
  "notes": "",
  "worker": {
