@@ -1,7 +1,7 @@
 {
  "job": "n84f-w12",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r29f4.npz",
   "games": 480,
