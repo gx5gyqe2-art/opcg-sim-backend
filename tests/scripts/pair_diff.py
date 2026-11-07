@@ -480,6 +480,48 @@ def cmd_merge(a):
                   f" 平均 {out['ml'][m].mean():+.3f}/{out['mm'][m].mean():+.3f}", flush=True)
 
 
+# ---------------------------------------------------------------- 試験台: 対の当てはまり（形ごと）
+
+def cmd_beds(a):
+    """各ネットの予測の差（多い − 少ない）を対ごとに出し、形 × {取り置きの局, 訓練の局} で教師の差と比べる。
+    比＝予測の差の平均 ÷ 教師の差の平均（教師の雑音で縮まない読み）。傾き・相関は対ごと（教師の雑音で縮む）。
+    `--ref` のネットとの対にした差（同じ対で 予測の差 − ref の予測の差 の平均と 95% 区間）も出す。"""
+    from value_teach import net_values
+    from opcg_sim.learned.train import pair_diff as PD
+    P = PD.load_pairs([a.pairs])
+    hold = P["seed"] % 7 == 0
+    allix = np.arange(len(P["d"]))
+    dv = {}
+    for net in a.nets:
+        dv[net] = PD.predict_diff(lambda sc, ci, tok, n=net: net_values(n, sc, ci, tok), P, allix)
+    res = {"pairs": int(len(allix)), "groups": {}, "nets": {}}
+    groups = {}
+    for sh in sorted(set(P["shape"].tolist())):
+        for nm, m in (("hold", hold), ("train", ~hold)):
+            mm = (P["shape"] == sh) & m
+            if mm.any():
+                groups[f"{sh}_{nm}"] = mm
+    for g, mm in groups.items():
+        dt = P["d"][mm].astype(np.float64)
+        res["groups"][g] = {"n": int(mm.sum()), "teacher_mean": round(float(dt.mean()), 4),
+                            "teacher_ci": round(1.96 * float(dt.std(ddof=1)) / math.sqrt(len(dt)), 4)}
+    for net in a.nets:
+        row = {}
+        for g, mm in groups.items():
+            st = PD.fit_stats(dv[net][mm], P["d"][mm])
+            st["ratio"] = round(st["dv_mean"] / st["dt_mean"], 3) if st["dt_mean"] else None
+            if a.ref and a.ref in dv and net != a.ref:
+                x = dv[net][mm] - dv[a.ref][mm]
+                m_, h_ = _ci(x)
+                st["vs_ref"] = [round(m_, 4), round(h_, 4)]
+            row[g] = st
+        res["nets"][os.path.basename(net)] = row
+        print(os.path.basename(net), " ".join(f"{g} {x['dv_mean']:+.3f}({x['ratio']})" for g, x in row.items()), flush=True)
+    os.makedirs(os.path.dirname(a.out_json) or ".", exist_ok=True)
+    json.dump(res, open(a.out_json, "w"), ensure_ascii=False, indent=1)
+    print("teacher", " ".join(f"{g} {x['teacher_mean']:+.3f}±{x['teacher_ci']:.3f}" for g, x in res["groups"].items()), flush=True)
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv=None):
@@ -505,6 +547,11 @@ def main(argv=None):
     m = sub.add_parser("merge")
     m.add_argument("--rows", nargs="+", default=[os.path.join(OUT_DIR, "pairs_*.jsonl*")])
     m.add_argument("--pairs", default=os.path.join(OUT_DIR, "pairs.npz"))
+    b = sub.add_parser("beds")
+    b.add_argument("--pairs", default=os.path.join(OUT_DIR, "pairs.npz"))
+    b.add_argument("--nets", nargs="+", required=True)
+    b.add_argument("--ref", default="")
+    b.add_argument("--out-json", default=os.path.join(OUT_DIR, "beds_pairs.json"))
     nd = sub.add_parser("need")
     nd.add_argument("--positions", default=POSITIONS)
     nd.add_argument("--shard", required=True)
@@ -513,7 +560,7 @@ def main(argv=None):
         return cmd_need(a)
     if a.cmd == "teach":
         return teach_summary(a) if a.summary_only else cmd_teach(a)
-    return {"plan": cmd_plan, "play": cmd_play, "merge": cmd_merge}[a.cmd](a)
+    return {"plan": cmd_plan, "play": cmd_play, "merge": cmd_merge, "beds": cmd_beds}[a.cmd](a)
 
 
 if __name__ == "__main__":

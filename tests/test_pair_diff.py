@@ -44,24 +44,28 @@ def test_load_schedule_factor(tmp_path):
     n = 10
     rng = np.random.default_rng(0)
     seed = np.array([7, 8, 9, 14, 15, 16, 17, 18, 21, 22], np.int64)          # 7・14・21 が取り置き
-    shape = np.array(["head", "close", "hold", "oppend", "head", "close", "hold", "oppend", "mid", "head"])
+    shape = np.array(["head", "close", "hold", "oppend", "head", "close", "mid", "oppend", "mid", "head"])
     kw = {"sc_l": rng.standard_normal((n, 3)).astype(np.float16), "ci_l": np.zeros((n, 22), np.int16),
           "tok_l": np.zeros((n, 22, 2), np.float16), "sc_m": rng.standard_normal((n, 3)).astype(np.float16),
           "ci_m": np.zeros((n, 22), np.int16), "tok_m": np.zeros((n, 22, 2), np.float16),
           "d": np.linspace(-0.5, 0.5, n).astype(np.float32), "seed": seed, "shape": shape}
     np.savez(tmp_path / "p.npz", **kw)
     P = PD.load_pairs([str(tmp_path / "p.npz")])
-    assert P["va"].tolist() == [0, 3, 8] and P["tr"].tolist() == [1, 2, 4, 5, 6, 7, 9]
+    # 評価だけの形（mid）は訓練に使わない（6 は訓練の局の mid＝評価だけ）
+    assert P["va"].tolist() == [0, 3, 8] and P["tr"].tolist() == [1, 2, 4, 5, 7, 9] and P["ev"].tolist() == [6]
     Ph = PD.load_pairs([str(tmp_path / "p.npz")], shapes=["head"])
     assert Ph["tr"].tolist() == [4, 9] and Ph["va"].tolist() == [0, 3, 8]      # 取り置きは全部の形のまま
     sc, ci, tok = PD.take(P, np.array([1, 2]))
     assert sc.shape == (4, 3) and sc.dtype == np.float32 and ci.dtype == np.int64
     assert np.array_equal(sc[:2], kw["sc_l"][[1, 2]].astype(np.float32)) and np.array_equal(sc[2:], kw["sc_m"][[1, 2]].astype(np.float32))
     # 1 周に 1 回ずつ・価値の更新 3 回に均等に
-    sch = PD.schedule(P["tr"], 3, np.random.default_rng(1))
+    sch = PD.schedule(P["tr"], 3, np.random.default_rng(1))       # 6 対 → 2 対ずつ
     assert len(sch) == 3 and sorted(np.concatenate(sch).tolist()) == P["tr"].tolist()
     assert max(map(len, sch)) - min(map(len, sch)) <= 1
-    # 倍率: 価値の行 1,000・損失 0.4／対 7・損失 0.1 → 1 周の対の合計 7×0.1×倍率 ＝ 1,000×0.4
+    # 対が更新より少ないときも周の全体に散らす（頭に寄せない）: 6 対・12 回 → 0, 2, 4, … 回目に 1 つずつ
+    sp = PD.schedule(P["tr"], 12, np.random.default_rng(2))
+    assert len(sp) == 12 and [len(x) for x in sp] == [1, 0] * 6
+    # 倍率: 価値の行 1,000・損失 0.4／対 7・損失 0.1 → 1 周の対の合計 7×0.1×倍率 ＝ 1,000×0.4（数だけの例）
     f, fc = PD.balanced_factor(1000, 7, 0.4, 0.1)
     assert np.isclose(7 * 0.1 * f, 1000 * 0.4) and np.isclose(fc, 1000 / 7)
     with pytest.raises(ValueError):

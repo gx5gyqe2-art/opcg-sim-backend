@@ -1,0 +1,2 @@
+{"wp": "pair-diff-loss", "shard": "8/16", "rows": 3832, "fail": 100, "sec": 9258,
+ "files": ["n1_results/pair_diff_loss/pairs_s08.jsonl.gz", "n1_results/pair_diff_loss/logs/pd_s08.log"], "note": "worker restart mid-run; resumed (part1 log in pd_s08.part1.log); sec is the resumed run only"}

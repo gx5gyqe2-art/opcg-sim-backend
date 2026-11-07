@@ -1,0 +1,2 @@
+nrel_pd.ep0.npz a_head 0.288(0.85) b_close 0.140(0.41) c_oppend 0.135(0.40) d_next 0.215(0.64)
+nrel_pd.ep1.npz a_head 0.326(0.96) b_close 0.157(0.46) c_oppend 0.164(0.48) d_next 0.256(0.76)

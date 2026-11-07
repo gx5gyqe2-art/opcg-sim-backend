@@ -1327,7 +1327,9 @@ def train(args):
     if PD_ is not None:
         if "rel" not in net.ablate:
             raise SystemExit("--pair-diff は --ablate rel 前提（対の盤面に関係 R を渡さない）")
-        PD_["factor"], PD_["count_factor"], pd_info = _pair_diff_factor(backend, src, V, va_v, PD_, args)
+        f_bal, PD_["count_factor"], pd_info = _pair_diff_factor(backend, src, V, va_v, PD_, args)
+        PD_["factor"] = f_bal if args.pair_diff_weight == "balanced" else PD_["count_factor"]
+        pd_info["factor_used"] = round(PD_["factor"], 3)
         print("PAIR_DIFF " + json.dumps(pd_info, ensure_ascii=False), flush=True)
         pd_rng = np.random.default_rng(args.seed + 303)          # 主の並びと別の列
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
@@ -1540,8 +1542,10 @@ def _eval_pair_diff(backend, PD_):
         with torch.no_grad():
             return backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok), None, None).numpy()
     out = {}
-    for nm in ("tr", "va"):
+    for nm in ("tr", "va", "ev"):
         ix = PD_[nm]
+        if not len(ix):
+            continue
         dv = PDM.predict_diff(vf, PD_, ix)
         for sh in sorted(set(PD_["shape"][ix].tolist())):
             m = PD_["shape"][ix] == sh
@@ -1755,8 +1759,9 @@ def main(argv=None):
                     help="§7.88（WP pair-diff-loss）: 同じ盤面のドン ±1 の対の npz（tests/scripts/pair_diff.py merge）。価値の損失に"
                          "（対の予測の差 − 教師の差）² を足す（対は 1 周に 1 回ずつ・倍率は --pair-diff-weight）。"
                          "**無ければ切＝今までと 1 bit も同じ**。torch・--ablate rel 専用")
-    tr.add_argument("--pair-diff-weight", choices=("balanced",), default="balanced",
-                    help="§7.88: balanced＝1 周で対の損失の合計＝それ以外の価値の損失の合計になる一律の倍率（始める前の損失から）")
+    tr.add_argument("--pair-diff-weight", choices=("balanced", "count"), default="balanced",
+                    help="§7.88: balanced＝1 周で対の損失の合計＝それ以外の価値の損失の合計になる一律の倍率（始める前の損失から）・"
+                         "count＝行数の比だけ（訓練の価値の行数 ÷ 訓練の対の数・損失の大きさを見ない）")
     tr.add_argument("--pair-diff-shapes", default="",
                     help="§7.88: 訓練に使う対の形（カンマ区切り・例 head）。空＝全部。取り置きの対は全部の形で測る")
     tr.add_argument("--out", required=True)

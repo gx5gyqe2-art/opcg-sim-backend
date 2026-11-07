@@ -13,7 +13,7 @@
 
     倍率 = (訓練の価値の行数 × L_v) ／ (訓練の対の数 × L_d)
 
-にする（行数の比だけの倍率 ``訓練の価値の行数 ／ 訓練の対の数`` も印字する）。
+にする（行数の比だけの倍率 ``訓練の価値の行数 ／ 訓練の対の数`` も印字する・``count`` はこちらを使う）。
 
 **取り置き**: 対の局 seed % holdout_mod == 0 の対は訓練に使わない（価値の取り置きと同じ局）。
 ``shapes`` で訓練に使う形を絞れる（形を越えて移るかの腕）。
@@ -25,23 +25,27 @@ import numpy as np
 
 #: 対の npz の列（l＝少ない側・m＝多い側は同じ位置で対になる）
 PAIR_KEYS = ("sc_l", "ci_l", "tok_l", "sc_m", "ci_m", "tok_m", "d", "seed", "shape")
-PAIR_DIFF_MODES = ("balanced",)
+#: balanced＝損失の合計の釣り合い（第一）・count＝行数の比だけ（§7.83 と同じ数え方・損失の大きさを見ない）
+PAIR_DIFF_MODES = ("balanced", "count")
+#: 評価だけの形（対を作っていない形として読む＝訓練には使わない・取り置きにも訓練の局にも測る）
+EVAL_SHAPES = ("mid",)
 
 
 def load_pairs(paths, holdout_mod=7, shapes=None):
     """対の npz（複数可）→ 連結した dict。``tr``／``va``＝訓練に使う対・取り置きの対の添字。
-    ``shapes`` を渡すと訓練に使う対をその形に絞る（取り置きは全部の形を残す＝評価用）。"""
+    評価だけの形（``EVAL_SHAPES``）は訓練に使わない。``shapes`` を渡すと訓練に使う対をその形に絞る（取り置きは全部の形を残す＝評価用）。"""
     parts = []
     for p in paths:
         with np.load(p, allow_pickle=False) as d:
             parts.append({k: np.asarray(d[k]) for k in PAIR_KEYS})
     out = {k: np.concatenate([x[k] for x in parts]) for k in PAIR_KEYS}
     hold = out["seed"] % holdout_mod == 0
-    use = ~hold
+    use = ~hold & ~np.isin(out["shape"], EVAL_SHAPES)
     if shapes:
         use &= np.isin(out["shape"], list(shapes))
     out["tr"] = np.flatnonzero(use)
     out["va"] = np.flatnonzero(hold)
+    out["ev"] = np.flatnonzero(~hold & np.isin(out["shape"], EVAL_SHAPES))      # 訓練の局の評価だけの形
     return out
 
 
@@ -54,9 +58,11 @@ def take(PR, ix):
 
 
 def schedule(tr, nv, rng):
-    """訓練の対を 1 周に 1 回ずつ、価値の更新 ``nv`` 回に均等に割り振る → 長さ ``nv`` の添字の配列の列。"""
+    """訓練の対を 1 周に 1 回ずつ、価値の更新 ``nv`` 回に**周の全体へ均等に**割り振る → 長さ ``nv`` の添字の配列の列。
+    i 番目（並べ替えた後）の対は更新 floor(i·nv／対の数) 回目に入る（対が更新より少なくても周の頭に寄らない）。"""
     perm = np.asarray(tr)[rng.permutation(len(tr))]
-    return np.array_split(perm, nv)
+    pos = (np.arange(len(perm), dtype=np.int64) * int(nv)) // max(len(perm), 1)
+    return np.split(perm, np.searchsorted(pos, np.arange(1, int(nv))))
 
 
 def balanced_factor(n_value_rows, n_pairs, l_v, l_d):
