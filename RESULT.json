@@ -10,10 +10,12 @@
  },
  "outputs": {
   "files": [
+   "arena_pdc/pdc_mirror_w07.jsonl",
    "arena_pdc/pdc_real_w07.jsonl"
   ]
  },
  "metrics": {
+  "arena_pdc/pdc_mirror_w07.jsonl": 175,
   "arena_pdc/pdc_real_w07.jsonl": 175
  },
  "notes": "",
