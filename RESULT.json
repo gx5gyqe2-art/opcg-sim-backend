@@ -1,12 +1,13 @@
 {
  "job": "arena-w8-w05",
  "role": "arena",
- "status": "done",
+ "status": "error",
  "inputs": {
-  "candidate": "nrel_r13d.npz + --cand-sims 1280 --cand-worlds 8 --cand-budget 0",
-  "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
-  "pairs": 120,
-  "code": "claude/cpu-spec-improvements-yw91jd"
+  "candidate": "nrel_r29f4.npz + worlds 8",
+  "baseline": "nrel_r29f4.npz + worlds 4 (current shipping)",
+  "both": "sims 1280 x budget 0 x lethal root (fair) x defense_dialog_tree all (default)",
+  "pairs": 84,
+  "code": "claude/cpu-spec-improvements-yw91jd (after rs-ddt-default)"
  },
  "outputs": {
   "files": [
@@ -16,5 +17,11 @@
  "metrics": {
   "arena_w8/w8_w05.jsonl": 120
  },
- "notes": ""
+ "notes": "error: require: rust/opcg_engine/src/search/decide.rs に 'defense_dialog_tree: DefenseDialogTree::All,' が無い（コードの基が違う）",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_w8.json",
+  "k": 5,
+  "branch": "claude/arena-w8-w05",
+  "code_commit": "c306f33e0d8a886e22eaf96c98a3a724c3c48c5a"
+ }
 }
