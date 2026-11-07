@@ -1,0 +1,75 @@
+{
+ "wp": "rs-ddt-default",
+ "section": "§7.87",
+ "date": "2026-11-07",
+ "status": "done",
+ "stage1": {
+  "default": "defense_dialog_tree=all",
+  "mainline_commit": "4d1338b",
+  "pushed_to": "claude/cpu-spec-improvements-yw91jd",
+  "golden": {
+   "audit": "unchanged",
+   "replay_random_150": "unchanged",
+   "replay_a1_50": {
+    "changed_vs_off_rerun": 9,
+    "identical_vs_off_rerun": 41,
+    "first_divergence_kind": {
+     "CONFIRM_OPTIONAL_opponent_turn_in_battle": 9
+    },
+    "winner_changed": 1,
+    "note": "mainline a1 golden was stale since r28x4 (not re-made at r29f4 adoption): 50/50 differ vs HEAD; off re-run matches HEAD 0/50"
+   }
+  },
+  "make_test": {
+   "cargo_passed": 643,
+   "pytest_passed": 942,
+   "failed": 0
+  },
+  "audit_cross": {
+   "pairs": 120,
+   "void": 0
+  }
+ },
+ "stage2": {
+  "jobs": [
+   "opcg_sim/loop/jobs/arena_w6.json",
+   "opcg_sim/loop/jobs/arena_w8.json"
+  ],
+  "mainline_commit": "360eb16",
+  "seeds": {
+   "w6": "4551000-4582999",
+   "w8": "4591000-4622999"
+  },
+  "latency_1core": {
+   "w4": {
+    "moves": 2893,
+    "mean": 0.705,
+    "p50": 0.332,
+    "p90": 1.726,
+    "p99": 4.659,
+    "max": 14.96,
+    "wall_sec": 2154.7
+   },
+   "w6": {
+    "moves": 2882,
+    "mean": 1.089,
+    "p50": 0.411,
+    "p90": 2.624,
+    "p99": 8.975,
+    "max": 21.31,
+    "wall_sec": 3279.3
+   },
+   "w8": {
+    "moves": 2750,
+    "mean": 1.382,
+    "p50": 0.35,
+    "p90": 3.554,
+    "p99": 10.01,
+    "max": 31.26,
+    "wall_sec": 3914.5
+   }
+  }
+ },
+ "report": "docs/reports/2026-11-07_ddt_default.md",
+ "results": "n1_results/ddt_default/"
+}
