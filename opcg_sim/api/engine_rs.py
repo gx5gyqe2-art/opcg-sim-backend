@@ -373,9 +373,9 @@ class RsGame:
         `confirm_trigger_legacy`（省略可・§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**）＝トリガーの発動確認
         （ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけにする旧い形。本番アリーナの基準席用。
         **省略（None）／False＝渡さない＝Rust の既定**（発動する／しないの 2 手を読む）。
-        `defense_dialog_tree`（省略可・§7.85・WP `rs-defense-dialog-tree`・**測定用**）＝相手の手番の戦闘中に自分が
-        答える効果の対話を短い木で読む範囲（"off"／"life1"＝自分のライフ ≤ 1 だけ／"all"）。**省略（None）＝渡さない＝
-        Rust の既定（off）**。
+        `defense_dialog_tree`（省略可・§7.85・WP `rs-defense-dialog-tree`）＝相手の手番の戦闘中に自分が
+        答える効果の対話を短い木で読む範囲（"off"＝旧い形・測定用／"life1"＝自分のライフ ≤ 1 だけ／"all"）。**省略（None）＝渡さない＝
+        Rust の既定（all・2026-11-07〜・§7.87）**。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,

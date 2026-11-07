@@ -1,8 +1,8 @@
 //! 相手の手番の戦闘中に自分が答える効果の対話を短い木で読む（`search_efficiency_plan.md` §7.85・WP `rs-defense-dialog-tree`）。
 //!
-//! (a) opts の鍵 `defense_dialog_tree`（既定 off・"off"／"life1"／"all"・知らない値はエラー）
-//! (b) 相手のアタック時の任意の効果（ラッキー・ルウ OP17-033）の対話: off は今の形（静的な値）と 1 bit も同じ・
-//!     life1 は自分のライフ ≤ 1 だけ木・all はライフを問わず木
+//! (a) opts の鍵 `defense_dialog_tree`（既定 all〔2026-11-07・§7.87〕・"off"／"life1"／"all"・知らない値はエラー）
+//! (b) 相手のアタック時の任意の効果（ラッキー・ルウ OP17-033）の対話: 旗なし（既定）は all と 1 bit も同じ・
+//!     off は旧い形（静的な値）・life1 は自分のライフ ≤ 1 だけ木・all はライフを問わず木
 //!     （既定は候補を当てた直後から木・`defense_dialog_fold` は戦闘の終わりまで畳んでから木＝測定専用）
 //! (c) 戦闘の応手（ブロッカー・カウンター）の窓は旗に依らず今の形
 //!
@@ -61,7 +61,10 @@ fn roux_dialog(masters: &'static MasterTable, life: usize) -> Option<GameState> 
 /// (a)
 #[test]
 fn defense_dialog_tree_is_read_from_opts() {
-    assert_eq!(DecideOptions::default().defense_dialog_tree, DefenseDialogTree::Off);
+    assert_eq!(DecideOptions::default().defense_dialog_tree, DefenseDialogTree::All);
+    assert_eq!(DefenseDialogTree::default(), DefenseDialogTree::All);
+    let (o, _) = super::super::decide_opts_and_carry(&json!({})).expect("opts");
+    assert_eq!(o.defense_dialog_tree, DefenseDialogTree::All, "鍵なしは all");
     for (name, want) in [("off", DefenseDialogTree::Off), ("life1", DefenseDialogTree::Life1),
                          ("all", DefenseDialogTree::All)] {
         let (o, _) = super::super::decide_opts_and_carry(&json!({"defense_dialog_tree": name})).expect("opts");
@@ -78,22 +81,27 @@ fn defense_dialog_tree_is_read_from_opts() {
 fn opponent_turn_battle_dialog_reads_a_short_tree_by_flag() {
     let Some(masters) = crate::search::tests_setup_box::masters() else { return };
     let low = roux_dialog(masters, 1).expect("ラッキー・ルウの確認が p1 に開く");
-    let base = run(masters, &low, &opts(7));
+    // 既定（旗なし）は all と 1 bit も同じ＝木（2026-11-07〜）
+    let dflt = run(masters, &low, &opts(7));
+    assert_eq!(dflt["window"]["tree"], json!(true), "既定は木: {dflt}");
+    assert_eq!(dflt, run(masters, &low, &with(DefenseDialogTree::All, 7)), "旗なしは all と 1 bit も同じ");
+    // off は旧い形（静的な値）
+    let base = run(masters, &low, &with(DefenseDialogTree::Off, 7));
     assert_eq!(base["kind"], "window");
-    assert_eq!(base["window"]["tree"], json!(false), "既定は静的な値: {base}");
-    assert_eq!(base, run(masters, &low, &with(DefenseDialogTree::Off, 7)), "off は既定と 1 bit も同じ");
+    assert_eq!(base["window"]["tree"], json!(false), "off は静的な値: {base}");
     let l1 = run(masters, &low, &with(DefenseDialogTree::Life1, 7));
     assert_eq!(l1["window"], json!({"worlds": WINDOW_TREE_WORLDS, "tree": true}), "ライフ 1 は木: {l1}");
     assert_eq!(l1, run(masters, &low, &with(DefenseDialogTree::Life1, 7)), "同じ seed なら同じ");
     let mid = roux_dialog(masters, 3).expect("確認が開く");
     let l1 = run(masters, &mid, &with(DefenseDialogTree::Life1, 7));
-    assert_eq!(l1, run(masters, &mid, &opts(7)), "ライフ 3 の life1 は今の形");
+    assert_eq!(l1, run(masters, &mid, &with(DefenseDialogTree::Off, 7)), "ライフ 3 の life1 は off と同じ");
     let all = run(masters, &mid, &with(DefenseDialogTree::All, 7));
     assert_eq!(all["window"]["tree"], json!(true), "all はライフ 3 も木: {all}");
+    assert_eq!(all, run(masters, &mid, &opts(7)), "ライフ 3 も旗なしは all と同じ");
     // 畳む形（測定専用）も木で読む・off なら畳む旗は効かない
     let fold = run(masters, &low, &DecideOptions { defense_dialog_fold: true, ..with(DefenseDialogTree::Life1, 7) });
     assert_eq!(fold["window"]["tree"], json!(true));
-    assert_eq!(base, run(masters, &low, &DecideOptions { defense_dialog_fold: true, ..opts(7) }), "off なら畳む旗は効かない");
+    assert_eq!(base, run(masters, &low, &DecideOptions { defense_dialog_fold: true, ..with(DefenseDialogTree::Off, 7) }), "off なら畳む旗は効かない");
     // window_tree_life で life1 の線が動く（戦闘の応手と同じ線）
     let l3 = run(masters, &mid, &DecideOptions { window_tree_life: 3, ..with(DefenseDialogTree::Life1, 7) });
     assert_eq!(l3["window"]["tree"], json!(true));
@@ -105,7 +113,8 @@ fn battle_reply_windows_are_unchanged_by_the_flag() {
     let Some(masters) = crate::search::tests_setup_box::masters() else { return };
     for life in [1usize, 3] {
         let st = attacked(masters, life, true);
-        let base = run(masters, &st, &opts(5));
+        let base = run(masters, &st, &with(DefenseDialogTree::Off, 5));
+        assert_eq!(base, run(masters, &st, &opts(5)), "ライフ {life} の戦闘の窓は旗なしも同じ");
         for mode in [DefenseDialogTree::Life1, DefenseDialogTree::All] {
             assert_eq!(base, run(masters, &st, &with(mode, 5)), "ライフ {life} の戦闘の窓は同じ");
         }

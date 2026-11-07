@@ -180,7 +180,8 @@ pub struct DecideOptions {
     /// 配り方を誰の視点で作るか（`defense_proof_view`・既定 [`DefenseView::Mine`]）。
     pub defense_proof_view: DefenseView,
     /// 相手の手番の戦闘中に自分が答える効果の対話を短い木で読む（`defense_dialog_tree`・§7.85・
-    /// WP `rs-defense-dialog-tree`・**測定用**・既定 [`DefenseDialogTree::Off`]＝今の形と 1 bit も同じ）。
+    /// WP `rs-defense-dialog-tree`・既定 [`DefenseDialogTree::All`]〔2026-11-07・§7.87・WP `rs-ddt-default`〕・
+    /// `Off` は旧い形〔世界 K 本の静的な値〕に 1 bit も同じに戻る測定用）。
     /// `Life1` は自分のライフが [`DecideOptions::window_tree_life`] 以下のときだけ、`All` はライフを問わず、
     /// 相手の手番・戦闘中（`active_battle` が在る）に判断するのが自分の効果の対話（任意の効果の確認・
     /// 探して選ぶ 等・ブロッカー／カウンターの選択ではないもの）で候補が 2 つ以上なら、戦闘の応手の
@@ -195,12 +196,12 @@ pub struct DecideOptions {
 /// 相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DefenseDialogTree {
-    /// 読まない（既定＝今の形・世界 K 本の静的な値）。
-    #[default]
+    /// 読まない（2026-11-06 までの形・世界 K 本の静的な値・測定用）。
     Off,
     /// 自分のライフが `window_tree_life`（既定 1）以下のときだけ短い木（今の戦闘の応手と同じ線）。
     Life1,
-    /// ライフを問わず全部短い木。
+    /// ライフを問わず全部短い木（既定・2026-11-07〜・§7.87）。
+    #[default]
     All,
 }
 
@@ -380,7 +381,7 @@ impl Default for DecideOptions {
             defense_proof_nodes: DEFENSE_PROOF_NODES,
             defense_proof_total: DEFENSE_PROOF_TOTAL,
             defense_proof_view: DefenseView::Mine,
-            defense_dialog_tree: DefenseDialogTree::Off,
+            defense_dialog_tree: DefenseDialogTree::All,
             defense_dialog_fold: false,
         }
     }

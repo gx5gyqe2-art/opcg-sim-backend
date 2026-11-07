@@ -96,7 +96,7 @@ def build_parser():
                     help="基準席を、トリガーの発動確認を「発動する」の 1 手だけで打つ旧い形で打たせる"
                          "（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。候補席は --cand-confirm-trigger-legacy")
     ap.add_argument("--defense-dialog-tree", default=None, choices=("off", "life1", "all"),
-                    help="基準席の、相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85・測定用・省略＝既定 off）。"
+                    help="基準席の、相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85・off＝旧い形・省略＝既定 all〔§7.87〕）。"
                          "候補席は --cand-defense-dialog-tree")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"

@@ -723,7 +723,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_str)
             .and_then(decide::DefenseView::from_name)
             .unwrap_or(d.defense_proof_view),
-        // 相手の手番の戦闘中の効果の対話を短い木で読む（§7.85・WP `rs-defense-dialog-tree`・測定用・既定 off）。
+        // 相手の手番の戦闘中の効果の対話を短い木で読む（§7.85・WP `rs-defense-dialog-tree`・既定 all〔§7.87〕・off は旧い形）。
         defense_dialog_tree: v
             .get("defense_dialog_tree")
             .and_then(Value::as_str)

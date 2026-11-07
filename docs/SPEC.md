@@ -1365,7 +1365,11 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 計測（守りの再監査の局面・費用）は `docs/reports/2026-10-25_defense_proof.md`。
 
 **相手の手番の戦闘中に自分が答える効果の対話を短い木で読む**（2026-11-06・WP `rs-defense-dialog-tree`・`search_efficiency_plan.md` §7.85・
-opts の `defense_dialog_tree`＝`off`／`life1`／`all`・**測定用・既定 off＝1 bit も変わらない**・`decide.rs::defense_dialog_tree_applies`）:
+opts の `defense_dialog_tree`＝`off`／`life1`／`all`・`decide.rs::defense_dialog_tree_applies`。
+**2026-11-07 から既定は `all`**〔ユーザ決定・WP `rs-ddt-default`・§7.87・本番アリーナ 2,688 ペアで `off` に +6.6 Elo［+2.9, +10.3］・
+`life1` は +1.9・費用は 1 手あたり +6.7%〕。`off` は旧い形〔世界 K 本の静的な値〕と 1 bit も同じに戻る**測定用**の値。
+窓の判断は読みの回数〔`sims`〕の設定に依らず掛かるので、**生成・アリーナ・serve の全部の打ち方が変わる＝物差しが動いた**
+〔2026-11-07 より前のアリーナ・教材の局はこの旗が `off` の打ち方。golden の a1 帯は作り直した・`docs/reports/2026-11-07_ddt_default.md`〕）:
 相手の手番・戦闘中（`active_battle` が在る）で、判断するのが自分の効果の対話（中断スタックの対話＝相手のアタック時の任意の効果の確認・
 探して選ぶ 等。ブロッカー／カウンターの選択は対象外＝上の 3 のまま）なら、上の 3 と同じ短い木（`sims ÷ 候補の数` 回・世界は
 `min(K, window_tree_worlds)`）で比べる。`life1` は自分のライフが `window_tree_life`（既定 1）以下のときだけ、`all` はライフを問わず。
