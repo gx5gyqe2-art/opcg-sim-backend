@@ -1,0 +1,322 @@
+{
+ "wp": "pair-diff-loss",
+ "section": "§7.88",
+ "ledger": "2+534",
+ "branch": "claude/pair-diff-loss",
+ "report": "docs/reports/2026-11-07_pair_diff_loss.md",
+ "engine_commit": "7b25720（ブランチの基点・エンジンは不変）",
+ "seed_bands": {
+  "world_offset": 20000,
+  "note": "move_judge.world_seed の i に足す（対の打ち続け・既存の 14000〜19000 と重ねない）。teach は §7.79 と同じ 18000 の世界を読み直しただけ"
+ },
+ "stage0": {
+  "teacher_choice": "rollout_L16_16games_shared_worlds",
+  "teach": {
+   "kaido": {
+    "L16": {
+     "diff": 0.262,
+     "ci": 0.1702,
+     "ratio_to_truth": 0.775,
+     "points": 24,
+     "pairs": 761,
+     "corr_L160": 0.874
+    },
+    "L160": {
+     "diff": 0.2566,
+     "ci": 0.2115,
+     "ratio_to_truth": 0.759,
+     "points": 24,
+     "pairs": 761
+    },
+    "R160": {
+     "diff": 0.1209,
+     "ci": 0.0624,
+     "ratio_to_truth": 0.358,
+     "points": 24,
+     "pairs": 761,
+     "corr_L160": 0.843
+    },
+    "R1280": {
+     "diff": 0.1327,
+     "ci": 0.0686,
+     "ratio_to_truth": 0.393,
+     "points": 24,
+     "pairs": 761,
+     "corr_L160": 0.822
+    }
+   },
+   "jitter": {
+    "L16": {
+     "gap": 0.4806,
+     "ci": 0.135,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 0.991
+    },
+    "L160": {
+     "gap": 0.485,
+     "ci": 0.1301,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 1.0
+    },
+    "z": {
+     "gap": 0.39,
+     "ci": 0.1919,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 0.804
+    },
+    "net_r28x4": {
+     "gap": 0.1786,
+     "ci": 0.1151,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 0.368
+    },
+    "R160": {
+     "gap": 0.2299,
+     "ci": 0.1138,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 0.474
+    },
+    "R1280": {
+     "gap": 0.2755,
+     "ci": 0.1151,
+     "n": [
+      200,
+      200
+     ],
+     "ratio_to_L160": 0.568
+    }
+   },
+   "fails": {
+    "ended": 7
+   }
+  },
+  "shapes": [
+   "head",
+   "close",
+   "hold",
+   "oppend",
+   "(eval) mid"
+  ],
+  "games": 16000,
+  "shards": "16 planned, 15 used (s05 failed at 11%, not pushed)",
+  "pairs": 60382,
+  "pairs_fail": 1398,
+  "pairs_train": 50149,
+  "pairs_holdout": 8677,
+  "pairs_eval_mid_train_games": 1556,
+  "teacher_diff": {
+   "head": 0.1505,
+   "close": 0.0831,
+   "hold": 0.1091,
+   "oppend": 0.1104,
+   "mid": 0.094
+  },
+  "cost": "約 9 コア秒/対・計 約 165 コア時間（16 シャード × 2.7〜4.1 時間・Sonnet）",
+  "factor": {
+   "balanced_A": 1286.981,
+   "balanced_B_head_only": 4057.76,
+   "count_C": 183.129,
+   "loss_value_start": 0.48364,
+   "loss_pair_start_A": 0.06882
+  }
+ },
+ "control": {
+  "r29f4.ep0": {
+   "kaido_window": 0.335,
+   "jitter82j_holdout": 0.3227,
+   "band74c_vmse": 0.4749
+  },
+  "r29f4.ep1": {
+   "kaido_window": 0.315,
+   "jitter82j_holdout": 0.3269,
+   "band74c_vmse": 0.475
+  }
+ },
+ "arms": {
+  "A_4shapes_balanced": {
+   "ep0": {
+    "kaido_ratio": {
+     "a_head": 0.851,
+     "b_close": 0.414,
+     "c_oppend": 0.398,
+     "d_next": 0.636
+    },
+    "jitter82j_turn3_6_holdout": 0.6738,
+    "jitter82j_turn3_6": 0.6235,
+    "band74c_vmse": 0.4917,
+    "band74c_calib": 0.0103,
+    "pair_ratio_holdout": {
+     "head_hold": 1.143,
+     "close_hold": 1.072,
+     "hold_hold": 1.212,
+     "oppend_hold": 1.07,
+     "mid_hold": 1.474,
+     "mid_train": 1.077
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 9,
+     "root_gap": -0.0731,
+     "visit_share": 0.114
+    }
+   },
+   "ep1": {
+    "kaido_ratio": {
+     "a_head": 0.964,
+     "b_close": 0.463,
+     "c_oppend": 0.485,
+     "d_next": 0.756
+    },
+    "jitter82j_turn3_6_holdout": 0.6311,
+    "jitter82j_turn3_6": 0.6017,
+    "band74c_vmse": 0.4834,
+    "band74c_calib": 0.022,
+    "pair_ratio_holdout": {
+     "head_hold": 1.042,
+     "close_hold": 1.029,
+     "hold_hold": 1.122,
+     "oppend_hold": 1.028,
+     "mid_hold": 1.313,
+     "mid_train": 0.988
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 6,
+     "root_gap": -0.0833,
+     "visit_share": 0.126
+    }
+   }
+  },
+  "B_head_only_balanced": {
+   "ep0": {
+    "kaido_ratio": {
+     "a_head": 0.847,
+     "b_close": 0.343,
+     "c_oppend": 0.321,
+     "d_next": 0.651
+    },
+    "jitter82j_turn3_6_holdout": 0.6031,
+    "jitter82j_turn3_6": 0.5736,
+    "band74c_vmse": 0.4982,
+    "band74c_calib": 0.0396,
+    "pair_ratio_holdout": {
+     "head_hold": 1.058,
+     "close_hold": 0.706,
+     "hold_hold": 0.933,
+     "oppend_hold": 0.633,
+     "mid_hold": 1.255,
+     "mid_train": 0.929
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 10,
+     "root_gap": -0.0379,
+     "visit_share": 0.164
+    }
+   },
+   "ep1": {
+    "kaido_ratio": {
+     "a_head": 0.745,
+     "b_close": 0.307,
+     "c_oppend": 0.3,
+     "d_next": 0.611
+    },
+    "jitter82j_turn3_6_holdout": 0.4626,
+    "jitter82j_turn3_6": 0.4539,
+    "band74c_vmse": 0.4924,
+    "band74c_calib": 0.024,
+    "pair_ratio_holdout": {
+     "head_hold": 0.809,
+     "close_hold": 0.526,
+     "hold_hold": 0.583,
+     "oppend_hold": 0.449,
+     "mid_hold": 0.933,
+     "mid_train": 0.736
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 18,
+     "root_gap": -0.0424,
+     "visit_share": 0.26
+    }
+   }
+  },
+  "C_4shapes_count": {
+   "ep0": {
+    "kaido_ratio": {
+     "a_head": 0.864,
+     "b_close": 0.476,
+     "c_oppend": 0.503,
+     "d_next": 0.769
+    },
+    "jitter82j_turn3_6_holdout": 0.5633,
+    "jitter82j_turn3_6": 0.5391,
+    "band74c_vmse": 0.4792,
+    "band74c_calib": 0.0321,
+    "pair_ratio_holdout": {
+     "head_hold": 1.037,
+     "close_hold": 0.968,
+     "hold_hold": 1.101,
+     "oppend_hold": 0.965,
+     "mid_hold": 1.327,
+     "mid_train": 0.943
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 3,
+     "root_gap": -0.0896,
+     "visit_share": 0.087
+    }
+   },
+   "ep1": {
+    "kaido_ratio": {
+     "a_head": 0.772,
+     "b_close": 0.478,
+     "c_oppend": 0.531,
+     "d_next": 0.619
+    },
+    "jitter82j_turn3_6_holdout": 0.5849,
+    "jitter82j_turn3_6": 0.5517,
+    "band74c_vmse": 0.4751,
+    "band74c_calib": 0.031,
+    "pair_ratio_holdout": {
+     "head_hold": 0.998,
+     "close_hold": 0.987,
+     "hold_hold": 1.119,
+     "oppend_hold": 0.998,
+     "mid_hold": 1.273,
+     "mid_train": 0.939
+    },
+    "rocks": {
+     "points": 53,
+     "pick_return": 3,
+     "root_gap": -0.1001,
+     "visit_share": 0.07
+    }
+   }
+  }
+ },
+ "verdict": "腕 C（4 形・行数の比の倍率）が §7.88 の「効くなら」の予告に全部当たる（カイドウの窓 0.48／0.48・82j 0.563／0.585・74c +0.004／+0.000・較正 1.3 倍）。腕 A（損失の釣り合い）は差は伸びるが 74c の誤差が線を越える。腕 B（手番の頭の対だけ）はカイドウの窓・相手の手番の終わりが対照のまま＝差は形ごとに覚える。強さは未測定。",
+ "nets": "n1_results/pair_diff_loss/nets/（本線には同梱しない）",
+ "notes": [
+  "割り振りの不具合（対が更新より少ないと周の頭に寄る）を腕 B の途中で直して B を打ち直した。腕 A は直す前の割り振り（毎回 1〜2 対・周の頭 4 割は 2 対）",
+  "シャード 05 は 11% で落ち push 無し・打ち直さず 15 本で進めた",
+  "ディスクの割り当てが訓練の記録の詰め直し（~/.cache/opcg/dump_pack 15GB）で尽き、1 回目の訓練の起動が落ちた（74c・82j の詰め直しを消して再起動）",
+  "対の『ドンを控えた後』は相手の手番の頭の盤面（手番を終えた直後そのものは判断点でない）"
+ ]
+}

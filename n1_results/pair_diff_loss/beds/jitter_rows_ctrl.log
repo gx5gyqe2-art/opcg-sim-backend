@@ -1,0 +1,4 @@
+nrel_r28x4.npz {'turn3_6': 0.2818, 'turn7_10': 0.1432, 'all': 0.213, 'turn3_6_holdout': 0.3058, 'turn3_6_trained': 0.2779}
+nrel_r29f4.ep0.npz {'turn3_6': 0.3009, 'turn7_10': 0.1477, 'all': 0.2261, 'turn3_6_holdout': 0.3227, 'turn3_6_trained': 0.2974}
+nrel_r29f4.ep1.npz {'turn3_6': 0.3056, 'turn7_10': 0.1538, 'all': 0.2283, 'turn3_6_holdout': 0.3269, 'turn3_6_trained': 0.3022}
+z {'turn3_6': {'plus': 0.2936, 'minus': -0.2487, 'diff': 0.5424, 'ci95': 0.0856, 'n': [957, 985]}, 'turn7_10': {'plus': 0.0891, 'minus': -0.1053, 'diff': 0.1944, 'ci95': 0.0931, 'n': [696, 1187]}, 'all': {'plus': 0.2075, 'minus': -0.1703, 'diff': 0.3779, 'ci95': 0.0628, 'n': [1653, 2172]}, 'turn3_6_holdout': {'plus': 0.2727, 'minus': -0.2148, 'diff': 0.4875, 'ci95': 0.2281, 'n': [143, 135]}, 'turn3_6_trained': {'plus': 0.2973, 'minus': -0.2541, 'diff': 0.5514, 'ci95': 0.0924, 'n': [814, 850]}}

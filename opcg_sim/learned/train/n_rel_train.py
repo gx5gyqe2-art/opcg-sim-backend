@@ -1269,6 +1269,17 @@ def train(args):
         PR["va"] = np.where(PR["hold"])[0]
         print(f"pair: {len(PR['t_a'])} 対（holdout {len(PR['va'])}）λ={args.pair_lambda} 価値の重み {args.pair_value_weight}"
               f" {args.pair_every} 回ごとに {args.pair_bs} 組", flush=True)
+    # 対の差の損失（§7.88・WP `pair-diff-loss`）。既定（--pair-diff 無し）は何も読まず、価値の更新に何も足さない。
+    PD_ = None
+    pd_paths = list(getattr(args, "pair_diff", None) or [])
+    if pd_paths:
+        if args.backend != "torch":
+            raise SystemExit("--pair-diff は torch backend 専用（WP pair-diff-loss）")
+        from opcg_sim.learned.train import pair_diff as PDM
+        shapes = [x for x in (getattr(args, "pair_diff_shapes", "") or "").split(",") if x]
+        PD_ = PDM.load_pairs(pd_paths, args.holdout_mod, shapes or None)
+        print(f"pair-diff: 対 {len(PD_['d'])}（訓練 {len(PD_['tr'])}・取り置き {len(PD_['va'])}）"
+              f" 形 {sorted(set(PD_['shape'].tolist()))} 訓練に使う形 {shapes or 'all'}", flush=True)
     # V と方策の更新回数の比（§20.11 の候補 A）。1.0＝今までと同じ。
     pi_mult = float(getattr(args, "pi_steps_mult", 1.0) or 1.0)
     if pi_mult != 1.0:
@@ -1312,6 +1323,15 @@ def train(args):
                                              cache_dir=args.cache_dir)
     rng = np.random.default_rng(args.seed)
     pair_rng = np.random.default_rng(args.seed + 101) if PR is not None else None   # 主の並びと別の列
+    pd_rng = None
+    if PD_ is not None:
+        if "rel" not in net.ablate:
+            raise SystemExit("--pair-diff は --ablate rel 前提（対の盤面に関係 R を渡さない）")
+        f_bal, PD_["count_factor"], pd_info = _pair_diff_factor(backend, src, V, va_v, PD_, args)
+        PD_["factor"] = f_bal if args.pair_diff_weight == "balanced" else PD_["count_factor"]
+        pd_info["factor_used"] = round(PD_["factor"], 3)
+        print("PAIR_DIFF " + json.dumps(pd_info, ensure_ascii=False), flush=True)
+        pd_rng = np.random.default_rng(args.seed + 303)          # 主の並びと別の列
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
     for ep in range(args.epochs):
@@ -1321,6 +1341,9 @@ def train(args):
         npi, ord_p = _policy_order(tr_p, args.bs_p, pi_mult, rng)
         if src is not None:
             src.begin(tr_v[:nv * args.bs_v], args.bs_v, ord_p, args.bs_p)
+        pd_sched = PDM.schedule(PD_["tr"], nv, pd_rng) if PD_ is not None else None
+        if PD_ is not None:
+            backend.pd_loss = (0.0, 0)
         mse = ce = 0.0
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
@@ -1347,6 +1370,9 @@ def train(args):
                         kw.update(tm=b[10], tm_mask=b[11])
                     if v_w is not None:
                         kw["vw"] = v_w[tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]]
+                    if pd_sched is not None and len(pd_sched[iv]):
+                        j_ = pd_sched[iv]
+                        kw["pd"] = (*PDM.take(PD_, j_), PD_["d"][j_].astype(np.float32), PD_["factor"])
                     if res_on:
                         bi_ = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
                         kw.update(res=np.asarray(V["res"][bi_], np.float32),
@@ -1446,6 +1472,12 @@ def train(args):
             row.update({"res_weight": res_w, "val_res_huber": vr, "val_res_rows": nr,
                         "train_res": list(backend.res_loss)})
             print(f"  res val huber {vr:.4f}（{nr} 行）", flush=True)
+        if PD_ is not None:
+            pe = _eval_pair_diff(backend, PD_)
+            s_, n_ = getattr(backend, "pd_loss", (0.0, 0))
+            row.update({"pair_diff": pe, "train_pair_diff_mse": s_ / max(n_, 1), "train_pairs_seen": n_,
+                        "pair_diff_factor": PD_["factor"]})
+            print("  pair-diff " + json.dumps(pe, ensure_ascii=False), flush=True)
         if PR is not None:
             pe = _eval_pairs(backend, PR)
             row.update({"pair": pe, "train_pair": list(backend.pair_loss)})
@@ -1477,6 +1509,48 @@ def train(args):
                  **backend.res_params())
     print("N_REL_TRAIN_DONE " + json.dumps({"out": args.out}))
     return 0
+
+
+def _pair_diff_factor(backend, src, V, va_v, PD_, args, n_sample=200000):
+    """§7.88 の倍率（`pair_diff.balanced_factor`）: 始める前のネットで、訓練の価値の行（決まった乱数で最大 20 万行）の
+    二乗誤差の平均と、訓練の対の差の二乗誤差の平均を測る。"""
+    import torch
+    from opcg_sim.learned.train import pair_diff as PDM
+    tr = np.flatnonzero(~va_v)
+    n_rows = (len(tr) // args.bs_v) * args.bs_v
+    smp = np.sort(np.random.default_rng(args.seed + 404).choice(tr, size=min(n_sample, len(tr)), replace=False))
+    vv = src.eval_value(backend.tn, smp)
+    l_v = float(np.mean((vv - np.asarray(V["z"][smp], np.float32)) ** 2))
+
+    def vf(sc, ci, tok):
+        with torch.no_grad():
+            return backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok), None, None).numpy()
+    dv = PDM.predict_diff(vf, PD_, PD_["tr"])
+    l_d = float(np.mean((dv - PD_["d"][PD_["tr"]]) ** 2))
+    f, fc = PDM.balanced_factor(n_rows, len(PD_["tr"]), l_v, l_d)
+    return f, fc, {"mode": args.pair_diff_weight, "value_rows_per_epoch": int(n_rows), "pairs_train": int(len(PD_["tr"])),
+                   "loss_value_start": round(l_v, 5), "loss_pair_start": round(l_d, 5), "factor": round(f, 3),
+                   "count_factor": round(fc, 3), "value_rows_sampled": int(len(smp))}
+
+
+def _eval_pair_diff(backend, PD_):
+    """対の差の当てはまり（形ごと・訓練の対／取り置きの対）。"""
+    import torch
+    from opcg_sim.learned.train import pair_diff as PDM
+
+    def vf(sc, ci, tok):
+        with torch.no_grad():
+            return backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok), None, None).numpy()
+    out = {}
+    for nm in ("tr", "va", "ev"):
+        ix = PD_[nm]
+        if not len(ix):
+            continue
+        dv = PDM.predict_diff(vf, PD_, ix)
+        for sh in sorted(set(PD_["shape"][ix].tolist())):
+            m = PD_["shape"][ix] == sh
+            out[f"{nm}_{sh}"] = PDM.fit_stats(dv[m], PD_["d"][ix][m])
+    return out
 
 
 def _pair_take(PR, ix):
@@ -1563,6 +1637,10 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                              # ドンだけが違う行の重み（§7.83）。既定 off のときは焼かない＝今までの npz と同じ。
                              **({} if (getattr(args, "jitter_weight", "off") or "off") == "off"
                                 else {"jitter_weight": args.jitter_weight}),
+                             # 対の差の損失（§7.88）。既定（無し）のときは焼かない＝今までの npz と同じ。
+                             **({"pair_diff": list(args.pair_diff), "pair_diff_weight": args.pair_diff_weight,
+                                 "pair_diff_shapes": args.pair_diff_shapes or "all"}
+                                if getattr(args, "pair_diff", None) else {}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
@@ -1677,6 +1755,15 @@ def main(argv=None):
                     help="§7.83（WP don-weight）: balanced＝波 82j のドンを動かした局の、動かした手番の頭以後の行（両席・dump の"
                          " don_jitter）の価値の損失に一律の倍率を掛け、その行の重みの合計＝それ以外の行の重みの合計にする（倍率は行数の比・"
                          "重みの平均は 1 に揃える・方策と補助の頭は不変・torch 専用）。**既定は off＝今までと 1 bit も同じ**")
+    tr.add_argument("--pair-diff", nargs="*", default=[],
+                    help="§7.88（WP pair-diff-loss）: 同じ盤面のドン ±1 の対の npz（tests/scripts/pair_diff.py merge）。価値の損失に"
+                         "（対の予測の差 − 教師の差）² を足す（対は 1 周に 1 回ずつ・倍率は --pair-diff-weight）。"
+                         "**無ければ切＝今までと 1 bit も同じ**。torch・--ablate rel 専用")
+    tr.add_argument("--pair-diff-weight", choices=("balanced", "count"), default="balanced",
+                    help="§7.88: balanced＝1 周で対の損失の合計＝それ以外の価値の損失の合計になる一律の倍率（始める前の損失から）・"
+                         "count＝行数の比だけ（訓練の価値の行数 ÷ 訓練の対の数・損失の大きさを見ない）")
+    tr.add_argument("--pair-diff-shapes", default="",
+                    help="§7.88: 訓練に使う対の形（カンマ区切り・例 head）。空＝全部。取り置きの対は全部の形で測る")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")

@@ -1,0 +1,94 @@
+TEACH jobs 764 -> /root/pdl/teach/teach_root.jsonl
+[50/764] kaido ok=True (49s)
+[100/764] kaido ok=True (86s)
+[150/764] kaido ok=True (108s)
+[200/764] kaido ok=True (142s)
+[250/764] kaido ok=True (170s)
+[300/764] kaido ok=True (193s)
+[350/764] kaido ok=True (219s)
+[400/764] kaido ok=True (252s)
+[450/764] kaido ok=True (279s)
+[500/764] kaido ok=True (305s)
+[550/764] kaido ok=True (324s)
+[600/764] kaido ok=True (349s)
+[650/764] kaido ok=True (384s)
+[700/764] kaido ok=True (406s)
+[750/764] kaido ok=True (422s)
+[764/764] kaido ok=True (428s)
+TEACH_DONE 428s
+{
+ "kaido": {
+  "L16": {
+   "diff": 0.262,
+   "ci": 0.1702,
+   "ratio_to_truth": 0.775,
+   "points": 24,
+   "pairs": 761,
+   "corr_L160": 0.874
+  },
+  "L160": {
+   "diff": 0.2566,
+   "ci": 0.2115,
+   "ratio_to_truth": 0.759,
+   "points": 24,
+   "pairs": 761
+  },
+  "R160": {
+   "diff": 0.1209,
+   "ci": 0.0624,
+   "ratio_to_truth": 0.358,
+   "points": 24,
+   "pairs": 761,
+   "corr_L160": 0.843
+  },
+  "R1280": {
+   "diff": 0.1327,
+   "ci": 0.0686,
+   "ratio_to_truth": 0.393,
+   "points": 24,
+   "pairs": 761,
+   "corr_L160": 0.822
+  }
+ },
+ "jitter": {
+  "L16": {
+   "gap": 0.4806,
+   "ci": 0.135,
+   "n": [
+    200,
+    200
+   ],
+   "ratio_to_L160": 0.991
+  },
+  "L160": {
+   "gap": 0.485,
+   "ci": 0.1301,
+   "n": [
+    200,
+    200
+   ],
+   "ratio_to_L160": 1.0
+  },
+  "z": {
+   "gap": 0.39,
+   "ci": 0.1919,
+   "n": [
+    200,
+    200
+   ],
+   "ratio_to_L160": 0.804
+  },
+  "net_r28x4": {
+   "gap": 0.1786,
+   "ci": 0.1151,
+   "n": [
+    200,
+    200
+   ],
+   "ratio_to_L160": 0.368
+  }
+ },
+ "fails": {
+  "ended": 7
+ }
+}

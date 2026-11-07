@@ -1,0 +1,50 @@
+{
+ "points": 24,
+ "truth": 0.338,
+ "nets": {
+  "nrel_pdc.ep0.npz": {
+   "a_head": {
+    "mean": 0.2922,
+    "ratio": 0.864,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.161,
+    "ratio": 0.476,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1701,
+    "ratio": 0.503,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2598,
+    "ratio": 0.769,
+    "n": 24
+   }
+  },
+  "nrel_pdc.ep1.npz": {
+   "a_head": {
+    "mean": 0.2609,
+    "ratio": 0.772,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1616,
+    "ratio": 0.478,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1794,
+    "ratio": 0.531,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2093,
+    "ratio": 0.619,
+    "n": 24
+   }
+  }
+ }
+}
