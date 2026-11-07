@@ -489,7 +489,7 @@ class TorchTrainer:
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
                    aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None,
-                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None, vw=None):
+                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None, vw=None, pd=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
@@ -540,6 +540,16 @@ class TorchTrainer:
             lr_, nr_ = VT.res_loss_terms(self.tn.res_head(e), _f32(res), _f32(res_mask))
             loss = loss + self.res_weight * lr_
             self.res_loss = (float(lr_.detach()), nr_)
+        if pd is not None:
+            # 対の差の損失（§7.88・WP `pair-diff-loss`）: 倍率 × 0.5·Σ_対((v_m − v_l) − d)² ／ この回の価値の行数
+            from opcg_sim.learned.train import pair_diff as PDM
+            psc, pci, ptok, pdt, pfac = pd
+            B = pdt.shape[0]
+            pv = self.tn.value(_f32(psc), _i64(pci), _f32(ptok), None, None)
+            dd = PDM.diff_terms(pv, B, _f32(pdt))
+            loss = loss + float(pfac) * 0.5 * dd.sum() / tz.shape[0]
+            s_, n_ = getattr(self, "pd_loss", (0.0, 0))
+            self.pd_loss = (s_ + float(dd.detach().sum()), n_ + B)
         self._mark("step_v_bwd")
         self._update(loss, lr)
         return out
