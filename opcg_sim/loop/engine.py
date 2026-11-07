@@ -56,7 +56,10 @@ PLAY_BUDGET = 0
 #: 2026-10-26 ユーザ決定「4 本にする」: 世界 4 本（今の 2 本に +13.2 Elo [+6.6, +19.8]・`docs/reports/2026-10-25_worlds4_prod_arena.md`）。
 #: 1 コアの機械では世界を順に読むので 1 手平均 0.31 → 0.61 秒・最悪 3.5 → 17 秒（`2026-10-25_world_parallel.md`）。
 #: 長い思考はフロントに経過秒を出して見せる（`api/services/cpu_think.py`）。
-PLAY_WORLDS = 4
+#: 2026-11-07 ユーザ決定「a と c でお願いします」: 世界 8 本（4 本に +8.0 Elo [+1.8, +14.2]・2,688 ペア・
+#: 守りの効果の対話の木が既定の上で測った・`docs/search_efficiency_plan.md` §7.87・`docs/reports/2026-11-07_ddt_default.md`）。
+#: 1 コアで 1 手平均 0.71 → 1.38 秒・最悪 15 → 31 秒。
+PLAY_WORLDS = 8
 #: 対戦 API の「迷う局面だけ世界 K 本で読み直す」（`docs/search_efficiency_plan.md` §7.4・WP
 #: `play-rethink`）。根の 2 位の訪問数 ÷ 1 位の訪問数が `PLAY_RETHINK_RATIO` 以上なら、同じ
 #: `search_seed` で世界 `PLAY_RETHINK_WORLDS` 本の読みをやり直してその手に差し替える。

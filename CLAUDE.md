@@ -235,9 +235,9 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
     r13d（2026-10-19 採用）の方策の教師は出荷と同じ読みで打った波 43・価値は波 43＋42 だった。
     **対戦 API の CPU だけ探索は 8 倍（1,280 回）・戦闘箱の枝予算なし**（2026-10-18 ユーザ決定・+46.5 Elo・
     `opcg_sim/loop/engine.py::PLAY_SIMS`／`PLAY_BUDGET`・生成・アリーナの物差しは 160 回のまま）。
-    **さらに世界 4 本で読む**（2026-10-26 ユーザ決定「4 本にする」・`PLAY_WORLDS = 4`・2 本に +13.2 Elo［+6.6, +19.8］・
-    1 コアでは 1 手平均 0.61 秒・最悪 17 秒＝長い思考はフロントに経過秒を出す〔`cpu/step` の `cpu_thinking`〕・`docs/reports/2026-10-25_worlds4_prod_arena.md`。
-    その前は世界 2 本〔2026-10-21・1 本に +18.1〕）。
+    **さらに世界 8 本で読む**（2026-11-07 ユーザ決定「a と c でお願いします」・`PLAY_WORLDS = 8`・4 本に +8.0 Elo［+1.8, +14.2］・
+    1 コアでは 1 手平均 1.38 秒・最悪 31 秒＝長い思考はフロントに経過秒を出す〔`cpu/step` の `cpu_thinking`〕・`docs/search_efficiency_plan.md` §7.87。
+    その前は世界 4 本〔2026-10-26・2 本に +13.2・`docs/reports/2026-10-25_worlds4_prod_arena.md`〕、世界 2 本〔2026-10-21・1 本に +18.1〕）。
     **さらに根で詰みを証明する**（2026-10-22 ユーザ決定「入れる」・`PLAY_LETHAL_PROOF = "root"`・+5.2 Elo［+3.1, +7.3］・1 手 +37%・
     公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ・`docs/SPEC.md` §2.5.10・`docs/reports/2026-10-22_lethal_prod_arena.md`・生成・アリーナは既定 off）。
     **戦闘の応手と効果の対話は 2026-10-24 から決め方を直した**（WP `rs-window-read`・+32.2 Elo・`docs/SPEC.md` §2.5.12・`docs/reports/2026-10-24_window_read_arena.md`）——続きを積まずその場で読み直す・
