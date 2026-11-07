@@ -1,7 +1,7 @@
 {
  "job": "arena-w8n-w09",
  "role": "arena",
- "status": "done",
+ "status": "partial",
  "inputs": {
   "candidate": "nrel_r29f4.npz + worlds 8",
   "baseline": "nrel_r29f4.npz + worlds 4 (current shipping)",
@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_w8/w8_real_w09.jsonl": 167
+  "arena_w8/w8_real_w09.jsonl": 168
  },
  "notes": "",
  "worker": {
