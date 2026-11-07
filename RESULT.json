@@ -11,12 +11,14 @@
  "outputs": {
   "files": [
    "arena_pdc/pdc_mirror_w15.jsonl",
-   "arena_pdc/pdc_real_w15.jsonl"
+   "arena_pdc/pdc_real_w15.jsonl",
+   "arena_pdc/pdc_synth2_w15.jsonl"
   ]
  },
  "metrics": {
   "arena_pdc/pdc_mirror_w15.jsonl": 175,
-  "arena_pdc/pdc_real_w15.jsonl": 175
+  "arena_pdc/pdc_real_w15.jsonl": 175,
+  "arena_pdc/pdc_synth2_w15.jsonl": 175
  },
  "notes": "",
  "worker": {
