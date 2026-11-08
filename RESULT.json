@@ -1,7 +1,7 @@
 {
  "job": "arena-pdcp-w22",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_pdc.ep1.npz (claude/pair-diff-loss)",
   "baseline": "nrel_r29f4.npz",
