@@ -72,7 +72,7 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
 
 > **ゲームプレイ退行の一次防衛線は golden 2 本**（いずれも Rust だけで回り
 > `tests/fixtures/rs_goldens/` の記録と照合する）:
-> `tests/test_rs_golden_audit.py`（カード×トリガー 3,386 件を汎用盤面で発動→既定解決）と
+> `tests/test_rs_golden_audit.py`（カード×トリガー 3,492 件〔2026-11-08 に EB05 追加で 3,387→3,492〕を汎用盤面で発動→既定解決）と
 > `tests/test_rs_golden_replay.py`（実対局 200 局＝random 150・a1 50 の盤面／合法手／イベント）。
 > **golden の正本は Rust**（2026-09-07・§16.3-10）＝作り直しも Rust だけで回る
 > （`make golden-audit`／`make golden-replay`＝`tests/scripts/rs_golden_make.py`）。

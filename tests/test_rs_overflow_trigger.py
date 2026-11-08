@@ -41,8 +41,11 @@ def _games():
 
 
 def _board(g):
-    db = D.load_db()
-    p1, p2 = D.build_pair(db, g["leaders"][0], g["leaders"][1], g["seed"], g["decks"])
+    # 両席のデッキは記録時のものを fixture に固定している（`deck_pair`）。seed から帯を引き直すと、実デッキ帯の本数や
+    # カード DB（合成デッキの母集団）が変わったとき別のデッキになり、局を当て直せない（2026-11-08 に帯を 115→117 本・
+    # DB に EB05 を足したときに実際に起きた）。
+    (l1, c1), (l2, c2) = g["deck_pair"]
+    p1, p2 = (l1, list(c1)), (l2, list(c2))
     game = DR.new_game(g["seed"], p1, p2)
     for mv in g["moves"]:
         _apply(game, json.loads(game.pending_json())["player_id"], mv)
