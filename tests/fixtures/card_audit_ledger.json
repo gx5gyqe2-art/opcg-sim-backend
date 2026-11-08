@@ -2249,12 +2249,12 @@
    "verdict": "ok"
   },
   "EB05-057": {
-   "ast_sha": "f240179b602c2f4a",
-   "note": "起動メインの対象「属性(特)か(知)を持つ」が attributes=['特'] のみで(知)が欠落（パーサ）",
+   "ast_sha": "0d25aacc2fa15ff7",
+   "note": "全句が対応（属性(特)か(知)＝attributes=['特','知']・2026-11-08 パーサ修正後）[厳格レビュー]",
    "probe_sha": "9e61f89e0469b11b",
    "reviewed": "2026-11-08",
    "text_sha": "2c3a57bcdd9af15f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-059": {
    "ast_sha": "587cfacc4c0ae9f4",
