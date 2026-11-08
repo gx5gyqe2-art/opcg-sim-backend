@@ -402,3 +402,11 @@ def test_played_character_clause_binds_that_character_to_the_trigger_subject():
     assert g["status"] == "速攻"
     # 誘発句は効果本体に残らない（トラッシュ・特徴の語を対象に取り込まない）。
     assert g["target"]["zone"] != "TRASH" and not g["target"]["traits"]
+
+
+def test_attribute_or_without_repeated_keyword_keeps_both():
+    """「属性(特)か(知)を持つ」＝2 つ目の属性は「属性」を繰り返さない（EB05-057 ノジコ・2026-11-08）。
+    (知) が脱落すると、属性(知)のキャラにドン!!を付与できなくなる。"""
+    act = _one(_parse("【起動メイン】【ターン1回】自分の属性(特)か(知)を持つ、リーダーかキャラ1枚に"
+                      "レストのドン!!1枚までを、付与する。"), "ATTACH_DON")
+    assert sorted(act["target"]["attributes"]) == ["特", "知"]

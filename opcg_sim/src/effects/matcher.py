@@ -256,6 +256,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.flags.add("NAME_OR_COLORTYPE")
 
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
+    # 「属性(特)か(知)を持つ」= 2 つ目以降の属性は「属性」を繰り返さず括弧だけで続く（EB05-057 ノジコ）。
+    # 従来は 1 つ目しか拾わず (知) が脱落していた。エンジンは attributes を OR で照合する（matcher.rs）。
+    for _am in re.finditer(_nfc(ParserKeyword.ATTRIBUTE + r'[((][^))]+[))]((?:か[((][^))]+[))])+)'), tgt_text):
+        attrs.extend(re.findall(_nfc(r'か[((]([^))]+)[))]'), _am.group(1)))
     tq.attributes.extend(attrs)
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:

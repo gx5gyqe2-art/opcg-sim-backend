@@ -130,7 +130,7 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
         pair = (singleton_deck(db, la), singleton_deck(db, lb))
         return (pair + (kinds,)) if with_kinds else pair
     if decks == "user":
-        # 実デッキ（ユーザの 4 デッキ・`tests/fixtures/decks/user_decks_20260728.json`）。リーダーは
+        # 実デッキ（ユーザの 6 デッキ・2026-11-08 に 2 本追加・`tests/fixtures/decks/user_decks_20260728.json`）。リーダーは
         # デッキ側が決める（`la`／`lb` は無視）。seed から 2 本を引く（同じデッキ同士も可）＝
         # 「除去を打つべき展開が起きているか」の census 用（§20.8.9）。**訓練の教材にはしない**
         # （ホールドアウトのリーク防止・`heldout_decks.json` の規約と同じ扱い）。
@@ -138,7 +138,7 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
         return (pair + (kinds,)) if with_kinds else pair
     if decks in ("official", "real"):
         # 実デッキ帯の拡張（2026-10-22）: official＝公式サイトの構築例 111 本（`official_decks_20261022.json`）、
-        # real＝ユーザの 4 本＋構築例 111 本。リーダーはデッキ側が決める（`la`／`lb` は無視）。
+        # real＝ユーザの 6 本＋構築例 111 本。リーダーはデッキ側が決める（`la`／`lb` は無視）。
         # **2026-10-22 ユーザ決定「b でお願いします」で訓練の教材にも使う**（実デッキでリーダーをほぼ網羅できたため・
         # 波 49 から）。判定の主条件もこの帯（`real`）。
         pair = real_deck_pair(seed, decks)
@@ -191,7 +191,7 @@ def _load_deck_file(path: str) -> List[Tuple[str, List[str]]]:
 
 
 def user_decks() -> List[Tuple[str, List[str]]]:
-    """実デッキ（ユーザの 4 本）を `(leader_id, [card_id]×50)` の列で返す（ファイル順・キャッシュ）。"""
+    """実デッキ（ユーザの 6 本・2026-11-08 に赤緑ルフィ OP13-001 と青黄ナミ OP11-041 の 2 本を追加）を `(leader_id, [card_id]×50)` の列で返す（ファイル順・キャッシュ）。"""
     return _load_deck_file(_USER_DECKS)
 
 
@@ -213,6 +213,6 @@ def user_deck_pair(seed: int):
 
 
 def real_deck_pair(seed: int, which: str = "real"):
-    """seed から実デッキ帯の 2 本を引く。`official`＝構築例だけ・`real`＝ユーザの 4 本＋構築例（一様）。"""
+    """seed から実デッキ帯の 2 本を引く。`official`＝構築例だけ・`real`＝ユーザの 6 本＋構築例（一様）。"""
     ds = official_decks() if which == "official" else user_decks() + official_decks()
     return _pair_from(ds, seed)

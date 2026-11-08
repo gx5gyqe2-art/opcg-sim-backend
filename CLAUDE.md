@@ -72,7 +72,7 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
 
 > **ゲームプレイ退行の一次防衛線は golden 2 本**（いずれも Rust だけで回り
 > `tests/fixtures/rs_goldens/` の記録と照合する）:
-> `tests/test_rs_golden_audit.py`（カード×トリガー 3,386 件を汎用盤面で発動→既定解決）と
+> `tests/test_rs_golden_audit.py`（カード×トリガー 3,492 件〔2026-11-08 に EB05 追加で 3,387→3,492〕を汎用盤面で発動→既定解決）と
 > `tests/test_rs_golden_replay.py`（実対局 200 局＝random 150・a1 50 の盤面／合法手／イベント）。
 > **golden の正本は Rust**（2026-09-07・§16.3-10）＝作り直しも Rust だけで回る
 > （`make golden-audit`／`make golden-replay`＝`tests/scripts/rs_golden_make.py`）。
@@ -157,7 +157,7 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
   汎化と強さの根本改善を常に優先する（例: G17 は実デッキを訓練に入れず全ランダムで学習し、
   実デッキは完全ホールドアウトの検証帯とする）。
 - **2026-10-22 から実デッキも教材にする**（ユーザ決定「b でお願いします」・実デッキでリーダーをほぼ網羅できたため）——
-  実デッキ帯＝ユーザの 4 本＋公式サイトの構築例 111 本（`tests/fixtures/decks/official_decks_20261022.json`・105／143 リーダー）
+  実デッキ帯＝ユーザの 6 本（2026-11-08 に 4→6 本・赤緑ルフィ OP13-001／青黄ナミ OP11-041 を追加）＋公式サイトの構築例 111 本（`tests/fixtures/decks/official_decks_20261022.json`・105／143 リーダー）
   を `--decks real` で生成にも使う（波 49 から）。**判定の主条件も `real`**（同じデッキでも seed が違えば別の局＝デッキは環境であって教師ではない）。
   上の「実デッキは完全ホールドアウト」はこの決定で置き換わった。合成デッキ（`synth_roles2`・`synth_roles`）は汎化の副次条件として測る。
   根拠: ユーザの 4 本だけの帯では r18 が +11.2 に見えたが 115 本では +0.5（4 本への過剰適合・`docs/reports/2026-10-22_r18_realdeck115.md`）。
