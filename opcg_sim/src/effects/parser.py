@@ -139,6 +139,11 @@ class EffectParser:
         norm = re.sub(_nfc(r'(【(?:ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通)】)\s*[(（][^()（）]*[)）](?=\s*【)'),
                       r'\1 / ', norm)
 
+        # 「…【速攻】を得る。(このカードは登場したターンにアタックできる)」のように、句点の直後へ区切りなしで
+        # キーワードの説明括弧が続く表記（P-143）。他のカードと同じく説明括弧だけのセグメントに切り離す
+        # （つながったままだと説明が別の効果＝永続の【速攻】付与として読まれていた）。
+        norm = re.sub(_nfc(r'。\s*(?=[(（]このカードは[^()（）]*[)）]\s*(?:/|$))'), '。 / ', norm)
+
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
 
@@ -619,7 +624,7 @@ class EffectParser:
             # テキストで済んでおり、トリガー宣言の【トリガー】prefix は「を持つ」が続かないため
             # ここでは除去される。
             clean_text = re.sub(
-                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】(?!を持つ|効果を持たない)'),
+                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】(?!を持つ|を両方持つ|効果を持たない)'),
                 '', norm_text
             ).strip()
 
@@ -982,6 +987,12 @@ class EffectParser:
         （修飾が無ければバトルKOも含む）。複数はカンマ区切り（エンジンが分割して照合する）。"""
         if mod == _nfc("バトルで"):
             return "BATTLE_KO"
+        if mod == _nfc("相手によって"):
+            # 「相手によって」は相手の効果と相手のアタック（バトル）の両方を含む
+            # （「相手の効果で」は効果だけ）。自分のキャラがバトルで KO されるのは相手のアタック
+            # だけなので BATTLE_KO はそのまま足す（EB05-061・OP15-098）。効果側は相手の効果に限る
+            # （エンジンの opp_only_removal が raw_text の「相手によって」を読む）。
+            return ("EFFECT_KO" if kind == _nfc("KOされる") else "LEAVE") + ",BATTLE_KO"
         if kind == _nfc("KOされる"):
             return "EFFECT_KO" if mod else "EFFECT_KO,BATTLE_KO"
         return "LEAVE" if mod else "LEAVE,BATTLE_KO"
@@ -997,6 +1008,10 @@ class EffectParser:
         if not m:
             return None
         head = m.group("head")
+        # 「自分がダメージを受ける場合、代わりに〜」（EB05-052）はダメージの置換（status=DAMAGE）。
+        # リーダーへのダメージ 1 点ごとにエンジンが確認する（rules/battle.rs の run_damage）。
+        if re.match(_nfc(r'^自分(?:のリーダー)?がダメージを受ける場合$'), head):
+            return {"status": "DAMAGE", "body": m.group("body"), "conds": []}
         # 「KOされるか（、）相手の効果で場を離れる場合」（OP13-046）は 1 つの節に 2 つの除去種別。
         dual = re.match(_nfc(r'^(?P<pre>.+?)(?:が|は)KOされるか、?(?P<mod>相手の効果で|相手によって)場を離れる場合$'), head)
         if dual:

@@ -538,7 +538,9 @@ fn opp_only_removal(raw: &str) -> bool {
         .filter_map(|m| raw.find(m))
         .min()
         .unwrap_or(raw.len());
-    raw[..cut].replace("【相手のターン中】", "").contains("相手の")
+    let pre = raw[..cut].replace("【相手のターン中】", "");
+    // 「相手によって場を離れる場合」（EB05-061・OP15-098）も相手専用（効果側は相手の効果だけ）。
+    pre.contains("相手の") || pre.contains("相手によって")
 }
 
 /// [`find_replacement`] に除去を行った効果の実行者（`actor`）を渡す版。持ち主自身の効果による

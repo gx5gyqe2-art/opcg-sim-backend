@@ -1108,7 +1108,62 @@ pub fn ko_listener_matches(
     if !names.is_empty() && !names.iter().any(|n| matches_name(masters, master, n)) {
         return false;
     }
+    // 「属性(知)を持ち」「属性(特)か(知)を持つ」（EB05-010）。
+    let attrs = find_attributes(&pre);
+    if !attrs.is_empty() {
+        let c = s.state().card(koed_card);
+        let m = masters.get(master);
+        if !attrs.iter().any(|a| c.has_attribute(m, a)) {
+            return false;
+        }
+    }
+    // 「【ブロッカー】を持たない／持つ」（EB05-010）。KO の時点のキャラは場を離れて
+    // キーワードが元々のものに戻っているので、元々のキーワードと残っている付与の両方を見る。
+    // （`pre` は `strip_tags` で【】の中身ごと消えているので、タグを残した句で読む。）
+    let pre_tagged = before(raw, "KOされた時");
+    let blocker_neg = pre_tagged.contains("【ブロッカー】を持たない");
+    let blocker_pos = !blocker_neg && pre_tagged.contains("【ブロッカー】を持つ");
+    if blocker_neg || blocker_pos {
+        let c = s.state().card(koed_card);
+        let has_blocker = masters.get(master).keywords.iter().any(|k| k == crate::rules::KW_BLOCKER)
+            || c.current_keywords.iter().any(|k| k == crate::rules::KW_BLOCKER)
+            || c.timed_keywords.iter().any(|k| k == crate::rules::KW_BLOCKER);
+        if has_blocker == blocker_neg {
+            return false;
+        }
+    }
     true
+}
+
+/// 「属性(X)」「属性(X)か(Y)」の X・Y（全角括弧も可）。
+fn find_attributes(pre: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = pre;
+    while let Some(i) = rest.find("属性") {
+        let mut tail = &rest[i + "属性".len()..];
+        loop {
+            let open = if tail.starts_with('(') {
+                '('.len_utf8()
+            } else if tail.starts_with('（') {
+                '（'.len_utf8()
+            } else {
+                break;
+            };
+            let body = &tail[open..];
+            let Some(close) = body.find([')', '）']) else { break };
+            out.push(body[..close].to_string());
+            let after = &body[close + body[close..].chars().next().map_or(1, char::len_utf8)..];
+            match after.strip_prefix('か') {
+                Some(t) if t.starts_with('(') || t.starts_with('（') => tail = t,
+                _ => {
+                    tail = after;
+                    break;
+                }
+            }
+        }
+        rest = tail;
+    }
+    out
 }
 
 /// Python `re.search(r'(?:元々の)?パワー(\d+)以上', pre)` の数値。
@@ -2116,6 +2171,16 @@ mod tests {
     fn strip_tags_removes_timing_tags_only() {
         assert_eq!(strip_tags("【自分のターン中】相手のキャラが"), "相手のキャラが");
         assert_eq!(strip_tags("自分の"), "自分の");
+    }
+
+    /// EB05-010「属性(知)を持ち」・EB05-057 型の「属性(特)か(知)」。
+    #[test]
+    fn attributes_are_read_including_the_or_chain() {
+        assert_eq!(find_attributes("自分の属性(知)を持ち、を持たないキャラが"), vec!["知"]);
+        assert_eq!(find_attributes("自分の属性(特)か(知)を持つキャラが"), vec!["特", "知"]);
+        assert_eq!(find_attributes("属性（斬）を持つ"), vec!["斬"]);
+        assert!(find_attributes("自分の特徴《海軍》を持つキャラが").is_empty());
+        assert!(find_attributes("属性を持たない").is_empty());
     }
 
     #[test]

@@ -194,6 +194,14 @@ V2 読み込みに失敗した場合は自動的にレガシーへ退避する�
 - 置換 `sub_effect` が対象選択/任意確認で中断した場合は `_auto_resolve_replacement` が同期解決する
   （任意=accept、対象=有効候補を自動選択）。除去解決中に走るため、解決前後で外側の
   `active_interaction` を保全する。フロントへ選択を提示する完全な対話化は未実装。
+- **ダメージの置換**（2026-11-09・EB05-052）: 「自分(のリーダー)がダメージを受ける場合、代わりに〜」は status `DAMAGE`
+  （`_split_replacement`）。エンジンがダメージ 1 点ごとに確認する（`docs/SPEC.md` §3.4）。
+- **除去種別の読み**（`_repl_status_of`）: 「バトルで」=`BATTLE_KO`・「相手の効果で／効果で」=`LEAVE`（KO なら `EFFECT_KO`）・
+  修飾なし=＋`BATTLE_KO`・**「相手によって」=`LEAVE,BATTLE_KO`**（相手の効果と相手のアタックの両方・2026-11-09・EB05-061／OP15-098）。
+- 2026-11-09 の EB05 修正で足した句（`docs/reports/2026-11-09_card_fix_eb05.md`）: 「特徴《X》と【トリガー】を両方持つ」＝特徴 AND
+  `HAS_TRIGGER`（【トリガー】タグを除去しない）／陣営指定なしの「キャラN枚までを、…パワー±N」＝`ALL`／「イベントか特徴《X》を持つ」
+  ＝`TYPE_OR_TRAIT`（種類 OR 特徴）／「効果を無効にし、持ち主の手札に戻す」＝`negate_then_bounce`（NEGATE_EFFECT→同じ対象の BOUNCE）／
+  「属性(X)か(Y)」＝属性 2 つの OR／句点直後の説明括弧「(このカードは〜)」は説明だけのセグメントに切り離す（効果にしない）。
 - **`execute_main`（EXECUTE_MAIN_EFFECT）の2形態**: (1) target 無し＝発生源自身の参照トリガー
   （【メイン】/【登場時】等）を再展開（`_expand_main_effect`）。(2) **target 付き**＝「（自分の）
   トラッシュにある…イベント…の【メイン】効果を発動する」（EB03-031）。選択句を `parse_target`

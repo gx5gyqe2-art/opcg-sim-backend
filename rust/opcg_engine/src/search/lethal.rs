@@ -1207,6 +1207,7 @@ fn interaction_hash(st: &GameState, h: &mut impl Hasher) {
                 c.battle_ko.hash(h);
                 c.rest_replace.hash(h);
                 c.query.hash(h);
+                c.damage_replace.hash(h);
                 if let Some(r) = &c.removal_replace {
                     format!("{r:?}").hash(h);
                 }

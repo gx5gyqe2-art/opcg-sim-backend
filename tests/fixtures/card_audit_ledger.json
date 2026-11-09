@@ -1865,28 +1865,28 @@
    "verdict": "ok"
   },
   "EB05-005": {
-   "ast_sha": "7a0d56784b652c5d",
-   "note": "ng パーサ: 登場時の対象が《革命軍》だけで「【トリガー】を両方持つ」の要件(HAS_TRIGGER)が欠落（起動メインの任意 QUALIFIER_GAP は起動自体が任意で決着） [厳格レビュー]",
+   "ast_sha": "ce12a2970a457250",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「特徴《革命軍》と【トリガー】を両方持つ」の【トリガー】タグ除去を止め HAS_TRIGGER（TRAIT_OR_TRIGGER なし＝AND）に。起動メインの QUALIFIER_GAP は起動自体が任意で決着（従来どおり）",
    "probe_sha": "dd433160350277e0",
    "reviewed": "2026-11-09",
    "text_sha": "81461034b5ec3f4e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-006": {
-   "ast_sha": "5042cedaa625e500",
-   "note": "ng パーサ: 選択肢2つの「キャラ1枚まで」(陣営指定なし＝両陣営)が player=SELF になり、相手キャラに+3000/-4000 を撃てない [厳格レビュー]",
+   "ast_sha": "0303f9734e3e1e86",
+   "note": "[厳格レビュー] 2026-11-09 修正: 陣営指定なしの「キャラ1枚までを、…パワー±N」を player=ALL に（atoms._buff_target・DB でこの形は本カードだけ）。コスト（ライフ上1枚を手札 任意）・ターン1回・選択肢2つは一致",
    "probe_sha": "7c038e87ef23d253",
    "reviewed": "2026-11-09",
    "text_sha": "ef578eab6d768c37",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-007": {
-   "ast_sha": "fb953849620cb17c",
-   "note": "ng パーサ: 公開コスト「イベントか特徴《パンクハザード》を持つカード合計3枚」が card_type=EVENT AND traits=パンクハザード（OR 旗なし）になり、実質イベント兼パンクハザードしか数えない（NOT_FIRED） [厳格レビュー]",
+   "ast_sha": "299a8b0a8c3de47d",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「イベントか特徴《パンクハザード》を持つカード」を TYPE_OR_TRAIT（種類 OR 特徴・Rust/Python の matcher）に。ACTION_NOT_FIRED はプローブ盤面の手札にイベントが2枚しかなく「合計3枚」の公開が払えないため（実装の欠陥ではない）。ターン終了時の+5000は一致",
    "probe_sha": "c2e140bf8044cadd",
    "reviewed": "2026-11-09",
    "text_sha": "e47463ad8a627743",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-008": {
    "ast_sha": "08cecac4aab8a132",
@@ -1906,11 +1906,11 @@
   },
   "EB05-010": {
    "ast_sha": "9e59a463b741af41",
-   "note": "ng エンジン: リーダーの KO リスナー（triggers.rs ko_listener_matches）が「属性(知)を持ち【ブロッカー】を持たない」を判定せず、自分のどのキャラの KO でも誘発する [厳格レビュー]",
+   "note": "[厳格レビュー] 2026-11-09 修正（エンジン）: triggers.rs ko_listener_matches が「属性(X)」（find_attributes・(X)か(Y) も）と「【ブロッカー】を持たない／持つ」（元々のキーワード＋残っている付与）を判定。UNCOVERED_TEXT はエンジンが raw_text から読む句。起動メイン（パワー6000以下・属性(知)のキャラ1枚までアクティブ）は一致。実対局テストで(知)非ブロッカーのみ誘発を確認",
    "probe_sha": "132302a95453d19f",
    "reviewed": "2026-11-09",
    "text_sha": "3ca7c2c9c83e73f5",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-011": {
    "ast_sha": "b7929214e7027c94",
@@ -2041,12 +2041,12 @@
    "verdict": "ok"
   },
   "EB05-029": {
-   "ast_sha": "946c15236ee37e54",
-   "note": "ng パーサ: 「このターン中、効果を無効にし、持ち主の手札に戻す」の効果無効(NEGATE_EFFECT・このターン中)のノードが無く BOUNCE だけ（QUALIFIER_GAP 期間＝本物の欠落） [厳格レビュー]",
-   "probe_sha": "c8b8842ddd14e14d",
+   "ast_sha": "8a5decc499b7526d",
+   "note": "[厳格レビュー] 2026-11-09 修正: 新ルール negate_then_bounce で NEGATE_EFFECT（このターン中・相手コスト6以下1枚まで・save_id）→ 同じ対象を BOUNCE（ref_id）。コスト（手札1枚捨て 任意）・【トリガー】は一致",
+   "probe_sha": "42d9a2859401d556",
    "reviewed": "2026-11-09",
    "text_sha": "678510861bc05c34",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-030": {
    "ast_sha": "f9ac8c87d26ac535",
@@ -2209,12 +2209,12 @@
    "verdict": "ok"
   },
   "EB05-052": {
-   "ast_sha": "b2ef911f90e92cef",
-   "note": "「自分がダメージを受ける場合、代わりにこのキャラをトラッシュに置くことができる」のダメージ置換が無い（パーサ/エンジン）: 条件は GENERIC（常に真）・効果は素の PASSIVE TRASH self・任意欄なし（QUALIFIER_GAP は本当の欠落）。REPLACE_EFFECT でも is_rest_replacement でもないので継続効果の再計算で能力が実行され自壊しうる [厳格レビュー]",
-   "probe_sha": "c6678a0c9ff1f869",
+   "ast_sha": "25c160f65b54bb2c",
+   "note": "[厳格レビュー] 2026-11-09 修正: ダメージの置換を新設（パーサ status=DAMAGE の REPLACE_EFFECT・sub TRASH このキャラ 任意／エンジン rules/battle.rs run_damage がバトル・効果の両方のダメージで 1 点ごとに確認）。継続効果の再計算での自壊は解消（REPLACE_EFFECT は no-op）。【ダブルアタック】は 1 点ずつ・ライフ0でも置換できる裁定。【トリガー】（2枚引き1枚捨て）は一致。実対局テスト test_play_flow_eb05.py",
+   "probe_sha": "e8ea9ca59ddb11f9",
    "reviewed": "2026-11-09",
    "text_sha": "765db92996a01e8a",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-053": {
    "ast_sha": "c345858896c6c68e",
@@ -2249,12 +2249,12 @@
    "verdict": "ok"
   },
   "EB05-057": {
-   "ast_sha": "f240179b602c2f4a",
-   "note": "「自分の属性(特)か(知)を持つ、リーダーかキャラ」が attributes=['特'] だけで (知) が落ちている（パーサ）＝(知) のリーダー/キャラにドンを付与できない。トリガー能力は一致 [厳格レビュー]",
+   "ast_sha": "0d25aacc2fa15ff7",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「属性(特)か(知)」の 2 つ目を拾う（matcher.parse_target の属性 OR 連鎖・DB でこの形は本カードだけ）。attributes=[特,知] リーダーかキャラ1枚・レストのドン1枚まで・ターン1回、【トリガー】は一致",
    "probe_sha": "9e61f89e0469b11b",
    "reviewed": "2026-11-09",
    "text_sha": "2c3a57bcdd9af15f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB05-059": {
    "ast_sha": "587cfacc4c0ae9f4",
@@ -2273,12 +2273,12 @@
    "verdict": "ok"
   },
   "EB05-061": {
-   "ast_sha": "4bed72b0f28d49f9",
-   "note": "「相手によって場を離れる場合」が status=LEAVE だけで BATTLE_KO を含まない（パーサ parser.py _repl_status_of が「相手によって」を「相手の効果で」と同扱い）＝相手のアタックでバトルKOされるときに置換できない。他の句（元々のパワー6000以下・ターン1回・ライフ上1枚手札 任意・登場時の赤コスト2以下登場）は一致。同じ形の OP15-098 も台帳 ok だが同じ問題を持つ [厳格レビュー]",
+   "ast_sha": "38bc78c363718866",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「相手によって場を離れる」を LEAVE,BATTLE_KO に（parser _repl_status_of）＋エンジン opp_only_removal が「相手によって」も相手専用と読む（自分の効果の除去には置換しない）。他の句（元々のパワー6000以下・ターン1回・ライフ上1枚手札 任意・登場時の赤コスト2以下登場）は一致。実対局テストでバトルKOの置換を確認",
    "probe_sha": "5da8948dcbf7a4fb",
    "reviewed": "2026-11-09",
    "text_sha": "f5767040bcf42b0c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP01-001": {
    "ast_sha": "3b42dc314766777c",
@@ -14993,10 +14993,10 @@
    "verdict": "ok"
   },
   "OP15-098": {
-   "ast_sha": "2378ab7d2cd8bbb2",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "8f409d65d4a7386f",
+   "note": "[厳格レビュー] 2026-11-09 修正（EB05-061 と同じ類型）: 「相手によって場を離れる」が LEAVE,BATTLE_KO になり相手のアタックによるバトルKOも置換できる。元々のパワー6000以上・《空島》の限定は条件の対象クエリ（実対局テストで 4000 の非空島は置換しないことを確認）",
    "probe_sha": "1bd42a55acd607d2",
-   "reviewed": "2026-10-01",
+   "reviewed": "2026-11-09",
    "text_sha": "4965558f64d5ad9b",
    "verdict": "ok"
   },
@@ -17865,12 +17865,12 @@
    "verdict": "ok"
   },
   "P-143": {
-   "ast_sha": "f5090c3982b1115d",
-   "note": "注釈「(このカードは登場したターンにアタックできる)」が別ノード GRANT_KEYWORD 速攻 PERMANENT として余分に解析され、本文「このターン中」の付与に加えて永続の速攻が付く（パーサ・実害は小さい）。条件（誰のでもコスト0のキャラ・cost 0..0）は一致 [厳格レビュー]",
-   "probe_sha": "d7baa8008b27c710",
+   "ast_sha": "d2746a147fef2da7",
+   "note": "[厳格レビュー] 2026-11-09 修正: 句点直後の注釈「(このカードは登場したターンにアタックできる)」を説明括弧のセグメントとして切り離す（parse_card_text）＝余分な PERMANENT 速攻が消え、このターン中の速攻付与だけ。条件（コスト0のキャラがいる）は一致",
+   "probe_sha": "b351f8ac075daf13",
    "reviewed": "2026-11-09",
    "text_sha": "1f899bd150433630",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "P-144": {
    "ast_sha": "a25ef3e7ff96f245",

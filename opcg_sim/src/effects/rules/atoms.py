@@ -541,7 +541,14 @@ def _buff_target(t: str) -> TargetQuery:
     if m_ld:
         return TargetQuery(card_type=["LEADER"],
                            player=Player.OPPONENT if m_ld.group(1) == _nfc("相手") else Player.SELF)
-    return parse_target(t)
+    tq = parse_target(t)
+    # 陣営の指定が無い「キャラ1枚までを、…パワー±N」は両陣営のキャラが対象（EB05-006・
+    # KO の側未指定〔ALL〕と同じ読み）。parse_target 既定の SELF だと相手キャラへ撃てない。
+    if (tq.player == Player.SELF
+            and re.match(_nfc(r"^・?(?:リーダーか)?キャラ[\d０-９]+枚"), t)
+            and not re.search(_nfc(r"相手|自分|この(?:キャラ|カード|リーダー)|味方|お互い|持ち主"), t)):
+        tq.player = Player.ALL
+    return tq
 
 
 @rule("leader_and_char_dual", priority=67)
@@ -3526,6 +3533,29 @@ def _negate_then_ko(ctx: ParseContext) -> Optional[Sequence]:
     return Sequence(actions=[
         GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration="THIS_TURN", raw_text=t),
         GameAction(type=ActionType.KO, target=tq2, raw_text=t),
+    ])
+
+
+# ---------------------------------------------------------------------------
+# 効果無効＋手札に戻す: 「<対象>を、このターン中、効果を無効にし、持ち主の手札に戻す」(EB05-029)
+#   negate_then_ko と同型。区切らないと bounce が全体を丸呑みして「効果を無効にし」が脱落する
+#   （場を離れる時の置換・保護・誘発を無効にしてから戻す）。
+# ---------------------------------------------------------------------------
+@rule("negate_then_bounce", priority=72)
+def _negate_then_bounce(ctx: ParseContext) -> Optional[Sequence]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果を無効にし、.{0,6}?手札に戻す"), t):
+        return None
+    head = t.split(_nfc("効果を無効にし"))[0]
+    tq1 = parse_target(head)
+    tq1.save_id = "negate_bounce_char"
+    if _nfc("まで") in head:
+        tq1.is_up_to = True
+    tq2 = TargetQuery(player=tq1.player, zone=Zone.FIELD, card_type=list(tq1.card_type) or ["CHARACTER"],
+                      count=1, ref_id="negate_bounce_char")
+    return Sequence(actions=[
+        GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration="THIS_TURN", raw_text=t),
+        GameAction(type=ActionType.BOUNCE, target=tq2, raw_text=t),
     ])
 
 
