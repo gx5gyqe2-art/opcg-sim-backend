@@ -150,7 +150,8 @@ class Split:
         return {k: round(v, nd) for k, v in sorted(self.t.items())}
 
 
-def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, time_weight=0.0):
+def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, time_weight=0.0,
+                 res_weight=0.0):
     """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
 
     `numpy`＝この module の手書き backward（参照実装）。`torch`＝`n_rel_torch.TorchTrainer`
@@ -167,7 +168,7 @@ def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0, t
               flush=True)
         return net, "numpy", "torch-import-failed"
     tr = TorchTrainer(net, lr=lr, threads=threads, aux_weight=aux_weight, plan_weight=plan_weight,
-                      time_weight=time_weight)
+                      time_weight=time_weight, res_weight=res_weight)
     return tr, "torch", f"threads={tr.threads}"
 
 
@@ -253,7 +254,7 @@ class NRelNet(NL.NRelNet):
     def __init__(self, tables, hidden=192, seed=13):
         super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
-                      for p in self.params + self.aux_params + self.plan_params}
+                      for p in self.params + self.aux_params + self.plan_params + [NL.SKIP_PARAM, NL.TH_PARAM]}
         self._t = 0
 
     def _trainable(self):
@@ -262,7 +263,9 @@ class NRelNet(NL.NRelNet):
         `_t` は今までどおり**全パラメータで 1 本**＝補助ヘッドを足しても既存の更新式は動かない。
         """
         return (self.params + (self.aux_params if self.aux else [])
-                + (self.plan_params if self.plan else []))
+                + (self.plan_params if self.plan else [])
+                + ([NL.SKIP_PARAM] if self.value_skip else [])
+                + ([NL.TH_PARAM] if getattr(self, "theory_in", False) else []))
 
     # --- card_table backward（NEff と同じ） ---
     def card_table_backward(self, k, dtab, g):
@@ -281,13 +284,17 @@ class NRelNet(NL.NRelNet):
         g["ba"] = g.get("ba", 0) + dH.sum((0, 1))
 
     # --- body backward: dE → (dh, gW1/W2) ---
-    def body_backward(self, k, dE, g):
+    def body_backward(self, k, dE, g, dz_extra=None):
         dh2 = dE * (k["h2"] > 0)
         g["W2"] = g.get("W2", 0) + k["r1"].T @ dh2; g["b2"] = g.get("b2", 0) + dh2.sum(0)
         dr1 = dh2 @ self.W2.T
         dh1 = dr1 * (k["h1"] > 0)
         g["W1"] = g.get("W1", 0) + k["z"].T @ dh1; g["b1"] = g.get("b1", 0) + dh1.sum(0)
+        if k.get("th") is not None:          # 理論の列（§7.82）→ 1 段目の新しい重み
+            g[NL.TH_PARAM] = g.get(NL.TH_PARAM, 0) + k["th"].T @ dh1
         dz = dh1 @ self.W1.T
+        if dz_extra is not None:
+            dz = dz + dz_extra             # 価値の出口のまっすぐな道（§7.78）から入力の束へ戻る分
         dmean = dz[:, D_SC:D_SC + D_H]
         dmx = dz[:, D_SC + D_H:]
         present = k["present"]
@@ -437,11 +444,18 @@ class NRelNet(NL.NRelNet):
         tab = self.card_table(k)
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab, k)
         e = self.body(sc, h, present, k)
-        o = (e @ self.Wv + self.bv)[:, 0]
+        if self.value_skip:
+            o = (e @ self.Wv + k["z"] @ self.Wvz + self.bv)[:, 0]     # §7.78 のまっすぐな道
+        else:
+            o = (e @ self.Wv + self.bv)[:, 0]
         v = np.tanh(o)
         B = len(zt)
         do = ((v - zt) / B) * (1.0 - v ** 2)
         g = {"Wv": e.T @ do[:, None], "bv": np.array([do.sum()], np.float32)}
+        dz_skip = None
+        if self.value_skip:
+            g[NL.SKIP_PARAM] = k["z"].T @ do[:, None]
+            dz_skip = do[:, None] @ self.Wvz.T
         dE = do[:, None] @ self.Wv.T
         dh_aux = None
         if self.aux and aux_w > 0.0 and aux_mask is not None:
@@ -456,7 +470,7 @@ class NRelNet(NL.NRelNet):
             dE_u = self.time_backward(e, tm, tm_mask, time_w, g)
             if dE_u is not None:
                 dE = dE + dE_u
-        dh = self.body_backward(k, dE, g)
+        dh = self.body_backward(k, dE, g, dz_skip)
         if dh_aux is not None:
             dh = dh + dh_aux
         dtab = np.zeros_like(tab)
@@ -838,7 +852,208 @@ def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, c
 #: 価値の教師の作り方（`docs/search_efficiency_plan.md` §7.16・WP `omni-value`）。
 #: z＝勝敗（既定・今までと 1 bit も変わらない）／omni＝全部見える探索の根の評価 `v_omni`／
 #: mix＝0.5 z + 0.5 v_omni。`v_omni` が無い行（根の探索が無い点・復元に失敗した行）は z のまま。
-Z_MODES = ("z", "omni", "mix")
+#: v0mix＝0.5 z + 0.5 pol_v0（記録にある**生成役の根の価値の推定**・公平な配り直しの探索・§7.72・WP `value-mix`）。
+#: 根の探索が在る行（main・候補 1 つ以上・訪問 > 0）だけ差し替え、窓・コミットの行は z のまま。`--omni-in` は要らない。
+#: rollout＝打ち続けの平均（§7.80・WP `rollout-teach`）: 記録の隣の sidecar `*.roll.npz`（`rollout_labels`）に行がある行だけ
+#: 勝敗を平均に差し替え、残りは z のまま。`--omni-in` は要らない。
+#: next_v0＝**次の自分の手番の頭の根の値**（§7.81・WP `value-next`・主の腕）: 各行の教師を「同じ局（seed）・同じ席（who）の、
+#: その行の turn より後の最初の、根の推定のある main の行（印は v0mix と同じ）」の `pol_v0` に差し替える（同じ手番の後の
+#: 判断点は飛ばす＝時間が 1 手番ぶん進む）。そういう行が無い行（その前に局が終わる）は z のまま。相手の手番の行（窓・続き）も、
+#: いちばん近い次の自分の手番の頭の値。混ぜる割合は無し（新定数ゼロ）。`pol_v0` は行の手番の視点＝同じ席なら z と同じ視点
+#: なので符号は変えない。
+#: next_v0_step＝**次の自分のメインの判断点**（副の腕・時間の歩幅が 1 判断点）: 同じ局・同じ席の、その行の step より後の最初の
+#: 根の推定のある main の行の `pol_v0`（同じ手番の数歩先も教師になる）。残りは next_v0 と同じ。
+Z_MODES = ("z", "omni", "mix", "v0mix", "rollout", "next_v0", "next_v0_step")
+NEXT_V0_MODES = ("next_v0", "next_v0_step")
+
+
+def load_root_v0(dirs, z_dirs=()):
+    """行ごとの (根の価値の推定 `pol_v0` float32, 根の探索が在る印 bool)。pack と同じ行順（§7.72）。
+
+    印＝`kind==0`（main）かつ `pol_len>=1` かつ候補の訪問の合計 > 0（`record_gen` は訪問 0 の根に 0 を書く＝
+    推定ではない）。`pol_v0` は手番（行の `who`）視点＝`z` と同じ視点（record_gen が根の手番の Q で書く）。
+    1 本でも `pol_v0` を持たないシャードがあれば ValueError（dump v4 より前の波は混ぜられない）。"""
+    vs, ms = [], []
+    for d in [d for d in list(dirs) + list(z_dirs) if DIO.shard_files(d)]:
+        for f in DIO.shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                if "pol_v0" not in dd.files:
+                    raise ValueError(f"--z-mode v0mix: {f} に pol_v0 が無い（dump v4 より前の波）")
+                nr = int(dd["z"].shape[0])
+                pl = np.asarray(dd["pol_len"][:nr], np.int64)
+                off = np.concatenate([[0], np.cumsum(pl)]).astype(np.int64)
+                csum = np.concatenate([[0.0], np.cumsum(np.asarray(dd["pol_n"], np.float64))])
+                ntot = csum[off[1:]] - csum[off[:-1]]
+                ms.append((np.asarray(dd["kind"][:nr]) == 0) & (pl >= 1) & (ntot > 0))
+                vs.append(np.asarray(dd["pol_v0"][:nr], np.float32))
+    if not vs:
+        raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    return np.concatenate(vs), np.concatenate(ms)
+
+
+def mix_root_v0(z, v0, mask):
+    """`0.5 z + 0.5 v0` を印の立つ行だけに当てる → (教師 float32, 差し替えた行数)。印の無い行は z のまま。"""
+    out = np.asarray(z, np.float32).copy()
+    m = np.asarray(mask, bool)
+    out[m] = 0.5 * out[m] + 0.5 * np.asarray(v0, np.float32)[m]
+    return out, int(m.sum())
+
+
+def _root_mask(dd, nr):
+    """`load_root_v0` と同じ「根の探索が在る印」（main・候補 1 つ以上・訪問の合計 > 0）。"""
+    pl = np.asarray(dd["pol_len"][:nr], np.int64)
+    off = np.concatenate([[0], np.cumsum(pl)]).astype(np.int64)
+    csum = np.concatenate([[0.0], np.cumsum(np.asarray(dd["pol_n"], np.float64))])
+    ntot = csum[off[1:]] - csum[off[:-1]]
+    return (np.asarray(dd["kind"][:nr]) == 0) & (pl >= 1) & (ntot > 0)
+
+
+#: `next_v0` の行の鍵: (局 seed, 席 who, 手番 turn, step) を 1 本の int64 に。turn < 2048・step < 1024
+#: （`driver.DEFAULT_MAX_STEPS`＝1,000）・seed < 2^41 で収まる。
+_NEXT_T, _NEXT_S = 2048, 1024
+
+
+def next_v0_teacher(z, seed, who, step, v0, mask, turn=None, by="turn"):
+    """§7.81（WP `value-next`）: 行ごとの教師を「同じ局・同じ席の、その行より後の最初の印の立つ行」の `v0` にする。
+
+    `by="turn"`（主の腕・`next_v0`）＝その行の `turn` より後の手番の最初の印の立つ行（同じ手番の後の判断点は飛ばす）。
+    `by="step"`（副の腕・`next_v0_step`）＝その行の `step` より後の最初の印の立つ行（同じ手番の数歩先も可）。
+    → (教師 float32, 印 bool＝差し替えた行, 教師の行の index int64＝無い行は −1)。印の無い行は z のまま。
+    印の立つ行（根の推定のある main の行）自身も、**自分の値ではなく後の行の値**を教師にする（§7.72 の `v0mix` と
+    違う点＝時間が進む）。1 局の行の並びは問わない（鍵で引く）。"""
+    seed = np.asarray(seed, np.int64)
+    who = np.asarray(who, np.int64)
+    step = np.asarray(step, np.int64)
+    turn = np.zeros(len(step), np.int64) if turn is None else np.asarray(turn, np.int64)
+    if len(step) and (step.min() < 0 or step.max() >= _NEXT_S or turn.min() < 0 or turn.max() >= _NEXT_T):
+        raise ValueError(f"--z-mode next_v0: step／turn の範囲が鍵に収まらない（step {step.min()}〜{step.max()}・"
+                         f"turn {turn.min()}〜{turn.max()}）")
+    if by not in ("turn", "step"):
+        raise ValueError(f"next_v0_teacher: by は turn か step（{by}）")
+    base = ((seed * 2 + who) * _NEXT_T + turn) * _NEXT_S
+    key = base + step
+    query = key if by == "step" else base + (_NEXT_S - 1)   # turn で引く＝同じ手番の最後より後
+    m = np.asarray(mask, bool)
+    mi = np.flatnonzero(m)
+    order = np.argsort(key[mi], kind="stable")
+    mi, mk = mi[order], key[mi][order]
+    out = np.asarray(z, np.float32).copy()
+    src = np.full(len(out), -1, np.int64)
+    if len(mi):
+        pos = np.searchsorted(mk, query, side="right")       # 最初の「鍵 > 自分の鍵」＝後の印の行
+        ok = pos < len(mi)
+        cand = mi[np.minimum(pos, len(mi) - 1)]
+        ok &= (seed[cand] == seed) & (who[cand] == who)        # 同じ局・同じ席の中に在る
+        src[ok] = cand[ok]
+        out[ok] = np.asarray(v0, np.float32)[cand[ok]]
+    return out, src >= 0, src
+
+
+def load_next_v0(dirs, z_dirs=(), by="turn"):
+    """§7.81: pack と同じ行順で (教師 float32, 差し替えた印 bool, 検算の数) を返す（`--z-mode next_v0`＝`by="turn"`／`next_v0_step`＝`by="step"`）。
+
+    シャードごとに `seed`・`who`・`step`・`kind`・`turn`・`pol_v0`・`pol_len`・`pol_n` を読み、`next_v0_teacher` を当てる
+    （局はシャードをまたがない＝シャードごとで足りる）。検算: 新しい教師と勝敗の相関（同じ席なら正）・差し替えた行数・
+    勝敗のままの行数・教師が同じ手番の行か後の手番の行か・行の種類（main／窓／続き）ごとの差し替えた行数。"""
+    outs, masks = [], []
+    n_same_turn = n_later_turn = 0
+    by_kind = np.zeros(3, np.int64)
+    zz, tt = [], []
+    for d in [d for d in list(dirs) + list(z_dirs) if DIO.shard_files(d)]:
+        for f in DIO.shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                if "pol_v0" not in dd.files:
+                    raise ValueError(f"--z-mode next_v0: {f} に pol_v0 が無い（dump v4 より前の波）")
+                nr = int(dd["z"].shape[0])
+                z = np.asarray(dd["z"][:nr], np.float32)
+                seed, who = np.asarray(dd["seed"][:nr], np.int64), np.asarray(dd["who"][:nr], np.int64)
+                step, kind = np.asarray(dd["step"][:nr], np.int64), np.asarray(dd["kind"][:nr], np.int64)
+                turn = np.asarray(dd["turn"][:nr], np.int64)
+                v0 = np.asarray(dd["pol_v0"][:nr], np.float32)
+                t, m, src = next_v0_teacher(z, seed, who, step, v0, _root_mask(dd, nr), turn=turn, by=by)
+            outs.append(t), masks.append(m)
+            same = turn[src[m]] == turn[m]
+            n_same_turn += int(same.sum()); n_later_turn += int((~same).sum())
+            by_kind += np.bincount(np.clip(kind[m], 0, 2), minlength=3)
+            zz.append(z[m]), tt.append(t[m])
+    if not outs:
+        raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    t, m = np.concatenate(outs), np.concatenate(masks)
+    zz, tt = np.concatenate(zz), np.concatenate(tt)
+    info = {"by": by, "replaced": int(m.sum()), "kept": int((~m).sum()), "rows": int(len(m)),
+            "corr_teacher_z": float(np.corrcoef(zz, tt)[0, 1]) if len(zz) > 1 else float("nan"),
+            "teacher_mean": float(tt.mean()) if len(tt) else 0.0, "teacher_std": float(tt.std()) if len(tt) else 0.0,
+            "same_turn": n_same_turn, "later_turn": n_later_turn,
+            "by_kind": {"main": int(by_kind[0]), "window": int(by_kind[1]), "commit": int(by_kind[2])}}
+    return t, m, info
+
+
+JITTER_WEIGHT_MODES = ("off", "balanced")
+
+
+def jitter_after_mask(seed, who, step, kind, turn, dj):
+    """§7.83（WP `don-weight`）: 1 シャードの「ドンだけが違う行」の印。
+
+    `dj` は record_gen の列 `don_jitter`（行ごとに局の (手番, 席, 符号)・符号 0＝動かしていない局）。動かした局では
+    「その手番の、手番の席の最初の main の行」（ドンを動かした直後の判断点＝`don_jitter_rows.py` と同じ行を main に絞った形）
+    の step を起点に、**その step 以後の行（両席）**に印を立てる。main の行が無い局（手番の前に決着）は印なし。"""
+    seed = np.asarray(seed, np.int64); who = np.asarray(who, np.int64)
+    step = np.asarray(step, np.int64); kind = np.asarray(kind, np.int64); turn = np.asarray(turn, np.int64)
+    dj = np.asarray(dj, np.int64).reshape(len(seed), -1)
+    out = np.zeros(len(seed), bool)
+    for s in np.unique(seed):
+        idx = np.flatnonzero(seed == s)
+        t, seat, sg = (int(x) for x in dj[idx[0], :3])
+        if sg == 0:
+            continue
+        hit = idx[(turn[idx] == t) & (who[idx] == seat) & (kind[idx] == 0)]
+        if not len(hit):
+            continue
+        out[idx[step[idx] >= int(step[hit].min())]] = True
+    return out
+
+
+def load_jitter_mask(dirs, z_dirs=()):
+    """§7.83: pack と同じ行順で「ドンだけが違う行」の印 bool と、シャードごとの数を返す。
+
+    `don_jitter` の列が無いシャード（ふつうの波）は全部 False。局はシャードをまたがない＝シャードごとで足りる。"""
+    ms = []
+    n_shard_dj = 0
+    for d in [d for d in list(dirs) + list(z_dirs) if DIO.shard_files(d)]:
+        for f in DIO.shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                nr = int(dd["z"].shape[0])
+                if "don_jitter" not in dd.files:
+                    ms.append(np.zeros(nr, bool))
+                    continue
+                n_shard_dj += 1
+                ms.append(jitter_after_mask(dd["seed"][:nr], dd["who"][:nr], dd["step"][:nr], dd["kind"][:nr],
+                                            dd["turn"][:nr], dd["don_jitter"][:nr]))
+    if not ms:
+        raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    return np.concatenate(ms), {"shards_with_don_jitter": n_shard_dj}
+
+
+def balanced_weights(mask, train_rows):
+    """§7.83: 価値の損失の行ごとの重み（float32・全行）と検算の数。
+
+    訓練に使う行（`train_rows`）の中で「印の行の重みの合計＝それ以外の行の重みの合計」になるよう、印の行に一律の倍率
+    （＝それ以外の行数 ÷ 印の行数・選ぶ定数なし）を掛ける。そのうえで訓練の行の重みの平均が 1 になるよう全体を一律に
+    縮める（価値の損失の大きさを方策・補助の頭と今までと同じ釣り合いに保つため）。取り置きの行の重みは使わない。"""
+    m = np.asarray(mask, bool)
+    tr = np.zeros(len(m), bool)
+    tr[np.asarray(train_rows, np.int64)] = True
+    n_j = int((m & tr).sum()); n_o = int((~m & tr).sum())
+    if n_j == 0:
+        raise ValueError("--jitter-weight balanced: 訓練の行にドンだけが違う行が 1 行も無い（波 82j を --in に入れたか）")
+    ratio = n_o / n_j
+    norm = (n_j + n_o) / (2.0 * n_o)          # 重みの平均を 1 に（Σw = ratio·n_j + n_o = 2·n_o）
+    w = np.full(len(m), norm, np.float32)
+    w[m] = ratio * norm
+    info = {"rows_jitter_train": n_j, "rows_other_train": n_o, "rows_jitter_all": int(m.sum()),
+            "ratio": ratio, "w_jitter": float(ratio * norm), "w_other": float(norm),
+            "mean_w_train": float(w[tr].mean())}
+    return w, info
 
 
 def load_omni(pats):
@@ -908,16 +1123,74 @@ def train(args):
     if args.zsrc:
         print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
     z_mode = getattr(args, "z_mode", "z") or "z"
-    if z_mode != "z":
+    if z_mode == "v0mix":
+        v0, m0 = load_root_v0(_expand(args.src), _expand(args.zsrc))
+        if len(v0) != len(V["z"]):
+            raise ValueError(f"pol_v0 の行数 {len(v0)} が value 行 {len(V['z'])} と合わない")
+        zf = np.asarray(V["z"], np.float32)
+        if m0.any():   # 視点の検算（§7.72）: 根の推定と勝敗は同じ視点なら正に相関する
+            r = float(np.corrcoef(zf[m0], v0[m0])[0, 1])
+            print(f"z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f}（行 {int(m0.sum())}）", flush=True)
+            if not r > 0.2:
+                raise ValueError(f"--z-mode v0mix: 根の推定と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
+        V["z"], n_rep = mix_root_v0(V["z"], v0, m0)
+        print(f"z-mode v0mix: 根の推定で混ぜた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    elif z_mode in NEXT_V0_MODES:
+        t_next, m_next, info = load_next_v0(_expand(args.src), _expand(args.zsrc),
+                                            by="turn" if z_mode == "next_v0" else "step")
+        if len(t_next) != len(V["z"]):
+            raise ValueError(f"{z_mode} の行数 {len(t_next)} が value 行 {len(V['z'])} と合わない")
+        print(f"z-mode {z_mode}: " + json.dumps(info, ensure_ascii=False), flush=True)
+        # 視点の検算（§7.81）: 次の自分の判断点の根の値と勝敗は同じ席なら正に相関する（予告: 0.5 以上）
+        if not info["replaced"]:
+            raise ValueError("--z-mode next_v0: 差し替えられる行が 1 行も無い")
+        if not info["corr_teacher_z"] > 0.2:
+            raise ValueError(f"--z-mode next_v0: 教師と勝敗の相関 {info['corr_teacher_z']:+.3f} が低すぎる（視点の取り違え？）")
+        V["z"], n_rep = t_next, info["replaced"]
+        print(f"z-mode {z_mode}: 次の自分の{'手番の頭' if z_mode == 'next_v0' else '判断点'}の根の値で差し替えた行 {n_rep}/{len(V['z'])}"
+              f"（残り {info['kept']} は z のまま・相関 {info['corr_teacher_z']:+.3f}・"
+              f"同じ手番 {info['same_turn']}・後の手番 {info['later_turn']}）", flush=True)
+    elif z_mode == "rollout":
+        from opcg_sim.learned.train import rollout_labels as RL
+        rm, rk = RL.load_rollout(_expand(args.src), _expand(args.zsrc), len(V["z"]))
+        if rk.any():   # 視点の検算: 打ち続けの平均と勝敗は同じ視点なら正に相関する（§7.79 で 0.65）
+            r = float(np.corrcoef(np.asarray(V["z"], np.float32)[rk], rm[rk])[0, 1])
+            print(f"z-mode rollout: 平均と勝敗の相関 {r:+.3f}（行 {int(rk.sum())}）", flush=True)
+            if not r > 0.2:
+                raise ValueError(f"--z-mode rollout: 平均と勝敗の相関 {r:+.3f} が低すぎる（視点の取り違え？）")
+        else:
+            raise ValueError("--z-mode rollout: sidecar（*.roll.npz）が 1 行も無い")
+        V["z"], n_rep = RL.apply_teacher(V["z"], rm, rk)
+        print(f"z-mode rollout: 打ち続けの平均で差し替えた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    elif z_mode != "z":
         steps = DIO.load_row_col(_expand(args.src), "step", _expand(args.zsrc))
         omni_key, v_omni = load_omni(getattr(args, "omni_in", None) or [])
         V["z"], n_rep = value_teacher(V["z"], V["seed"], steps, omni_key, v_omni, z_mode)
         print(f"z-mode {z_mode}: v_omni で差し替えた行 {n_rep}/{len(V['z'])}（残りは z のまま）", flush=True)
+    # 理論の列（§7.82・WP `theory-input`）: 記録の隣の sidecar（*.theory.npz・全行）を読み、V["sc"] の後ろに足した束に
+    # 差し替える（切＝既定なら何も読まない＝今までと 1 ビットも同じ）。sidecar の無いシャードがあれば止める。
+    if getattr(args, "theory_in", False):
+        from opcg_sim.learned.train import theory_labels as TL
+        th = TL.load_theory(_expand(args.src), _expand(args.zsrc), len(V["z"]), cache_dir=args.cache_dir or DIO.default_cache_dir())
+        TL.attach(V, th)
+        print(f"theory-in: 理論の列 {TL.D_TH} を入力の束に足した（行 {len(th)}・sc {V['sc'].shape[1]} 列）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
     va_v = V["seed"] % args.holdout_mod == 0
     va_p = P["seed"] % args.holdout_mod == 0
     print(f"value {len(V['z'])}行（val {int(va_v.sum())}） policy {len(P['len'])}点（val {int(va_p.sum())}）"
           f" {time.time()-t0:.0f}s", flush=True)
+    # ドンだけが違う行の重み（§7.83・WP `don-weight`）。切（既定）なら何も読まない＝今までと 1 bit も同じ。
+    jw = getattr(args, "jitter_weight", "off") or "off"
+    v_w = None
+    if jw != "off":
+        if args.backend != "torch":
+            raise SystemExit("--jitter-weight は torch backend 専用（WP don-weight）")
+        jm, jinfo = load_jitter_mask(_expand(args.src), _expand(args.zsrc))
+        if len(jm) != len(V["z"]):
+            raise ValueError(f"--jitter-weight の行数 {len(jm)} が value 行 {len(V['z'])} と合わない")
+        v_w, winfo = balanced_weights(jm, np.flatnonzero(~va_v))
+        print("JITTER_WEIGHT " + json.dumps({"mode": jw, **jinfo, **winfo,
+                                              "rows_jitter_holdout": int((jm & va_v).sum())}, ensure_ascii=False), flush=True)
     if args.warm_start:
         net = NRelNet.load(args.warm_start, tables=tables)
         print(f"warm-start: {args.warm_start}（hidden={net.W1.shape[1]}）", flush=True)
@@ -929,6 +1202,21 @@ def train(args):
         if bad:
             raise ValueError(f"--ablate に未知の種類: {sorted(bad)}（{NL.ABLATE_KINDS}）")
         print(f"ablate: {sorted(net.ablate)}", flush=True)
+    # 価値の出口の形の切替（§7.78・WP `value-skip`）: 入力の束からのまっすぐな道を足す。warm-start の
+    # npz に道が無ければ重み 0 で始める＝立てた直後の関数は元と同じ。切（既定）なら何も変えない。
+    if getattr(args, "value_skip", False) and not net.value_skip:
+        net.value_skip = True
+        net.Wvz = np.zeros((NL.D_Z, 1), np.float32)
+    if net.value_skip:
+        print(f"value-skip: on（入力の束 {NL.D_Z} → 価値の出口・|Wvz| {float(np.abs(net.Wvz).sum()):.4g}）", flush=True)
+    # 理論の列（§7.82）: warm-start の npz に無ければ重み 0 で始める。切替なしで理論入りの npz を温めるのは誤り。
+    if getattr(args, "theory_in", False) and not getattr(net, "theory_in", False):
+        net.theory_in = True
+        net.W1t = np.zeros((NL.D_TH, net.W1.shape[1]), np.float32)
+    if getattr(net, "theory_in", False):
+        if not getattr(args, "theory_in", False):
+            raise ValueError("warm-start のネットは理論の列を読む（theory_in）＝--theory-in を付けて sidecar を揃える")
+        print(f"theory-in: on（理論の列 {NL.D_TH} → 1 段目・|W1t| {float(np.abs(net.W1t).sum()):.4g}）", flush=True)
     # 補助教師（§20.8.2）: **λ_aux>0 かつ dump に aux 列がある**ときだけ立てる。どちらかが
     # 欠ければ `net.aux=False`＝補助ヘッドは初期化されたまま触られず、npz にも出ない＝
     # **今までの学習と 1 ビットも変わらない**（v3 の波に --aux-weight を付けても同じ）。
@@ -957,6 +1245,41 @@ def train(args):
         n_ok = int(np.asarray(V["time_mask"][:], np.int32).sum()) if time_on else 0
         print(f"time: {'on' if time_on else 'off（dump に time 列＝sidecar が無い）'}"
               f" λ={time_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
+    # WP `value-teach`（§7.71）の案 A（資源の先読みの頭）と案 B（対照の対）。どちらも既定は切＝
+    # ここで何も読まず、backend にも何も足さない＝今までの学習と 1 ビットも変わらない。torch 専用。
+    res_w = float(getattr(args, "res_weight", 0.0) or 0.0)
+    res_on = False
+    pair_paths = list(getattr(args, "pair_in", None) or [])
+    if (res_w > 0.0 or pair_paths) and args.backend != "torch":
+        raise SystemExit("--res-weight／--pair-in は torch backend 専用（WP value-teach）")
+    if res_w > 0.0:
+        from opcg_sim.learned.train import value_teach as VT
+        V["res"], V["res_mask"] = VT.load_res(_expand(args.src), _expand(args.zsrc), len(V["z"]))
+        res_on = V["res"] is not None
+        n_ok = int(V["res_mask"].sum()) if res_on else 0
+        print(f"res: {'on' if res_on else 'off（sidecar が無い）'} λ={res_w} 有効行 {n_ok}/{len(V['z'])}",
+              flush=True)
+        if not res_on:
+            res_w = 0.0
+    PR = None
+    if pair_paths:
+        from opcg_sim.learned.train import value_teach as VT
+        PR = VT.load_pairs(pair_paths)
+        PR["tr"] = np.where(~PR["hold"])[0]
+        PR["va"] = np.where(PR["hold"])[0]
+        print(f"pair: {len(PR['t_a'])} 対（holdout {len(PR['va'])}）λ={args.pair_lambda} 価値の重み {args.pair_value_weight}"
+              f" {args.pair_every} 回ごとに {args.pair_bs} 組", flush=True)
+    # 対の差の損失（§7.88・WP `pair-diff-loss`）。既定（--pair-diff 無し）は何も読まず、価値の更新に何も足さない。
+    PD_ = None
+    pd_paths = list(getattr(args, "pair_diff", None) or [])
+    if pd_paths:
+        if args.backend != "torch":
+            raise SystemExit("--pair-diff は torch backend 専用（WP pair-diff-loss）")
+        from opcg_sim.learned.train import pair_diff as PDM
+        shapes = [x for x in (getattr(args, "pair_diff_shapes", "") or "").split(",") if x]
+        PD_ = PDM.load_pairs(pd_paths, args.holdout_mod, shapes or None)
+        print(f"pair-diff: 対 {len(PD_['d'])}（訓練 {len(PD_['tr'])}・取り置き {len(PD_['va'])}）"
+              f" 形 {sorted(set(PD_['shape'].tolist()))} 訓練に使う形 {shapes or 'all'}", flush=True)
     # V と方策の更新回数の比（§20.11 の候補 A）。1.0＝今までと同じ。
     pi_mult = float(getattr(args, "pi_steps_mult", 1.0) or 1.0)
     if pi_mult != 1.0:
@@ -965,7 +1288,7 @@ def train(args):
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
                                                aux_weight=aux_w, plan_weight=plan_w,
-                                               time_weight=time_w)
+                                               time_weight=time_w, res_weight=res_w)
     if getattr(args, "fast", False):
         args.fast_pairs = args.fast_max = args.fast_index = True
     if getattr(args, "fast_pairs", False) and hasattr(backend, "tn"):
@@ -999,6 +1322,16 @@ def train(args):
                                              tn=getattr(backend, "tn", None),
                                              cache_dir=args.cache_dir)
     rng = np.random.default_rng(args.seed)
+    pair_rng = np.random.default_rng(args.seed + 101) if PR is not None else None   # 主の並びと別の列
+    pd_rng = None
+    if PD_ is not None:
+        if "rel" not in net.ablate:
+            raise SystemExit("--pair-diff は --ablate rel 前提（対の盤面に関係 R を渡さない）")
+        f_bal, PD_["count_factor"], pd_info = _pair_diff_factor(backend, src, V, va_v, PD_, args)
+        PD_["factor"] = f_bal if args.pair_diff_weight == "balanced" else PD_["count_factor"]
+        pd_info["factor_used"] = round(PD_["factor"], 3)
+        print("PAIR_DIFF " + json.dumps(pd_info, ensure_ascii=False), flush=True)
+        pd_rng = np.random.default_rng(args.seed + 303)          # 主の並びと別の列
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
     for ep in range(args.epochs):
@@ -1008,6 +1341,9 @@ def train(args):
         npi, ord_p = _policy_order(tr_p, args.bs_p, pi_mult, rng)
         if src is not None:
             src.begin(tr_v[:nv * args.bs_v], args.bs_v, ord_p, args.bs_p)
+        pd_sched = PDM.schedule(PD_["tr"], nv, pd_rng) if PD_ is not None else None
+        if PD_ is not None:
+            backend.pd_loss = (0.0, 0)
         mse = ce = 0.0
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
@@ -1032,7 +1368,18 @@ def train(args):
                         kw["plan"] = b[9]
                     if len(b) >= 12:
                         kw.update(tm=b[10], tm_mask=b[11])
+                    if v_w is not None:
+                        kw["vw"] = v_w[tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]]
+                    if pd_sched is not None and len(pd_sched[iv]):
+                        j_ = pd_sched[iv]
+                        kw["pd"] = (*PDM.take(PD_, j_), PD_["d"][j_].astype(np.float32), PD_["factor"])
+                    if res_on:
+                        bi_ = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
+                        kw.update(res=np.asarray(V["res"][bi_], np.float32),
+                                  res_mask=np.asarray(V["res_mask"][bi_], np.float32))
                     mse += backend.value_step(*b[:6], args.lr, **kw)
+                    if PR is not None and iv % args.pair_every == 0:
+                        _pair_step(backend, PR, pair_rng, args)
                 else:
                     sp("slice_v")
                     bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
@@ -1120,6 +1467,21 @@ def train(args):
             row.update({"time_weight": time_w, "val_time_huber": vu, "val_time_rows": nu,
                         "train_time": list(getattr(backend, "time_loss", (0.0, 0)))})
             print(f"  time val huber {vu:.4f}（{nu} 行）", flush=True)
+        if res_on:
+            vr, nr = _eval_res(backend, V, vi)
+            row.update({"res_weight": res_w, "val_res_huber": vr, "val_res_rows": nr,
+                        "train_res": list(backend.res_loss)})
+            print(f"  res val huber {vr:.4f}（{nr} 行）", flush=True)
+        if PD_ is not None:
+            pe = _eval_pair_diff(backend, PD_)
+            s_, n_ = getattr(backend, "pd_loss", (0.0, 0))
+            row.update({"pair_diff": pe, "train_pair_diff_mse": s_ / max(n_, 1), "train_pairs_seen": n_,
+                        "pair_diff_factor": PD_["factor"]})
+            print("  pair-diff " + json.dumps(pe, ensure_ascii=False), flush=True)
+        if PR is not None:
+            pe = _eval_pairs(backend, PR)
+            row.update({"pair": pe, "train_pair": list(backend.pair_loss)})
+            print(f"  pair {json.dumps(pe)}", flush=True)
         if plan_on:
             vq, nq = eval_plan(net, rt, V, vi)
             row.update({"plan_weight": plan_w, "val_plan_mse": vq, "val_plan_rows": nq,
@@ -1141,8 +1503,115 @@ def train(args):
             setattr(net, p, w)
         print(f"best ep{best_ep} val v_mse {best[0]:.4f} を保存", flush=True)
     _save(net, args, vocab, V, P, best_ep)
+    if res_on:
+        # 案 A の頭は本体の npz に焼かない（serve も Rust も知らない）＝別ファイルに置く
+        np.savez(args.out[:-4] + ".res_head.npz" if args.out.endswith(".npz") else args.out + ".res_head.npz",
+                 **backend.res_params())
     print("N_REL_TRAIN_DONE " + json.dumps({"out": args.out}))
     return 0
+
+
+def _pair_diff_factor(backend, src, V, va_v, PD_, args, n_sample=200000):
+    """§7.88 の倍率（`pair_diff.balanced_factor`）: 始める前のネットで、訓練の価値の行（決まった乱数で最大 20 万行）の
+    二乗誤差の平均と、訓練の対の差の二乗誤差の平均を測る。"""
+    import torch
+    from opcg_sim.learned.train import pair_diff as PDM
+    tr = np.flatnonzero(~va_v)
+    n_rows = (len(tr) // args.bs_v) * args.bs_v
+    smp = np.sort(np.random.default_rng(args.seed + 404).choice(tr, size=min(n_sample, len(tr)), replace=False))
+    vv = src.eval_value(backend.tn, smp)
+    l_v = float(np.mean((vv - np.asarray(V["z"][smp], np.float32)) ** 2))
+
+    def vf(sc, ci, tok):
+        with torch.no_grad():
+            return backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok), None, None).numpy()
+    dv = PDM.predict_diff(vf, PD_, PD_["tr"])
+    l_d = float(np.mean((dv - PD_["d"][PD_["tr"]]) ** 2))
+    f, fc = PDM.balanced_factor(n_rows, len(PD_["tr"]), l_v, l_d)
+    return f, fc, {"mode": args.pair_diff_weight, "value_rows_per_epoch": int(n_rows), "pairs_train": int(len(PD_["tr"])),
+                   "loss_value_start": round(l_v, 5), "loss_pair_start": round(l_d, 5), "factor": round(f, 3),
+                   "count_factor": round(fc, 3), "value_rows_sampled": int(len(smp))}
+
+
+def _eval_pair_diff(backend, PD_):
+    """対の差の当てはまり（形ごと・訓練の対／取り置きの対）。"""
+    import torch
+    from opcg_sim.learned.train import pair_diff as PDM
+
+    def vf(sc, ci, tok):
+        with torch.no_grad():
+            return backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok), None, None).numpy()
+    out = {}
+    for nm in ("tr", "va", "ev"):
+        ix = PD_[nm]
+        if not len(ix):
+            continue
+        dv = PDM.predict_diff(vf, PD_, ix)
+        for sh in sorted(set(PD_["shape"][ix].tolist())):
+            m = PD_["shape"][ix] == sh
+            out[f"{nm}_{sh}"] = PDM.fit_stats(dv[m], PD_["d"][ix][m])
+    return out
+
+
+def _pair_take(PR, ix):
+    """対の行を [a の行, b の行] に並べる（`pair_step`・`_eval_pairs` の入力）。"""
+    sc = np.concatenate([PR["sc_a"][ix], PR["sc_b"][ix]]).astype(np.float32)
+    ci = np.concatenate([PR["ci_a"][ix], PR["ci_b"][ix]]).astype(np.int64)
+    tok = np.concatenate([PR["tok_a"][ix], PR["tok_b"][ix]]).astype(np.float32)
+    return sc, ci, tok
+
+
+def _pair_step(backend, PR, rng, args):
+    """案 B の 1 回（WP `value-teach`）。対は訓練側（holdout 以外）から `pair_bs` 組を引く。"""
+    ix = rng.choice(PR["tr"], size=min(args.pair_bs, len(PR["tr"])), replace=False)
+    sc, ci, tok = _pair_take(PR, ix)
+    backend.pair_step(sc, ci, tok, PR["t_a"][ix].astype(np.float32), PR["t_b"][ix].astype(np.float32),
+                      args.lr, value_weight=args.pair_value_weight, lam=args.pair_lambda)
+
+
+def _eval_pairs(backend, PR, bs=256):
+    """対の当てはまり（訓練側・holdout 別）: 価値の mse・対の差の mse・差の相関・差の比（回帰の傾き）。"""
+    import torch
+    out = {}
+    for nm in ("tr", "va"):
+        ix = PR[nm]
+        if not len(ix):
+            continue
+        va_, vb_ = [], []
+        with torch.no_grad():
+            for s in range(0, len(ix), bs):
+                j = ix[s:s + bs]
+                sc, ci, tok = _pair_take(PR, j)
+                v = backend.tn.value(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok),
+                                     None, None).numpy()
+                va_.append(v[:len(j)]); vb_.append(v[len(j):])
+        va_, vb_ = np.concatenate(va_), np.concatenate(vb_)
+        ta, tb = PR["t_a"][ix].astype(np.float64), PR["t_b"][ix].astype(np.float64)
+        dv, dt = vb_ - va_, tb - ta
+        out[nm] = {"n": int(len(ix)),
+                   "v_mse": round(float(np.mean(np.concatenate([(va_ - ta) ** 2, (vb_ - tb) ** 2]))), 4),
+                   "d_mse": round(float(np.mean((dv - dt) ** 2)), 4),
+                   "d_corr": round(float(np.corrcoef(dv, dt)[0, 1]), 4) if np.std(dt) > 0 and np.std(dv) > 0 else None,
+                   "d_slope": round(float(np.dot(dv, dt) / max(np.dot(dt, dt), 1e-9)), 4),
+                   "dv_mean": round(float(dv.mean()), 4), "dt_mean": round(float(dt.mean()), 4)}
+    return out
+
+
+def _eval_res(backend, V, vi, bs=512):
+    """案 A の holdout の損失（有効行の平均 Huber）。"""
+    import torch
+    from opcg_sim.learned.train import value_teach as VT
+    tot = 0.0; n_tot = 0
+    with torch.no_grad():
+        for s in range(0, len(vi), bs):
+            bi = vi[s:s + bs]
+            sc, ci, tok = DIO.rows_f32(V, bi)
+            _v, _a, _t, _q, _u, e = backend.tn.value_heads(torch.from_numpy(sc), torch.from_numpy(ci),
+                                                           torch.from_numpy(tok), None, None, want_e=True)
+            m = torch.from_numpy(np.asarray(V["res_mask"][bi], np.float32))
+            l, n = VT.res_loss_terms(backend.tn.res_head(e), torch.from_numpy(np.asarray(V["res"][bi], np.float32)), m)
+            tot += float(l) * n; n_tot += n
+    return (tot / n_tot if n_tot else float("nan")), n_tot
 
 
 def _save(net, args, vocab, V, P, best_ep, out=None):
@@ -1161,9 +1630,26 @@ def _save(net, args, vocab, V, P, best_ep, out=None):
                                 {"pi_teacher": args.pi_teacher, "pi_n_min": args.pi_n_min,
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
+                             **({"value_skip": True} if getattr(net, "value_skip", False) else {}),
+                             **({"theory_in": True} if getattr(net, "theory_in", False) else {}),
+                             # 価値の教師の作り方（§7.80）。既定 z のときは焼かない＝今までの npz と同じ。
+                             **({} if (getattr(args, "z_mode", "z") or "z") == "z" else {"z_mode": args.z_mode}),
+                             # ドンだけが違う行の重み（§7.83）。既定 off のときは焼かない＝今までの npz と同じ。
+                             **({} if (getattr(args, "jitter_weight", "off") or "off") == "off"
+                                else {"jitter_weight": args.jitter_weight}),
+                             # 対の差の損失（§7.88）。既定（無し）のときは焼かない＝今までの npz と同じ。
+                             **({"pair_diff": list(args.pair_diff), "pair_diff_weight": args.pair_diff_weight,
+                                 "pair_diff_shapes": args.pair_diff_shapes or "all"}
+                                if getattr(args, "pair_diff", None) else {}),
                              **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
                              **({"time_weight": float(args.time_weight)}
                                 if getattr(net, "time", False) else {}),
+                             **({"res_weight": float(args.res_weight)}
+                                if float(getattr(args, "res_weight", 0.0) or 0.0) > 0.0 else {}),
+                             **({"pair_in": list(args.pair_in), "pair_lambda": float(args.pair_lambda),
+                                 "pair_value_weight": float(args.pair_value_weight),
+                                 "pair_every": int(args.pair_every), "pair_bs": int(args.pair_bs)}
+                                if getattr(args, "pair_in", None) else {}),
                              **({} if float(getattr(args, "pi_steps_mult", 1.0) or 1.0) == 1.0 else
                                 {"pi_steps_mult": float(args.pi_steps_mult)})})
 
@@ -1179,7 +1665,11 @@ def main(argv=None):
                          "学ぶ側のネットが打った席の行だけ（learner 列の無い波は全部）。価値の教師はどちらでも全部の行")
     tr.add_argument("--z-mode", choices=Z_MODES, default="z",
                     help="価値の教師（§7.16・WP omni-value）: z＝勝敗（**既定・今までと 1 bit も変わらない**）／"
-                         "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま")
+                         "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま／"
+                         "v0mix＝0.5 z + 0.5 pol_v0（記録の生成役の根の推定・§7.72・根の探索が無い行は z のまま）／"
+                         "rollout＝打ち続けの平均（§7.80・記録の隣の *.roll.npz に行がある行だけ・残りは z のまま）／"
+                         "next_v0＝同じ局・同じ席の次の自分の手番の頭（turn より後の最初の根の推定のある main の行）の pol_v0"
+                         "（§7.81 主の腕・無い行は z のまま）／next_v0_step＝step より後の最初の根の推定のある main の行（副の腕）")
     tr.add_argument("--omni-in", nargs="*", default=[],
                     help="--z-mode omni|mix の v_omni（omni_value_relabel.py の omni_*.npz・glob 可）")
     tr.add_argument("--epochs", type=int, default=2)
@@ -1244,6 +1734,36 @@ def main(argv=None):
                          "仕方だけが違う＝丸めの範囲の一致・既定は切・docs/reports/2026-10-17_train_speed.md）")
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
+    tr.add_argument("--res-weight", type=float, default=0.0,
+                    help="WP value-teach の案 A: 資源の先読みの頭（sidecar *.res.npz・value_teach.RES_COLS）の重み。"
+                         "**0 で完全に無効＝今までと 1 bit も同じ**。torch 専用")
+    tr.add_argument("--pair-in", nargs="*", default=[],
+                    help="WP value-teach の案 B: 対照の対の npz（tests/scripts/value_teach.py pairs）。無ければ切。torch 専用")
+    tr.add_argument("--pair-lambda", type=float, default=0.5, help="案 B: 対の差の損失の重み")
+    tr.add_argument("--pair-value-weight", type=float, default=1.0, help="案 B: 対の盤面の価値の損失の重み")
+    tr.add_argument("--pair-every", type=int, default=16, help="案 B: 価値の更新この回数ごとに 1 回")
+    tr.add_argument("--pair-bs", type=int, default=32, help="案 B: 1 回に引く対の組数")
+    tr.add_argument("--value-skip", action="store_true",
+                    help="§7.78（WP value-skip）: 価値の出口に入力の束（415 次元）からのまっすぐな道を足す"
+                         "（新しい重みは 0 で始める＝warm-start の直後は同じ関数・npz の鍵 skip_Wvz）。"
+                         "**既定は切＝今までと 1 bit も同じ**。Rust の forward はこの道を読まない（診断用）")
+    tr.add_argument("--theory-in", action="store_true",
+                    help="§7.82（WP theory-input）: 見える情報だけの理論の列（記録の隣の *.theory.npz・27 列）を入力の束の後ろに"
+                         "足して 1 段目へ入れる（新しい重み W1t は 0 で始める＝warm-start の直後は同じ関数・npz の鍵 thin_W1t）。"
+                         "**既定は切＝今までと 1 bit も同じ**。sidecar の無いシャードがあれば止める。Rust の forward は読まない（診断用）")
+    tr.add_argument("--jitter-weight", choices=JITTER_WEIGHT_MODES, default="off",
+                    help="§7.83（WP don-weight）: balanced＝波 82j のドンを動かした局の、動かした手番の頭以後の行（両席・dump の"
+                         " don_jitter）の価値の損失に一律の倍率を掛け、その行の重みの合計＝それ以外の行の重みの合計にする（倍率は行数の比・"
+                         "重みの平均は 1 に揃える・方策と補助の頭は不変・torch 専用）。**既定は off＝今までと 1 bit も同じ**")
+    tr.add_argument("--pair-diff", nargs="*", default=[],
+                    help="§7.88（WP pair-diff-loss）: 同じ盤面のドン ±1 の対の npz（tests/scripts/pair_diff.py merge）。価値の損失に"
+                         "（対の予測の差 − 教師の差）² を足す（対は 1 周に 1 回ずつ・倍率は --pair-diff-weight）。"
+                         "**無ければ切＝今までと 1 bit も同じ**。torch・--ablate rel 専用")
+    tr.add_argument("--pair-diff-weight", choices=("balanced", "count"), default="balanced",
+                    help="§7.88: balanced＝1 周で対の損失の合計＝それ以外の価値の損失の合計になる一律の倍率（始める前の損失から）・"
+                         "count＝行数の比だけ（訓練の価値の行数 ÷ 訓練の対の数・損失の大きさを見ない）")
+    tr.add_argument("--pair-diff-shapes", default="",
+                    help="§7.88: 訓練に使う対の形（カンマ区切り・例 head）。空＝全部。取り置きの対は全部の形で測る")
     tr.add_argument("--out", required=True)
     tr.add_argument("--save-each-epoch", action="store_true",
                     help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")

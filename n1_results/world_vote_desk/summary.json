@@ -1,0 +1,201 @@
+{
+ "points": 470,
+ "reproduce": 470,
+ "disagree": 171,
+ "disagree_rate": 0.3638,
+ "disagree_by_gap": {
+  "0.0": 171,
+  "0.01": 94,
+  "0.03": 32,
+  "0.05": 15,
+  "0.1": 6,
+  "0.2": 0
+ },
+ "forms": {
+  "now": {
+   "label": "今（4 本の合算）",
+   "changed": 0,
+   "unjudged": 0,
+   "changed_diff": {
+    "n": 0,
+    "mean": null,
+    "ci": null
+   },
+   "all_points_diff": {
+    "n": 470,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "sum_gain": 0,
+   "big_gain(>=0.2)": [],
+   "big_loss(<=-0.2)": [],
+   "skew": {
+    "4461051・163": {
+     "changed": false,
+     "diff": 0.0,
+     "move": "{\"action_type\": \"DON_BOX\", \"don_k\": 6, \"card\": \"OP15-041\"}"
+    },
+    "4461063・108": {
+     "changed": false,
+     "diff": 0.0,
+     "move": "{\"action_type\": \"TURN_END\"}"
+    }
+   }
+  },
+  "mean4": {
+   "label": "丸ごと平均（4 本）",
+   "changed": 171,
+   "unjudged": 0,
+   "changed_diff": {
+    "n": 171,
+    "mean": -0.0013,
+    "ci": [
+     -0.0109,
+     0.0084
+    ]
+   },
+   "all_points_diff": {
+    "n": 470,
+    "mean": -0.0005,
+    "ci": [
+     -0.004,
+     0.003
+    ]
+   },
+   "sum_gain": -0.219,
+   "big_gain(>=0.2)": [
+    [
+     4461070,
+     77,
+     0.25
+    ]
+   ],
+   "big_loss(<=-0.2)": [
+    [
+     4461065,
+     95,
+     -0.2812
+    ]
+   ],
+   "skew": {
+    "4461051・163": {
+     "changed": true,
+     "diff": 0.1562,
+     "move": "{\"action_type\": \"PLAY\", \"card\": \"OP15-053\"}"
+    },
+    "4461063・108": {
+     "changed": true,
+     "diff": 0.0312,
+     "move": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP01-016\"}"
+    }
+   }
+  },
+  "sum8": {
+   "label": "食い違う点だけ 8 本の合算",
+   "changed": 20,
+   "unjudged": 0,
+   "changed_diff": {
+    "n": 20,
+    "mean": 0.0359,
+    "ci": [
+     -0.0329,
+     0.1048
+    ]
+   },
+   "all_points_diff": {
+    "n": 470,
+    "mean": 0.0015,
+    "ci": [
+     -0.0014,
+     0.0045
+    ]
+   },
+   "sum_gain": 0.719,
+   "big_gain(>=0.2)": [
+    [
+     4461051,
+     163,
+     0.625
+    ]
+   ],
+   "big_loss(<=-0.2)": [],
+   "skew": {
+    "4461051・163": {
+     "changed": true,
+     "diff": 0.625,
+     "move": "{\"action_type\": \"PLAY\", \"card\": \"OP15-047\"}"
+    },
+    "4461063・108": {
+     "changed": false,
+     "diff": 0.0,
+     "move": "{\"action_type\": \"TURN_END\"}"
+    }
+   }
+  },
+  "mean8": {
+   "label": "食い違う点だけ 8 本の平均",
+   "changed": 144,
+   "unjudged": 0,
+   "changed_diff": {
+    "n": 144,
+    "mean": -0.0011,
+    "ci": [
+     -0.0122,
+     0.0101
+    ]
+   },
+   "all_points_diff": {
+    "n": 470,
+    "mean": -0.0003,
+    "ci": [
+     -0.0037,
+     0.0031
+    ]
+   },
+   "sum_gain": -0.156,
+   "big_gain(>=0.2)": [
+    [
+     4461070,
+     77,
+     0.25
+    ]
+   ],
+   "big_loss(<=-0.2)": [
+    [
+     4461065,
+     95,
+     -0.2812
+    ],
+    [
+     4461070,
+     31,
+     -0.2188
+    ]
+   ],
+   "skew": {
+    "4461051・163": {
+     "changed": true,
+     "diff": 0.1562,
+     "move": "{\"action_type\": \"PLAY\", \"card\": \"OP15-053\"}"
+    },
+    "4461063・108": {
+     "changed": true,
+     "diff": 0.0312,
+     "move": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP01-016\"}"
+    }
+   }
+  }
+ },
+ "cost": {
+  "cpu4_total": 678.6,
+  "cpu4_mean": 1.444,
+  "disagree_cpu4_total": 232.1,
+  "disagree_cpu8_total": 460.3,
+  "inc_reread8_over_tree": 0.6783,
+  "inc_add4_over_tree": 0.3362,
+  "inc_add4_worlds_count_over_tree": 0.3638
+ }
+}

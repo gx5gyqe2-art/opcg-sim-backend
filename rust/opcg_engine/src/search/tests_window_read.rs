@@ -82,7 +82,7 @@ fn dialog_window_continuation_is_carried_only_by_the_legacy_flag() {
     assert!(!legacy["commit"].as_array().unwrap().is_empty(), "旧い形は応手の続きを積む: {legacy}");
 }
 
-fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize) -> Value {
+pub(super) fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize) -> Value {
     json!({
         "name": name,
         "leader": card_json(VLDR, &format!("{name}-leader"), name, false),
@@ -191,7 +191,7 @@ fn tree_values_are_terminal_when_the_battle_ends_the_game() {
     let mut s = Session::new(state);
     let legal = c.legal_actions(&mut s).expect("合法手");
     let mut st = SearchState { budget: BoxBudget::new(None) };
-    let vals = tree_branch_values(&c, &mut s, &mut st, Seat::P1, &legal, Window::Battle, 4, C_PUCT, 1)
+    let vals = tree_branch_values(&c, &mut s, &mut st, Seat::P1, &legal, Window::Battle, QUIESCE_MAX_PLIES, 4, C_PUCT, 1)
         .expect("木");
     let pass = legal.iter().position(|m| m.action_type() == Some("PASS")).expect("素通しがある");
     assert_eq!(vals[pass], Some(-1.0), "ライフ 0 で素通しは負け: {vals:?}");

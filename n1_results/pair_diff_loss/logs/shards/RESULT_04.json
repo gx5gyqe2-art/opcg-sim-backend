@@ -1,0 +1,2 @@
+{"wp": "pair-diff-loss", "shard": "4/16", "rows": 3943, "fail": 100, "sec": 10231,
+ "files": ["n1_results/pair_diff_loss/pairs_s04.jsonl.gz", "n1_results/pair_diff_loss/logs/pd_s04.log"]}

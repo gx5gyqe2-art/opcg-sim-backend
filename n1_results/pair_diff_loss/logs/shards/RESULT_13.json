@@ -1,0 +1,1 @@
+{"wp": "pair-diff-loss", "shard": "13/16", "rows": 4059, "fail": 90, "sec": 11500, "note": "worker restarts twice; resumed from jsonl; sec is approximate sum of runs", "files": ["n1_results/pair_diff_loss/pairs_s13.jsonl.gz", "n1_results/pair_diff_loss/logs/pd_s13.log"]}

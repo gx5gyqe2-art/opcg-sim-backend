@@ -1,0 +1,297 @@
+{
+ "games": 52,
+ "void_games": 0,
+ "resp": {
+  "points_seen": 3182,
+  "points": 1156,
+  "turns": 145,
+  "by_action": {
+   "SELECT_COUNTER": 591,
+   "SEARCH_AND_SELECT": 198,
+   "CONFIRM_OPTIONAL": 184,
+   "SELECT_BLOCKER": 131,
+   "SELECT_RESOURCE": 32,
+   "CONFIRM_TRIGGER": 15,
+   "ARRANGE_DECK": 5
+  },
+  "threat": {
+   "k": 90,
+   "n": 1156,
+   "rate": 0.0779
+  },
+  "threat_otsu": {
+   "k": 67,
+   "n": 1156,
+   "rate": 0.058
+  },
+  "unknown_cpu": {
+   "k": 318,
+   "n": 1156,
+   "rate": 0.2751
+  },
+  "unknown_any": {
+   "k": 333,
+   "n": 1156,
+   "rate": 0.2881
+  },
+  "unknown_otsu_among_threat": {
+   "k": 21,
+   "n": 90,
+   "rate": 0.2333
+  },
+  "miss_per_point": {
+   "ko": {
+    "k": 7,
+    "n": 1156,
+    "rate": 0.0061
+   },
+   "otsu": {
+    "k": 4,
+    "n": 1156,
+    "rate": 0.0035
+   }
+  },
+  "miss_given_threat": {
+   "ko": {
+    "k": 7,
+    "n": 90,
+    "rate": 0.0778
+   },
+   "otsu": {
+    "k": 4,
+    "n": 67,
+    "rate": 0.0597
+   }
+  },
+  "miss_per_turn": {
+   "ko": {
+    "k": 7,
+    "n": 145,
+    "rate": 0.0483
+   },
+   "otsu": {
+    "k": 4,
+    "n": 145,
+    "rate": 0.0276
+   },
+   "turns_with_threat": 38,
+   "turns_with_threat_otsu": 30,
+   "ko_given_threat": {
+    "k": 7,
+    "n": 38,
+    "rate": 0.1842
+   },
+   "otsu_given_threat": {
+    "k": 4,
+    "n": 30,
+    "rate": 0.1333
+   }
+  },
+  "miss_per_game": {
+   "ko": {
+    "k": 7,
+    "n": 52,
+    "rate": 0.1346
+   },
+   "otsu": {
+    "k": 4,
+    "n": 52,
+    "rate": 0.0769
+   },
+   "ko_seats": 7,
+   "otsu_seats": 4,
+   "ko_missed_then_lost": 5,
+   "otsu_missed_then_lost": 2,
+   "otsu_missed_lost_this_turn": 0,
+   "ko_missed_lost_this_turn": 3
+  },
+  "miss_ko_by_action": {
+   "SELECT_COUNTER": 3,
+   "CONFIRM_OPTIONAL": 3,
+   "SEARCH_AND_SELECT": 1
+  },
+  "miss_ko_type": {
+   "SELECT_COUNTER:no_counter->counter": 2,
+   "CONFIRM_OPTIONAL:confirm_no->confirm_yes": 2,
+   "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1,
+   "SELECT_COUNTER:counter->no_counter": 1,
+   "SEARCH_AND_SELECT:target->target": 1
+  },
+  "miss_otsu_type": {
+   "SELECT_COUNTER:no_counter->counter": 2,
+   "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1,
+   "SELECT_COUNTER:counter->no_counter": 1
+  },
+  "threat_by_action": {
+   "SELECT_COUNTER": 66,
+   "SEARCH_AND_SELECT": 10,
+   "SELECT_BLOCKER": 8,
+   "CONFIRM_OPTIONAL": 6
+  },
+  "miss_otsu_my_life": {
+   "1": 2,
+   "0": 1,
+   "2": 1
+  },
+  "miss_otsu_opp_life": {
+   "1": 2,
+   "2": 1,
+   "3": 1
+  },
+  "miss_ko_my_life": {
+   "0": 4,
+   "1": 2,
+   "2": 1
+  },
+  "threat_my_life": {
+   "0": 74,
+   "1": 14,
+   "2": 2
+  },
+  "cands_mean": 2.79,
+  "sec": {
+   "mean": 4.815,
+   "p50": 0.056,
+   "p99": 36.315,
+   "max": 55.83
+  }
+ },
+ "end": {
+  "turns_seen": 651,
+  "turns": 95,
+  "threat_ko": {
+   "k": 30,
+   "n": 95,
+   "rate": 0.3158
+  },
+  "threat_otsu": {
+   "k": 21,
+   "n": 95,
+   "rate": 0.2211
+  },
+  "unknown_actual": {
+   "k": 55,
+   "n": 95,
+   "rate": 0.5789
+  },
+  "unknown_actual_otsu_among_ko": {
+   "k": 8,
+   "n": 30,
+   "rate": 0.2667
+  },
+  "miss_per_turn": {
+   "k": 0,
+   "n": 95,
+   "rate": 0.0
+  },
+  "miss_strict_per_turn": {
+   "k": 0,
+   "n": 95,
+   "rate": 0.0
+  },
+  "miss_given_threat": {
+   "k": 0,
+   "n": 21,
+   "rate": 0.0
+  },
+  "miss_strict_given_threat": {
+   "k": 0,
+   "n": 21,
+   "rate": 0.0
+  },
+  "unknown_alts_among_threat": {
+   "k": 3,
+   "n": 21,
+   "rate": 0.1429
+  },
+  "miss_games": 0,
+  "miss_then_lost": 0,
+  "miss_lost_next_turn": 0,
+  "miss_strict_then_lost": 0,
+  "miss_alt_type": {},
+  "miss_strict_alt_type": {},
+  "miss_my_life": {},
+  "threat_turns_with_own_win_alt": 2,
+  "threat_my_life": {
+   "0": 14,
+   "1": 6,
+   "2": 1
+  },
+  "alts_mean_among_threat": 5.8,
+  "sec": {
+   "mean": 11.425,
+   "p50": 10.001,
+   "p99": 116.391,
+   "max": 116.391
+  }
+ },
+ "verify": {
+  "resp": {
+   "verified": 7,
+   "errors": 0,
+   "playout": {
+    "n": 6,
+    "kept": 2,
+    "kept_otsu": 1,
+    "both": [
+     true
+    ]
+   },
+   "miss_ko_raw": 7,
+   "miss_ko_full": 6,
+   "miss_ko_full_unknown": 1,
+   "miss_otsu_raw": 4,
+   "miss_otsu_full": 3,
+   "miss_otsu_full_unknown": 1,
+   "turns_miss_otsu_full": 3,
+   "turns_miss_ko_full": 6,
+   "games_miss_otsu_full": 3,
+   "otsu_full_then_lost": 1,
+   "otsu_full_lost_this_turn": 0,
+   "miss_given_threat_full": {
+    "ko": {
+     "k": 6,
+     "n": 90,
+     "rate": 0.0667
+    },
+    "otsu": {
+     "k": 3,
+     "n": 67,
+     "rate": 0.0448
+    }
+   },
+   "live_kind_among_miss_ko_full": {
+    "window": 6
+   },
+   "live_kind_among_miss_otsu_full": {
+    "window": 3
+   },
+   "fresh_safe_among_miss_ko_full": {
+    "False": 6
+   },
+   "fresh_safe_among_miss_otsu_full": {
+    "False": 3
+   },
+   "fresh_safe_by_live_kind_otsu_full": {
+    "window:False": 3
+   },
+   "miss_otsu_full_type": {
+    "SELECT_COUNTER:no_counter->counter": 2,
+    "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1
+   },
+   "miss_otsu_full_my_life": {
+    "1": 2,
+    "0": 1
+   }
+  },
+  "end": {
+   "verified": 0,
+   "errors": 0,
+   "miss_raw": 0,
+   "miss_full": 0,
+   "miss_strict_full": 0,
+   "miss_full_unknown": 0,
+   "miss_full_then_lost": 0
+  }
+ }
+}

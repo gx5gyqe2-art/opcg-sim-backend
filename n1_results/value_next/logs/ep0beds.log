@@ -1,0 +1,17 @@
+EP0_FOUND 15:05 rss_train 11.8 GB
+nrel_vn.ep0.npz a_head 0.187(0.55) b_close 0.099(0.29) c_oppend 0.110(0.33) d_next 0.215(0.64)
+nrel_vn.ep0.npz {'turn3_6': 0.2956, 'turn7_10': 0.1534, 'all': 0.2238, 'turn3_6_holdout': 0.3265, 'turn3_6_trained': 0.2905}
+  nrel_r28x4.npz
+    calib gap_weighted 0.0236 gap_mean 0.0322 | [-1.0:19469:-0.94] [-0.8:9076:-0.69] [-0.6:7256:-0.54] [-0.4:6
+    all                          mse 0.4846 sign 0.827 n 100000 | aux 0.4246 life 0.195 atk 0.229 tok_atk 0.18
+  nrel_r29f4.ep0.npz
+    calib gap_weighted 0.0256 gap_mean 0.0332 | [-1.0:19727:-0.94] [-0.8:10152:-0.70] [-0.6:7827:-0.51] [-0.4:
+    all                          mse 0.4875 sign 0.826 n 100000 | aux 0.4228 life 0.195 atk 0.230 tok_atk 0.18
+  nrel_r29f4.ep1.npz
+    calib gap_weighted 0.0222 gap_mean 0.0291 | [-1.0:19026:-0.95] [-0.8:9225:-0.71] [-0.6:7458:-0.54] [-0.4:6
+    all                          mse 0.4880 sign 0.825 n 100000 | aux 0.4214 life 0.195 atk 0.227 tok_atk 0.18
+  nrel_vn.ep0.npz
+    calib gap_weighted 0.0473 gap_mean 0.0591 | [-1.0:17505:-0.96] [-0.8:9125:-0.75] [-0.6:7268:-0.59] [-0.4:6
+    all                          mse 0.4904 sign 0.825 n 100000 | aux 0.4219 life 0.195 atk 0.230 tok_atk 0.18
+N_REL_BAND {"rows": 100000, "src": ["/root/n74c/n_records/n74c_w01_p0", "/root/n74c/n_records/n74c_w01_p1", "/
+EP0_BEDS_DONE 15:12

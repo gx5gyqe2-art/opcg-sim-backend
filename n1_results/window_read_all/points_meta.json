@@ -1,0 +1,50 @@
+{
+ "cands": {
+  "counter": {
+   "hb": 2329,
+   "mu": 18312
+  },
+  "blocker": {
+   "hb": 571,
+   "mu": 2417
+  },
+  "confirm_own": {
+   "hb": 501,
+   "mu": 11479
+  },
+  "confirm_opp": {
+   "hb": 373,
+   "mu": 6554
+  },
+  "don_confirm": {
+   "hb": 0,
+   "mu": 0
+  },
+  "select": {
+   "hb": 2405,
+   "mu": 25594
+  },
+  "trigger": {
+   "hb": 221,
+   "mu": 284
+  },
+  "battle_life1": {
+   "hb": 0,
+   "mu": 0
+  }
+ },
+ "picked": {
+  "counter": 50,
+  "blocker": 50,
+  "confirm_own": 50,
+  "confirm_opp": 50,
+  "don_confirm": 50,
+  "select": 50,
+  "trigger": 50
+ },
+ "battle_life1_skipped": {
+  "counter": 12,
+  "blocker": 11,
+  "checked": 123
+ }
+}

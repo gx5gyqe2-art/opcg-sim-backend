@@ -24,7 +24,7 @@ use super::pd::D;
 use super::rows::{self as rw, Cfg};
 use super::state::Core;
 
-type K2 = (i64, i64);
+pub(super) type K2 = (i64, i64);
 
 fn getk<T: Clone>(v: &[(K2, T)], k: K2) -> Option<T> {
     v.iter().find(|(a, _)| *a == k).map(|(_, x)| x.clone())
@@ -88,10 +88,10 @@ pub struct SeatD {
 }
 
 impl SeatD {
-    fn get(&self, k: &str) -> &V {
+    pub(super) fn get(&self, k: &str) -> &V {
         self.kv.iter().find(|(a, _)| *a == k).map(|(_, v)| v).unwrap_or(&super::obj::VNONE_S.0)
     }
-    fn f(&self, k: &str) -> f64 {
+    pub(super) fn f(&self, k: &str) -> f64 {
         self.get(k).f()
     }
     fn set(&mut self, k: &'static str, v: V) {
@@ -103,7 +103,7 @@ impl SeatD {
 }
 
 /// `tau_theory_of(d)`
-fn tau_theory_of(d: &SeatD, decay_ko: bool) -> f64 {
+pub(super) fn tau_theory_of(d: &SeatD, decay_ko: bool) -> f64 {
     let or0 = |k: &str| -> f64 {
         let v = d.get(k);
         if v.truthy() {
@@ -130,18 +130,18 @@ fn tau_theory_of(d: &SeatD, decay_ko: bool) -> f64 {
 }
 
 /// 局の中の状態（`collect` の閉包が読む局所変数）
-struct Gs<'a> {
-    g: &'a Game,
-    cfg: &'a Cfg,
-    p: &'a V,
-    turn_seq: [Vec<i64>; 2],
-    turn_start: Vec<(K2, usize)>,
-    turn_last: Vec<(K2, usize)>,
-    z_of: Vec<(i64, f64)>,
-    g_self: Vec<(K2, V)>,
-    hb_self: Vec<(K2, f64)>,
-    has_seat_decks: bool,
-    decks: [Option<Vec<String>>; 2],
+pub(super) struct Gs<'a> {
+    pub(super) g: &'a Game,
+    pub(super) cfg: &'a Cfg,
+    pub(super) p: &'a V,
+    pub(super) turn_seq: [Vec<i64>; 2],
+    pub(super) turn_start: Vec<(K2, usize)>,
+    pub(super) turn_last: Vec<(K2, usize)>,
+    pub(super) z_of: Vec<(i64, f64)>,
+    pub(super) g_self: Vec<(K2, V)>,
+    pub(super) hb_self: Vec<(K2, f64)>,
+    pub(super) has_seat_decks: bool,
+    pub(super) decks: [Option<Vec<String>>; 2],
 }
 
 impl Gs<'_> {
@@ -379,7 +379,7 @@ fn guard_rate_q(c: &Core, row: &Row, t: i64) -> Option<f64> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
+pub(super) fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
     let mut snk = D::new();
     let (theta, mu) = (gs.cfg.theta, gs.cfg.mu);
     let g_def = gs.g_for(if sink { &mut snk } else { &mut *st }, 1 - w, t);

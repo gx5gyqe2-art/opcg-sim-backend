@@ -1,0 +1,648 @@
+{"idx": 0, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.4174}
+{"idx": 0, "step": 41, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.404, "own_turn": 3}
+{"idx": 0, "step": 336, "item": "9", "seat": "p1", "turn": 17, "why": "bk_attack", "qa": 0.9973, "own_turn": 9}
+{"idx": 1, "step": 44, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.935, "own_turn": 4}
+{"idx": 1, "step": 102, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9979, "own_turn": 6}
+{"idx": 1, "step": 147, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.9999, "own_turn": 7}
+{"idx": 1, "step": 165, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9999, "own_turn": 7}
+{"idx": 1, "step": 120, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9985, "own_turn": 6}
+{"idx": 2, "step": 40, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.9165, "own_turn": 4}
+{"idx": 2, "step": 126, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.9974, "own_turn": 6}
+{"idx": 2, "step": 151, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9996, "own_turn": 7}
+{"idx": 2, "step": 122, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9945, "own_turn": 6}
+{"idx": 3, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.0901}
+{"idx": 3, "step": 228, "item": "3", "seat": "p1", "turn": 17, "why": "T9:OP17-063", "qa": 0.9785, "own_turn": 9}
+{"idx": 3, "step": 274, "item": "3", "seat": "p1", "turn": 19, "why": "T10:OP17-061", "qa": 0.9997, "own_turn": 10}
+{"idx": 3, "step": 65, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.6866, "own_turn": 4}
+{"idx": 4, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.432}
+{"idx": 4, "step": 43, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.9559, "own_turn": 4}
+{"idx": 4, "step": 142, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9969, "own_turn": 6}
+{"idx": 4, "step": 189, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 1.0, "own_turn": 7}
+{"idx": 5, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3814}
+{"idx": 6, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3056}
+{"idx": 6, "step": 177, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.997, "own_turn": 7}
+{"idx": 7, "step": 113, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.9084, "own_turn": 6}
+{"idx": 9, "step": 61, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": -0.3221, "own_turn": 5}
+{"idx": 9, "step": 155, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9561, "own_turn": 7}
+{"idx": 10, "step": 49, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.774, "own_turn": 4}
+{"idx": 10, "step": 73, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.814, "own_turn": 5}
+{"idx": 10, "step": 181, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.5755, "own_turn": 7}
+{"idx": 11, "step": 114, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9961, "own_turn": 6}
+{"idx": 11, "step": 202, "item": "5", "seat": "p1", "turn": 14, "why": "big_next", "qa": 0.997, "own_turn": 7}
+{"idx": 12, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0385}
+{"idx": 12, "step": 43, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": -0.3318, "own_turn": 4}
+{"idx": 12, "step": 111, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": -0.1828, "own_turn": 6}
+{"idx": 12, "step": 152, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.0433, "own_turn": 7}
+{"idx": 12, "step": 194, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": -0.6209, "own_turn": 8}
+{"idx": 12, "step": 144, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": -0.1681, "own_turn": 7}
+{"idx": 13, "step": 114, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.9847, "own_turn": 6}
+{"idx": 13, "step": 130, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9911, "own_turn": 6}
+{"idx": 13, "step": 45, "item": "10", "seat": "p1", "turn": 7, "why": "rk_john", "qa": 0.9687, "own_turn": 4}
+{"idx": 14, "step": 225, "item": "5", "seat": "p1", "turn": 15, "why": "big_next", "qa": -0.9887, "own_turn": 8}
+{"idx": 14, "step": 118, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": -0.3201, "own_turn": 6}
+{"idx": 17, "step": 155, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.4984, "own_turn": 7}
+{"idx": 17, "step": 359, "item": "3", "seat": "p1", "turn": 25, "why": "T13:OP17-061", "qa": 1.0, "own_turn": 13}
+{"idx": 17, "step": 24, "item": "5", "seat": "p1", "turn": 4, "why": "early", "qa": 0.5339, "own_turn": 2}
+{"idx": 17, "step": 129, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.6379, "own_turn": 6}
+{"idx": 17, "step": 199, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 0.2037, "own_turn": 8}
+{"idx": 18, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3887}
+{"idx": 19, "step": 80, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": -0.2605, "own_turn": 5}
+{"idx": 19, "step": 176, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.0434, "own_turn": 7}
+{"idx": 19, "step": 33, "item": "5", "seat": "p1", "turn": 6, "why": "early", "qa": -0.6316, "own_turn": 3}
+{"idx": 20, "step": 17, "item": "5", "seat": "p1", "turn": 4, "why": "early", "qa": 0.5986, "own_turn": 2}
+{"idx": 21, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1511}
+{"idx": 21, "step": 67, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.8078, "own_turn": 5}
+{"idx": 21, "step": 109, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": 0.9567, "own_turn": 6}
+{"idx": 22, "step": 5, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.3159, "own_turn": 2}
+{"idx": 22, "step": 70, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": -0.1789, "own_turn": 5}
+{"idx": 22, "step": 167, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": -0.34, "own_turn": 7}
+{"idx": 23, "step": 43, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.8319, "own_turn": 4}
+{"idx": 23, "step": 190, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 0.9994, "own_turn": 8}
+{"idx": 23, "step": 135, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.9802, "own_turn": 6}
+{"idx": 23, "step": 161, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.8571, "own_turn": 7}
+{"idx": 24, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.4934}
+{"idx": 24, "step": 114, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.8406, "own_turn": 6}
+{"idx": 26, "step": 112, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.9143, "own_turn": 6}
+{"idx": 26, "step": 145, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9766, "own_turn": 7}
+{"idx": 26, "step": 122, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.8271, "own_turn": 6}
+{"idx": 26, "step": 112, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9143, "own_turn": 6}
+{"idx": 27, "step": 15, "item": "5", "seat": "p1", "turn": 4, "why": "early", "qa": 0.5816, "own_turn": 2}
+{"idx": 27, "step": 168, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9926, "own_turn": 7}
+{"idx": 27, "step": 217, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 0.9994, "own_turn": 8}
+{"idx": 28, "step": 44, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.809, "own_turn": 3}
+{"idx": 28, "step": 178, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9993, "own_turn": 7}
+{"idx": 28, "step": 156, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9985, "own_turn": 6}
+{"idx": 28, "step": 53, "item": "10", "seat": "p1", "turn": 7, "why": "rk_john", "qa": 0.9193, "own_turn": 4}
+{"idx": 29, "step": 152, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9999, "own_turn": 7}
+{"idx": 29, "step": 96, "item": "9", "seat": "p1", "turn": 9, "why": "bk_attack", "qa": 0.9966, "own_turn": 5}
+{"idx": 29, "step": 136, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9978, "own_turn": 6}
+{"idx": 30, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2816}
+{"idx": 30, "step": 114, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.9825, "own_turn": 6}
+{"idx": 30, "step": 143, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9987, "own_turn": 7}
+{"idx": 31, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2328}
+{"idx": 31, "step": 73, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.8066, "own_turn": 5}
+{"idx": 31, "step": 109, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9219, "own_turn": 6}
+{"idx": 32, "step": 217, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-061", "qa": 0.9993, "own_turn": 8}
+{"idx": 32, "step": 178, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9874, "own_turn": 7}
+{"idx": 33, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.4441}
+{"idx": 33, "step": 125, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.7362, "own_turn": 6}
+{"idx": 34, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3304}
+{"idx": 34, "step": 116, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.8302, "own_turn": 6}
+{"idx": 36, "step": 4, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.2023, "own_turn": 2}
+{"idx": 36, "step": 64, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.5522, "own_turn": 5}
+{"idx": 36, "step": 106, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9521, "own_turn": 6}
+{"idx": 37, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0987}
+{"idx": 37, "step": 104, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.5904, "own_turn": 6}
+{"idx": 37, "step": 66, "item": "5", "seat": "p1", "turn": 9, "why": "bk_on", "qa": 0.7008, "own_turn": 5}
+{"idx": 37, "step": 178, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9894, "own_turn": 7}
+{"idx": 37, "step": 217, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": 0.9997, "own_turn": 8}
+{"idx": 37, "step": 240, "item": "9", "seat": "p1", "turn": 17, "why": "bk_attack", "qa": 0.9998, "own_turn": 9}
+{"idx": 38, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.237}
+{"idx": 38, "step": 77, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.0386, "own_turn": 5}
+{"idx": 38, "step": 102, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": -0.446, "own_turn": 6}
+{"idx": 38, "step": 40, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.4373, "own_turn": 3}
+{"idx": 38, "step": 159, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": -0.4179, "own_turn": 7}
+{"idx": 38, "step": 205, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 0.6556, "own_turn": 8}
+{"idx": 39, "step": 43, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.927, "own_turn": 4}
+{"idx": 39, "step": 77, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.9855, "own_turn": 5}
+{"idx": 39, "step": 105, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.991, "own_turn": 6}
+{"idx": 39, "step": 139, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9872, "own_turn": 7}
+{"idx": 39, "step": 147, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9971, "own_turn": 7}
+{"idx": 39, "step": 139, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9872, "own_turn": 7}
+{"idx": 40, "step": 34, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.6259, "own_turn": 3}
+{"idx": 41, "step": 224, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 0.9999, "own_turn": 8}
+{"idx": 41, "step": 42, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.7533, "own_turn": 3}
+{"idx": 41, "step": 49, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.8349, "own_turn": 4}
+{"idx": 41, "step": 183, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9894, "own_turn": 7}
+{"idx": 41, "step": 243, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 1.0, "own_turn": 8}
+{"idx": 42, "step": 74, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.1662, "own_turn": 5}
+{"idx": 43, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2835}
+{"idx": 43, "step": 9, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": 0.4561, "own_turn": 2}
+{"idx": 43, "step": 223, "item": "3", "seat": "p1", "turn": 17, "why": "T9:OP17-061", "qa": 1.0, "own_turn": 9}
+{"idx": 43, "step": 55, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.595, "own_turn": 4}
+{"idx": 44, "step": 61, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.4463, "own_turn": 5}
+{"idx": 46, "step": 7, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": 0.6341, "own_turn": 2}
+{"idx": 47, "step": 81, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.863, "own_turn": 5}
+{"idx": 47, "step": 94, "item": "9", "seat": "p1", "turn": 9, "why": "bk_attack", "qa": 0.9452, "own_turn": 5}
+{"idx": 47, "step": 140, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9191, "own_turn": 6}
+{"idx": 48, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2802}
+{"idx": 49, "step": 62, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.1314, "own_turn": 5}
+{"idx": 49, "step": 87, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.6495, "own_turn": 6}
+{"idx": 49, "step": 208, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": -0.8132, "own_turn": 8}
+{"idx": 49, "step": 146, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": -0.5137, "own_turn": 7}
+{"idx": 49, "step": 200, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": -0.8753, "own_turn": 8}
+{"idx": 50, "step": 148, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9727, "own_turn": 7}
+{"idx": 50, "step": 129, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9311, "own_turn": 6}
+{"idx": 51, "step": 81, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.9244, "own_turn": 5}
+{"idx": 51, "step": 81, "item": "9", "seat": "p1", "turn": 9, "why": "bk_attack", "qa": 0.9244, "own_turn": 5}
+{"idx": 51, "step": 146, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.991, "own_turn": 6}
+{"idx": 51, "step": 197, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9988, "own_turn": 7}
+{"idx": 52, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3245}
+{"idx": 52, "step": 165, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": -0.8626, "own_turn": 7}
+{"idx": 52, "step": 29, "item": "5", "seat": "p1", "turn": 5, "why": "big_next", "qa": 0.6723, "own_turn": 3}
+{"idx": 53, "step": 8, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": 0.3172, "own_turn": 2}
+{"idx": 53, "step": 71, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.7837, "own_turn": 5}
+{"idx": 53, "step": 97, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.8415, "own_turn": 6}
+{"idx": 53, "step": 17, "item": "5", "seat": "p1", "turn": 4, "why": "early", "qa": 0.5804, "own_turn": 2}
+{"idx": 54, "step": 43, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.9188, "own_turn": 4}
+{"idx": 55, "step": 42, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.9363, "own_turn": 4}
+{"idx": 55, "step": 175, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9998, "own_turn": 7}
+{"idx": 55, "step": 146, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9971, "own_turn": 6}
+{"idx": 55, "step": 197, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9992, "own_turn": 7}
+{"idx": 56, "step": 4, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.2434, "own_turn": 2}
+{"idx": 57, "step": 71, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.9764, "own_turn": 5}
+{"idx": 57, "step": 208, "item": "5", "seat": "p1", "turn": 15, "why": "big_next:no_b", "qa": null, "own_turn": 8}
+{"idx": 58, "step": 7, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": 0.421, "own_turn": 2}
+{"idx": 58, "step": 44, "item": "3", "seat": "p1", "turn": 7, "why": "T4:OP17-062", "qa": 0.9424, "own_turn": 4}
+{"idx": 58, "step": 120, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.9995, "own_turn": 6}
+{"idx": 60, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.0464}
+{"idx": 61, "step": 89, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-063", "qa": 0.9176, "own_turn": 5}
+{"idx": 61, "step": 155, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9997, "own_turn": 7}
+{"idx": 61, "step": 132, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.9953, "own_turn": 6}
+{"idx": 62, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3704}
+{"idx": 62, "step": 8, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.1425, "own_turn": 2}
+{"idx": 62, "step": 120, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": -0.9554, "own_turn": 6}
+{"idx": 62, "step": 63, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": -0.477, "own_turn": 4}
+{"idx": 62, "step": 146, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": -0.9696, "own_turn": 6}
+{"idx": 63, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.075}
+{"idx": 63, "step": 190, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 0.9941, "own_turn": 8}
+{"idx": 63, "step": 48, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.3188, "own_turn": 4}
+{"idx": 63, "step": 58, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.2272, "own_turn": 4}
+{"idx": 63, "step": 245, "item": "5", "seat": "p1", "turn": 17, "why": "bk_on", "qa": 0.9999, "own_turn": 9}
+{"idx": 63, "step": 191, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 0.9954, "own_turn": 8}
+{"idx": 64, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3059}
+{"idx": 64, "step": 106, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.5423, "own_turn": 6}
+{"idx": 64, "step": 131, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.7904, "own_turn": 7}
+{"idx": 64, "step": 320, "item": "3", "seat": "p1", "turn": 23, "why": "T12:OP17-063", "qa": 0.9995, "own_turn": 12}
+{"idx": 64, "step": 49, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.9341, "own_turn": 4}
+{"idx": 64, "step": 65, "item": "5", "seat": "p1", "turn": 8, "why": "big_next", "qa": 0.7267, "own_turn": 4}
+{"idx": 64, "step": 47, "item": "10", "seat": "p1", "turn": 7, "why": "rk_john", "qa": 0.9089, "own_turn": 4}
+{"idx": 65, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3838}
+{"idx": 65, "step": 118, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.3149, "own_turn": 6}
+{"idx": 65, "step": 52, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.673, "own_turn": 4}
+{"idx": 65, "step": 62, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.5865, "own_turn": 4}
+{"idx": 66, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3591}
+{"idx": 66, "step": 195, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 0.9915, "own_turn": 8}
+{"idx": 66, "step": 228, "item": "3", "seat": "p1", "turn": 17, "why": "T9:OP17-063", "qa": 0.9974, "own_turn": 9}
+{"idx": 66, "step": 55, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.9295, "own_turn": 4}
+{"idx": 66, "step": 156, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9725, "own_turn": 7}
+{"idx": 67, "step": 119, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9971, "own_turn": 6}
+{"idx": 67, "step": 160, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.9956, "own_turn": 7}
+{"idx": 67, "step": 29, "item": "5", "seat": "p1", "turn": 5, "why": "big_next", "qa": 0.8878, "own_turn": 3}
+{"idx": 68, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2768}
+{"idx": 68, "step": 8, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.1255, "own_turn": 2}
+{"idx": 68, "step": 104, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.956, "own_turn": 6}
+{"idx": 68, "step": 139, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9755, "own_turn": 7}
+{"idx": 68, "step": 180, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-061", "qa": 0.9994, "own_turn": 8}
+{"idx": 68, "step": 54, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.4307, "own_turn": 4}
+{"idx": 68, "step": 154, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9851, "own_turn": 7}
+{"idx": 69, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3623}
+{"idx": 69, "step": 177, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9612, "own_turn": 7}
+{"idx": 70, "step": 135, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9953, "own_turn": 7}
+{"idx": 71, "step": 162, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.9586, "own_turn": 7}
+{"idx": 71, "step": 38, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.8057, "own_turn": 3}
+{"idx": 71, "step": 47, "item": "10", "seat": "p1", "turn": 7, "why": "rk_john", "qa": 0.9786, "own_turn": 4}
+{"idx": 72, "step": 84, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.9421, "own_turn": 5}
+{"idx": 72, "step": 95, "item": "9", "seat": "p1", "turn": 9, "why": "bk_attack", "qa": 0.9652, "own_turn": 5}
+{"idx": 73, "step": 70, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.3292, "own_turn": 5}
+{"idx": 73, "step": 280, "item": "3", "seat": "p1", "turn": 19, "why": "T10:OP17-063", "qa": 0.9969, "own_turn": 10}
+{"idx": 73, "step": 147, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": 0.6824, "own_turn": 6}
+{"idx": 73, "step": 202, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": 0.8599, "own_turn": 8}
+{"idx": 74, "step": 72, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.9609, "own_turn": 5}
+{"idx": 74, "step": 108, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9996, "own_turn": 6}
+{"idx": 74, "step": 90, "item": "5", "seat": "p1", "turn": 9, "why": "bk_on", "qa": 0.9965, "own_turn": 5}
+{"idx": 74, "step": 86, "item": "9", "seat": "p1", "turn": 9, "why": "bk_attack", "qa": 0.994, "own_turn": 5}
+{"idx": 75, "step": 204, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": 0.9935, "own_turn": 8}
+{"idx": 76, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2329}
+{"idx": 76, "step": 9, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-074", "qa": 0.2469, "own_turn": 2}
+{"idx": 76, "step": 53, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.6846, "own_turn": 4}
+{"idx": 77, "step": 9, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-074", "qa": 0.2547, "own_turn": 2}
+{"idx": 77, "step": 41, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.5526, "own_turn": 3}
+{"idx": 77, "step": 96, "item": "10", "seat": "p1", "turn": 11, "why": "rk_john", "qa": 0.8552, "own_turn": 6}
+{"idx": 78, "step": 196, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-061", "qa": 0.9996, "own_turn": 8}
+{"idx": 78, "step": 31, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.3535, "own_turn": 3}
+{"idx": 78, "step": 213, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": 0.9998, "own_turn": 8}
+{"idx": 79, "step": 134, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.9972, "own_turn": 6}
+{"idx": 80, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3829}
+{"idx": 80, "step": 7, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-074", "qa": 0.4042, "own_turn": 2}
+{"idx": 80, "step": 69, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.2257, "own_turn": 5}
+{"idx": 80, "step": 103, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.5557, "own_turn": 6}
+{"idx": 80, "step": 35, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.4477, "own_turn": 3}
+{"idx": 80, "step": 172, "item": "5", "seat": "p1", "turn": 14, "why": "big_next", "qa": 0.9484, "own_turn": 7}
+{"idx": 81, "step": 68, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.4139, "own_turn": 5}
+{"idx": 81, "step": 113, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.907, "own_turn": 6}
+{"idx": 82, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2772}
+{"idx": 82, "step": 7, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": 0.3441, "own_turn": 2}
+{"idx": 82, "step": 211, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 0.9983, "own_turn": 8}
+{"idx": 82, "step": 152, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.8484, "own_turn": 6}
+{"idx": 82, "step": 133, "item": "9", "seat": "p1", "turn": 11, "why": "bk_attack", "qa": 0.9352, "own_turn": 6}
+{"idx": 83, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3048}
+{"idx": 83, "step": 82, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.734, "own_turn": 5}
+{"idx": 83, "step": 106, "item": "5", "seat": "p1", "turn": 10, "why": "big_next", "qa": 0.58, "own_turn": 5}
+{"idx": 83, "step": 207, "item": "9", "seat": "p1", "turn": 15, "why": "bk_attack", "qa": -0.8782, "own_turn": 8}
+{"idx": 84, "step": 65, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.9788, "own_turn": 5}
+{"idx": 84, "step": 42, "item": "10", "seat": "p1", "turn": 7, "why": "rk_john", "qa": 0.9582, "own_turn": 4}
+{"idx": 85, "step": 35, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.2837, "own_turn": 3}
+{"idx": 85, "step": 50, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.512, "own_turn": 4}
+{"idx": 85, "step": 60, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.1705, "own_turn": 4}
+{"idx": 86, "step": 69, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.0014, "own_turn": 5}
+{"idx": 86, "step": 99, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.3855, "own_turn": 6}
+{"idx": 86, "step": 106, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": 0.4064, "own_turn": 6}
+{"idx": 86, "step": 128, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.2892, "own_turn": 6}
+{"idx": 87, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.5126}
+{"idx": 87, "step": 129, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.0991, "own_turn": 6}
+{"idx": 88, "step": 176, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9951, "own_turn": 7}
+{"idx": 88, "step": 212, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-063", "qa": 1.0, "own_turn": 8}
+{"idx": 89, "step": 111, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.8191, "own_turn": 6}
+{"idx": 89, "step": 257, "item": "3", "seat": "p1", "turn": 19, "why": "T10:OP17-063", "qa": 0.9106, "own_turn": 10}
+{"idx": 89, "step": 72, "item": "5", "seat": "p1", "turn": 8, "why": "big_next", "qa": -0.2016, "own_turn": 4}
+{"idx": 89, "step": 135, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.7183, "own_turn": 6}
+{"idx": 90, "step": 68, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": 0.7383, "own_turn": 5}
+{"idx": 90, "step": 161, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.9943, "own_turn": 7}
+{"idx": 90, "step": 35, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.2892, "own_turn": 3}
+{"idx": 91, "step": 82, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-061", "qa": -0.7018, "own_turn": 5}
+{"idx": 91, "step": 106, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": -0.1565, "own_turn": 6}
+{"idx": 91, "step": 207, "item": "3", "seat": "p1", "turn": 17, "why": "T9:OP17-061", "qa": 1.0, "own_turn": 9}
+{"idx": 91, "step": 190, "item": "5", "seat": "p1", "turn": 15, "why": "bk_on", "qa": 0.9969, "own_turn": 8}
+{"idx": 93, "step": 41, "item": "5", "seat": "p1", "turn": 6, "why": "early", "qa": -0.7609, "own_turn": 3}
+{"idx": 94, "step": 73, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": 0.8619, "own_turn": 5}
+{"idx": 94, "step": 240, "item": "3", "seat": "p1", "turn": 17, "why": "T9:OP17-063", "qa": 0.9996, "own_turn": 9}
+{"idx": 94, "step": 24, "item": "5", "seat": "p1", "turn": 4, "why": "early", "qa": 0.7388, "own_turn": 2}
+{"idx": 94, "step": 103, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": 0.9421, "own_turn": 6}
+{"idx": 94, "step": 119, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": 0.9277, "own_turn": 6}
+{"idx": 94, "step": 173, "item": "5", "seat": "p1", "turn": 14, "why": "big_next", "qa": 0.9844, "own_turn": 7}
+{"idx": 94, "step": 290, "item": "5", "seat": "p1", "turn": 18, "why": "big_next", "qa": 0.9995, "own_turn": 9}
+{"idx": 95, "step": 0, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3406}
+{"idx": 95, "step": 8, "item": "3", "seat": "p1", "turn": 3, "why": "T2:OP17-073", "qa": -0.0464, "own_turn": 2}
+{"idx": 95, "step": 74, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": -0.2767, "own_turn": 5}
+{"idx": 95, "step": 114, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": -0.0138, "own_turn": 6}
+{"idx": 96, "step": 160, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-061", "qa": 0.9995, "own_turn": 7}
+{"idx": 96, "step": 163, "item": "5", "seat": "p1", "turn": 13, "why": "bk_on", "qa": 0.9998, "own_turn": 7}
+{"idx": 96, "step": 172, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 1.0, "own_turn": 7}
+{"idx": 97, "step": 100, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-063", "qa": 0.6567, "own_turn": 6}
+{"idx": 97, "step": 149, "item": "3", "seat": "p1", "turn": 13, "why": "T7:OP17-063", "qa": 0.9982, "own_turn": 7}
+{"idx": 97, "step": 26, "item": "5", "seat": "p1", "turn": 5, "why": "big_next", "qa": 0.423, "own_turn": 3}
+{"idx": 97, "step": 101, "item": "5", "seat": "p1", "turn": 11, "why": "bk_on", "qa": 0.5101, "own_turn": 6}
+{"idx": 97, "step": 152, "item": "9", "seat": "p1", "turn": 13, "why": "bk_attack", "qa": 0.9969, "own_turn": 7}
+{"idx": 98, "step": 69, "item": "3", "seat": "p1", "turn": 9, "why": "T5:OP17-062", "qa": -0.4397, "own_turn": 5}
+{"idx": 98, "step": 160, "item": "5", "seat": "p1", "turn": 12, "why": "big_next", "qa": -1.0, "own_turn": 6}
+{"idx": 99, "step": 107, "item": "3", "seat": "p1", "turn": 11, "why": "T6:OP17-061", "qa": 0.9709, "own_turn": 6}
+{"idx": 99, "step": 207, "item": "3", "seat": "p1", "turn": 15, "why": "T8:OP17-061", "qa": 0.9552, "own_turn": 8}
+{"idx": 100, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2519}
+{"idx": 100, "step": 92, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": -0.1115, "own_turn": 5}
+{"idx": 100, "step": 67, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.5198, "own_turn": 4}
+{"idx": 100, "step": 246, "item": "5", "seat": "p1", "turn": 17, "why": "big_next", "qa": -1.0, "own_turn": 8}
+{"idx": 101, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0303}
+{"idx": 101, "step": 21, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.4231, "own_turn": 2}
+{"idx": 101, "step": 138, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9787, "own_turn": 6}
+{"idx": 101, "step": 184, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.973, "own_turn": 7}
+{"idx": 102, "step": 213, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.994, "own_turn": 7}
+{"idx": 103, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1359}
+{"idx": 103, "step": 59, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8195, "own_turn": 4}
+{"idx": 103, "step": 135, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9921, "own_turn": 6}
+{"idx": 103, "step": 152, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9998, "own_turn": 6}
+{"idx": 104, "step": 19, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.4945, "own_turn": 2}
+{"idx": 104, "step": 58, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.9385, "own_turn": 4}
+{"idx": 104, "step": 146, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9704, "own_turn": 7}
+{"idx": 104, "step": 27, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.422, "own_turn": 2}
+{"idx": 104, "step": 74, "item": "5", "seat": "p1", "turn": 9, "why": "early", "qa": 0.9161, "own_turn": 4}
+{"idx": 105, "step": 98, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.2297, "own_turn": 5}
+{"idx": 105, "step": 183, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.8808, "own_turn": 7}
+{"idx": 105, "step": 228, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9652, "own_turn": 8}
+{"idx": 105, "step": 107, "item": "9", "seat": "p1", "turn": 10, "why": "bk_attack", "qa": 0.4916, "own_turn": 5}
+{"idx": 106, "step": 157, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9995, "own_turn": 7}
+{"idx": 107, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0716}
+{"idx": 107, "step": 53, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8005, "own_turn": 4}
+{"idx": 107, "step": 138, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9971, "own_turn": 6}
+{"idx": 107, "step": 184, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9995, "own_turn": 7}
+{"idx": 107, "step": 56, "item": "10", "seat": "p1", "turn": 8, "why": "rk_john", "qa": 0.7901, "own_turn": 4}
+{"idx": 108, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1862}
+{"idx": 108, "step": 16, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.163, "own_turn": 2}
+{"idx": 108, "step": 56, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.0566, "own_turn": 4}
+{"idx": 108, "step": 138, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.7272, "own_turn": 6}
+{"idx": 108, "step": 205, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9968, "own_turn": 8}
+{"idx": 108, "step": 144, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9832, "own_turn": 6}
+{"idx": 109, "step": 177, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9999, "own_turn": 7}
+{"idx": 110, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0434}
+{"idx": 110, "step": 49, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": -0.342, "own_turn": 3}
+{"idx": 110, "step": 71, "item": "5", "seat": "p1", "turn": 9, "why": "big_next", "qa": -0.6228, "own_turn": 4}
+{"idx": 110, "step": 103, "item": "5", "seat": "p1", "turn": 10, "why": "big_next", "qa": -0.2169, "own_turn": 5}
+{"idx": 110, "step": 122, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": -0.7986, "own_turn": 5}
+{"idx": 111, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2659}
+{"idx": 111, "step": 201, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": 0.9999, "own_turn": 8}
+{"idx": 111, "step": 132, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9942, "own_turn": 6}
+{"idx": 111, "step": 187, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9992, "own_turn": 7}
+{"idx": 112, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1081}
+{"idx": 112, "step": 89, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.8947, "own_turn": 5}
+{"idx": 112, "step": 122, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.8521, "own_turn": 6}
+{"idx": 112, "step": 157, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.831, "own_turn": 7}
+{"idx": 112, "step": 71, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.8545, "own_turn": 4}
+{"idx": 112, "step": 176, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.7956, "own_turn": 7}
+{"idx": 112, "step": 214, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9365, "own_turn": 8}
+{"idx": 112, "step": 251, "item": "9", "seat": "p1", "turn": 18, "why": "bk_attack", "qa": 0.9878, "own_turn": 9}
+{"idx": 112, "step": 282, "item": "9", "seat": "p1", "turn": 20, "why": "bk_attack", "qa": 0.9837, "own_turn": 10}
+{"idx": 113, "step": 58, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.7646, "own_turn": 4}
+{"idx": 113, "step": 135, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9717, "own_turn": 6}
+{"idx": 113, "step": 145, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9856, "own_turn": 6}
+{"idx": 113, "step": 203, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9955, "own_turn": 7}
+{"idx": 114, "step": 16, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.1326, "own_turn": 2}
+{"idx": 115, "step": 65, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.1823, "own_turn": 4}
+{"idx": 115, "step": 134, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.701, "own_turn": 6}
+{"idx": 115, "step": 71, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.6052, "own_turn": 4}
+{"idx": 115, "step": 93, "item": "5", "seat": "p1", "turn": 9, "why": "big_next", "qa": -0.2989, "own_turn": 4}
+{"idx": 115, "step": 212, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9969, "own_turn": 8}
+{"idx": 116, "step": 106, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.9936, "own_turn": 6}
+{"idx": 116, "step": 146, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9999, "own_turn": 7}
+{"idx": 117, "step": 91, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.7926, "own_turn": 5}
+{"idx": 117, "step": 110, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.643, "own_turn": 5}
+{"idx": 117, "step": 113, "item": "9", "seat": "p1", "turn": 10, "why": "bk_attack", "qa": 0.075, "own_turn": 5}
+{"idx": 117, "step": 151, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.925, "own_turn": 6}
+{"idx": 118, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1934}
+{"idx": 118, "step": 15, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.1357, "own_turn": 2}
+{"idx": 118, "step": 172, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9988, "own_turn": 8}
+{"idx": 118, "step": 28, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.2945, "own_turn": 2}
+{"idx": 119, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.1351}
+{"idx": 119, "step": 15, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.2228, "own_turn": 2}
+{"idx": 119, "step": 153, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9993, "own_turn": 7}
+{"idx": 119, "step": 199, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9999, "own_turn": 8}
+{"idx": 119, "step": 179, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9991, "own_turn": 7}
+{"idx": 120, "step": 183, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9989, "own_turn": 7}
+{"idx": 120, "step": 211, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 1.0, "own_turn": 7}
+{"idx": 121, "step": 168, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.997, "own_turn": 7}
+{"idx": 122, "step": 57, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8841, "own_turn": 4}
+{"idx": 122, "step": 266, "item": "3", "seat": "p1", "turn": 18, "why": "T9:OP17-061", "qa": 0.9999, "own_turn": 9}
+{"idx": 122, "step": 169, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9916, "own_turn": 7}
+{"idx": 122, "step": 125, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.8776, "own_turn": 6}
+{"idx": 122, "step": 173, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.987, "own_turn": 7}
+{"idx": 122, "step": 230, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9953, "own_turn": 8}
+{"idx": 123, "step": 128, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.9497, "own_turn": 6}
+{"idx": 124, "step": 99, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.5324, "own_turn": 5}
+{"idx": 124, "step": 110, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": -0.2678, "own_turn": 5}
+{"idx": 124, "step": 112, "item": "9", "seat": "p1", "turn": 10, "why": "bk_attack", "qa": 0.3542, "own_turn": 5}
+{"idx": 125, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0918}
+{"idx": 125, "step": 48, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8902, "own_turn": 4}
+{"idx": 125, "step": 175, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 1.0, "own_turn": 7}
+{"idx": 126, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0451}
+{"idx": 126, "step": 151, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.986, "own_turn": 7}
+{"idx": 126, "step": 195, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9988, "own_turn": 8}
+{"idx": 126, "step": 78, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.7705, "own_turn": 5}
+{"idx": 126, "step": 117, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.8199, "own_turn": 6}
+{"idx": 126, "step": 57, "item": "6", "seat": "p1", "turn": 8, "why": "first_OP17-061_not_OP17-063", "qa": 0.7282, "own_turn": 4}
+{"idx": 126, "step": 130, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9772, "own_turn": 6}
+{"idx": 127, "step": 53, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.6874, "own_turn": 4}
+{"idx": 127, "step": 178, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9898, "own_turn": 7}
+{"idx": 127, "step": 172, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.9605, "own_turn": 6}
+{"idx": 127, "step": 146, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.8988, "own_turn": 6}
+{"idx": 128, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0667}
+{"idx": 128, "step": 51, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.2915, "own_turn": 4}
+{"idx": 128, "step": 65, "item": "5", "seat": "p1", "turn": 9, "why": "early", "qa": -0.1354, "own_turn": 4}
+{"idx": 128, "step": 151, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9899, "own_turn": 6}
+{"idx": 129, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.162}
+{"idx": 129, "step": 18, "item": "3", "seat": "p1", "turn": 4, "why": "T2:EB04-032", "qa": 0.7238, "own_turn": 2}
+{"idx": 130, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2631}
+{"idx": 130, "step": 65, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.5531, "own_turn": 4}
+{"idx": 130, "step": 105, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.9506, "own_turn": 5}
+{"idx": 131, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2357}
+{"idx": 131, "step": 306, "item": "3", "seat": "p1", "turn": 22, "why": "T11:OP17-063", "qa": -0.5486, "own_turn": 11}
+{"idx": 131, "step": 66, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.3949, "own_turn": 4}
+{"idx": 132, "step": 21, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.3824, "own_turn": 2}
+{"idx": 132, "step": 220, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": 0.5215, "own_turn": 8}
+{"idx": 132, "step": 55, "item": "5", "seat": "p1", "turn": 7, "why": "early", "qa": 0.42, "own_turn": 3}
+{"idx": 132, "step": 79, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.5135, "own_turn": 4}
+{"idx": 133, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.238}
+{"idx": 133, "step": 60, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": -0.6654, "own_turn": 4}
+{"idx": 133, "step": 155, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.7342, "own_turn": 6}
+{"idx": 133, "step": 200, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9389, "own_turn": 7}
+{"idx": 133, "step": 232, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9921, "own_turn": 8}
+{"idx": 134, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.0404}
+{"idx": 134, "step": 47, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.1534, "own_turn": 3}
+{"idx": 135, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0024}
+{"idx": 135, "step": 100, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.9342, "own_turn": 5}
+{"idx": 136, "step": 131, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.3219, "own_turn": 6}
+{"idx": 137, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": -0.2048}
+{"idx": 137, "step": 188, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 1.0, "own_turn": 7}
+{"idx": 138, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3109}
+{"idx": 138, "step": 17, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.2633, "own_turn": 2}
+{"idx": 138, "step": 56, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.673, "own_turn": 4}
+{"idx": 138, "step": 81, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.8235, "own_turn": 5}
+{"idx": 138, "step": 219, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9997, "own_turn": 8}
+{"idx": 138, "step": 211, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9998, "own_turn": 8}
+{"idx": 140, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.2168}
+{"idx": 140, "step": 18, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.2266, "own_turn": 2}
+{"idx": 140, "step": 116, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.8893, "own_turn": 6}
+{"idx": 141, "step": 18, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.4697, "own_turn": 2}
+{"idx": 141, "step": 43, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.6813, "own_turn": 3}
+{"idx": 142, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.278}
+{"idx": 142, "step": 212, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": -0.192, "own_turn": 8}
+{"idx": 142, "step": 61, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.8908, "own_turn": 4}
+{"idx": 142, "step": 59, "item": "10", "seat": "p1", "turn": 8, "why": "rk_john", "qa": 0.8245, "own_turn": 4}
+{"idx": 143, "step": 57, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.4601, "own_turn": 4}
+{"idx": 143, "step": 151, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9923, "own_turn": 6}
+{"idx": 143, "step": 176, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9833, "own_turn": 7}
+{"idx": 144, "step": 58, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8462, "own_turn": 4}
+{"idx": 144, "step": 213, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9995, "own_turn": 8}
+{"idx": 144, "step": 136, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9645, "own_turn": 6}
+{"idx": 144, "step": 231, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9998, "own_turn": 8}
+{"idx": 144, "step": 169, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9953, "own_turn": 7}
+{"idx": 144, "step": 234, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9999, "own_turn": 8}
+{"idx": 145, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3799}
+{"idx": 145, "step": 56, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.7888, "own_turn": 4}
+{"idx": 145, "step": 122, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.7034, "own_turn": 6}
+{"idx": 146, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0634}
+{"idx": 146, "step": 169, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.0348, "own_turn": 7}
+{"idx": 147, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1145}
+{"idx": 147, "step": 50, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.7769, "own_turn": 4}
+{"idx": 147, "step": 83, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.9102, "own_turn": 5}
+{"idx": 147, "step": 154, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9887, "own_turn": 7}
+{"idx": 147, "step": 58, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.9467, "own_turn": 4}
+{"idx": 147, "step": 186, "item": "5", "seat": "p1", "turn": 15, "why": "big_next", "qa": 0.9936, "own_turn": 7}
+{"idx": 148, "step": 54, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8441, "own_turn": 4}
+{"idx": 148, "step": 128, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9989, "own_turn": 6}
+{"idx": 149, "step": 283, "item": "9", "seat": "p1", "turn": 18, "why": "bk_attack", "qa": -0.9246, "own_turn": 9}
+{"idx": 150, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1254}
+{"idx": 150, "step": 60, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8903, "own_turn": 4}
+{"idx": 150, "step": 87, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.9641, "own_turn": 5}
+{"idx": 150, "step": 121, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9839, "own_turn": 6}
+{"idx": 150, "step": 169, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9959, "own_turn": 7}
+{"idx": 150, "step": 94, "item": "5", "seat": "p1", "turn": 10, "why": "big_next", "qa": 0.9842, "own_turn": 5}
+{"idx": 151, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": -0.0803}
+{"idx": 151, "step": 13, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": -0.2441, "own_turn": 2}
+{"idx": 151, "step": 51, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8282, "own_turn": 4}
+{"idx": 151, "step": 88, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.9804, "own_turn": 5}
+{"idx": 151, "step": 126, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.9978, "own_turn": 6}
+{"idx": 151, "step": 162, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 1.0, "own_turn": 7}
+{"idx": 152, "step": 81, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.9653, "own_turn": 5}
+{"idx": 152, "step": 116, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9959, "own_turn": 6}
+{"idx": 152, "step": 164, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 1.0, "own_turn": 7}
+{"idx": 153, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.0264}
+{"idx": 153, "step": 57, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.7143, "own_turn": 4}
+{"idx": 153, "step": 80, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.8726, "own_turn": 5}
+{"idx": 153, "step": 135, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.9628, "own_turn": 6}
+{"idx": 154, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.2306}
+{"idx": 154, "step": 177, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9892, "own_turn": 7}
+{"idx": 154, "step": 140, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9954, "own_turn": 6}
+{"idx": 154, "step": 110, "item": "9", "seat": "p1", "turn": 10, "why": "bk_attack", "qa": 0.9897, "own_turn": 5}
+{"idx": 155, "step": 15, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": -0.4014, "own_turn": 2}
+{"idx": 155, "step": 26, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.2695, "own_turn": 2}
+{"idx": 156, "step": 187, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9948, "own_turn": 7}
+{"idx": 156, "step": 227, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9984, "own_turn": 8}
+{"idx": 157, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0776}
+{"idx": 157, "step": 12, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.0667, "own_turn": 2}
+{"idx": 159, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.3185}
+{"idx": 159, "step": 81, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.8024, "own_turn": 5}
+{"idx": 159, "step": 45, "item": "5", "seat": "p1", "turn": 6, "why": "early", "qa": 0.716, "own_turn": 3}
+{"idx": 159, "step": 91, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.916, "own_turn": 5}
+{"idx": 159, "step": 255, "item": "5", "seat": "p1", "turn": 18, "why": "bk_on", "qa": 0.9868, "own_turn": 9}
+{"idx": 159, "step": 132, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.8458, "own_turn": 6}
+{"idx": 159, "step": 84, "item": "10", "seat": "p1", "turn": 10, "why": "rk_john", "qa": 0.8747, "own_turn": 5}
+{"idx": 160, "step": 76, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": -0.6554, "own_turn": 5}
+{"idx": 160, "step": 101, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": -0.4074, "own_turn": 6}
+{"idx": 160, "step": 181, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.6594, "own_turn": 8}
+{"idx": 160, "step": 21, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.2182, "own_turn": 2}
+{"idx": 160, "step": 213, "item": "9", "seat": "p1", "turn": 18, "why": "bk_attack", "qa": 0.9047, "own_turn": 9}
+{"idx": 160, "step": 267, "item": "9", "seat": "p1", "turn": 20, "why": "bk_attack", "qa": 0.8477, "own_turn": 10}
+{"idx": 161, "step": 94, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.7812, "own_turn": 5}
+{"idx": 161, "step": 105, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.7076, "own_turn": 5}
+{"idx": 161, "step": 126, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.927, "own_turn": 6}
+{"idx": 161, "step": 94, "item": "6", "seat": "p1", "turn": 10, "why": "first_OP17-062_not_OP17-069", "qa": 0.7812, "own_turn": 5}
+{"idx": 161, "step": 163, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9926, "own_turn": 7}
+{"idx": 161, "step": 193, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9997, "own_turn": 8}
+{"idx": 162, "step": 17, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.1187, "own_turn": 2}
+{"idx": 162, "step": 126, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.9806, "own_turn": 6}
+{"idx": 162, "step": 169, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9975, "own_turn": 7}
+{"idx": 162, "step": 207, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": 1.0, "own_turn": 8}
+{"idx": 162, "step": 143, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.9971, "own_turn": 6}
+{"idx": 162, "step": 186, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9993, "own_turn": 7}
+{"idx": 163, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0212}
+{"idx": 163, "step": 148, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9968, "own_turn": 7}
+{"idx": 164, "step": 54, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.5292, "own_turn": 4}
+{"idx": 164, "step": 121, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.6579, "own_turn": 6}
+{"idx": 164, "step": 186, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.8225, "own_turn": 7}
+{"idx": 165, "step": 74, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.8155, "own_turn": 5}
+{"idx": 166, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.054}
+{"idx": 166, "step": 134, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.1854, "own_turn": 6}
+{"idx": 166, "step": 80, "item": "5", "seat": "p1", "turn": 9, "why": "early", "qa": -0.179, "own_turn": 4}
+{"idx": 167, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0896}
+{"idx": 167, "step": 90, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": -0.4425, "own_turn": 5}
+{"idx": 167, "step": 47, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": -0.6362, "own_turn": 3}
+{"idx": 167, "step": 65, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": -0.4971, "own_turn": 4}
+{"idx": 167, "step": 73, "item": "5", "seat": "p1", "turn": 9, "why": "early", "qa": -0.5438, "own_turn": 4}
+{"idx": 168, "step": 94, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.953, "own_turn": 5}
+{"idx": 168, "step": 173, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9855, "own_turn": 7}
+{"idx": 168, "step": 30, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.3007, "own_turn": 2}
+{"idx": 168, "step": 71, "item": "10", "seat": "p1", "turn": 8, "why": "rk_john", "qa": 0.889, "own_turn": 4}
+{"idx": 169, "step": 19, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.4775, "own_turn": 2}
+{"idx": 169, "step": 115, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-063", "qa": 0.9751, "own_turn": 6}
+{"idx": 169, "step": 161, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9998, "own_turn": 7}
+{"idx": 170, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0307}
+{"idx": 170, "step": 153, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-063", "qa": 0.9012, "own_turn": 7}
+{"idx": 170, "step": 24, "item": "5", "seat": "p1", "turn": 5, "why": "big_next", "qa": 0.1441, "own_turn": 2}
+{"idx": 170, "step": 35, "item": "5", "seat": "p1", "turn": 6, "why": "early", "qa": 0.0303, "own_turn": 3}
+{"idx": 170, "step": 62, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.4939, "own_turn": 4}
+{"idx": 171, "step": 133, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9902, "own_turn": 6}
+{"idx": 172, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.0488}
+{"idx": 172, "step": 85, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.6674, "own_turn": 5}
+{"idx": 172, "step": 116, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.8024, "own_turn": 6}
+{"idx": 172, "step": 151, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9484, "own_turn": 7}
+{"idx": 172, "step": 154, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.9866, "own_turn": 7}
+{"idx": 173, "step": 141, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": -0.4297, "own_turn": 6}
+{"idx": 173, "step": 218, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9903, "own_turn": 8}
+{"idx": 174, "step": 90, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.9651, "own_turn": 5}
+{"idx": 174, "step": 123, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9929, "own_turn": 6}
+{"idx": 174, "step": 158, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9954, "own_turn": 7}
+{"idx": 174, "step": 42, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.6392, "own_turn": 3}
+{"idx": 175, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0865}
+{"idx": 175, "step": 82, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.4448, "own_turn": 5}
+{"idx": 175, "step": 64, "item": "5", "seat": "p1", "turn": 8, "why": "early", "qa": 0.6809, "own_turn": 4}
+{"idx": 176, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.053}
+{"idx": 176, "step": 81, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": -0.3474, "own_turn": 5}
+{"idx": 176, "step": 23, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.0202, "own_turn": 2}
+{"idx": 177, "step": 13, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": -0.2898, "own_turn": 2}
+{"idx": 177, "step": 23, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.1405, "own_turn": 2}
+{"idx": 177, "step": 66, "item": "5", "seat": "p1", "turn": 9, "why": "big_next", "qa": -0.1955, "own_turn": 4}
+{"idx": 177, "step": 126, "item": "10", "seat": "p1", "turn": 12, "why": "rk_john", "qa": -0.6902, "own_turn": 6}
+{"idx": 178, "step": 235, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": 0.9476, "own_turn": 8}
+{"idx": 179, "step": 52, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.7693, "own_turn": 4}
+{"idx": 180, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": -0.0688}
+{"idx": 180, "step": 71, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.7299, "own_turn": 5}
+{"idx": 180, "step": 106, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.8212, "own_turn": 6}
+{"idx": 180, "step": 178, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.754, "own_turn": 7}
+{"idx": 180, "step": 168, "item": "9", "seat": "p1", "turn": 14, "why": "bk_attack", "qa": 0.7687, "own_turn": 7}
+{"idx": 181, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": -0.0452}
+{"idx": 181, "step": 145, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9357, "own_turn": 6}
+{"idx": 182, "step": 16, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.2694, "own_turn": 2}
+{"idx": 182, "step": 87, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.8911, "own_turn": 5}
+{"idx": 182, "step": 202, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": 0.9976, "own_turn": 8}
+{"idx": 182, "step": 245, "item": "3", "seat": "p1", "turn": 18, "why": "T9:OP17-063", "qa": 1.0, "own_turn": 9}
+{"idx": 182, "step": 121, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": 0.9499, "own_turn": 5}
+{"idx": 182, "step": 163, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.9978, "own_turn": 6}
+{"idx": 182, "step": 87, "item": "6", "seat": "p1", "turn": 10, "why": "first_OP17-061_not_OP17-069", "qa": 0.8911, "own_turn": 5}
+{"idx": 183, "step": 103, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.9671, "own_turn": 5}
+{"idx": 183, "step": 151, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9406, "own_turn": 6}
+{"idx": 184, "step": 80, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.9587, "own_turn": 5}
+{"idx": 184, "step": 122, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9915, "own_turn": 6}
+{"idx": 184, "step": 177, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9993, "own_turn": 7}
+{"idx": 184, "step": 94, "item": "9", "seat": "p1", "turn": 10, "why": "bk_attack", "qa": 0.9823, "own_turn": 5}
+{"idx": 184, "step": 149, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9974, "own_turn": 6}
+{"idx": 184, "step": 83, "item": "10", "seat": "p1", "turn": 10, "why": "rk_john", "qa": 0.9715, "own_turn": 5}
+{"idx": 185, "step": 44, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": 0.4928, "own_turn": 3}
+{"idx": 185, "step": 175, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9976, "own_turn": 6}
+{"idx": 186, "step": 50, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.5451, "own_turn": 4}
+{"idx": 186, "step": 162, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9958, "own_turn": 7}
+{"idx": 187, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.2826}
+{"idx": 187, "step": 19, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.3433, "own_turn": 2}
+{"idx": 187, "step": 151, "item": "5", "seat": "p1", "turn": 12, "why": "bk_on", "qa": 0.24, "own_turn": 6}
+{"idx": 187, "step": 135, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.6566, "own_turn": 6}
+{"idx": 188, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.381}
+{"idx": 188, "step": 201, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-063", "qa": -0.1229, "own_turn": 8}
+{"idx": 188, "step": 29, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.0172, "own_turn": 2}
+{"idx": 189, "step": 16, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.2685, "own_turn": 2}
+{"idx": 190, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.0505}
+{"idx": 190, "step": 127, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9577, "own_turn": 6}
+{"idx": 190, "step": 155, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9535, "own_turn": 7}
+{"idx": 190, "step": 198, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9958, "own_turn": 8}
+{"idx": 191, "step": 18, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-074", "qa": 0.082, "own_turn": 2}
+{"idx": 192, "step": 262, "item": "3", "seat": "p1", "turn": 18, "why": "T9:OP17-063", "qa": -0.5593, "own_turn": 9}
+{"idx": 192, "step": 95, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.2038, "own_turn": 5}
+{"idx": 192, "step": 169, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.1585, "own_turn": 6}
+{"idx": 193, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": -0.1384}
+{"idx": 193, "step": 59, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": -0.1368, "own_turn": 4}
+{"idx": 193, "step": 91, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.3846, "own_turn": 5}
+{"idx": 193, "step": 188, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9989, "own_turn": 8}
+{"idx": 193, "step": 164, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9503, "own_turn": 7}
+{"idx": 194, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.1967}
+{"idx": 194, "step": 88, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-061", "qa": 0.2427, "own_turn": 5}
+{"idx": 194, "step": 148, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.8321, "own_turn": 7}
+{"idx": 194, "step": 30, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.1729, "own_turn": 2}
+{"idx": 194, "step": 37, "item": "5", "seat": "p1", "turn": 6, "why": "early", "qa": -0.3093, "own_turn": 3}
+{"idx": 194, "step": 158, "item": "5", "seat": "p1", "turn": 14, "why": "big_next", "qa": 0.8383, "own_turn": 7}
+{"idx": 194, "step": 175, "item": "5", "seat": "p1", "turn": 15, "why": "big_next", "qa": 0.395, "own_turn": 7}
+{"idx": 194, "step": 88, "item": "6", "seat": "p1", "turn": 10, "why": "first_OP17-061_not_OP17-063", "qa": 0.2427, "own_turn": 5}
+{"idx": 195, "step": 19, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.1217, "own_turn": 2}
+{"idx": 195, "step": 134, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9683, "own_turn": 6}
+{"idx": 195, "step": 218, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9997, "own_turn": 8}
+{"idx": 195, "step": 32, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.377, "own_turn": 2}
+{"idx": 195, "step": 122, "item": "5", "seat": "p1", "turn": 10, "why": "bk_on", "qa": 0.9904, "own_turn": 5}
+{"idx": 195, "step": 228, "item": "5", "seat": "p1", "turn": 16, "why": "bk_on", "qa": 0.9998, "own_turn": 8}
+{"idx": 196, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "mulligan", "qa": 0.1882}
+{"idx": 196, "step": 17, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": -0.1225, "own_turn": 2}
+{"idx": 196, "step": 88, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": 0.1072, "own_turn": 5}
+{"idx": 196, "step": 176, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.8962, "own_turn": 7}
+{"idx": 196, "step": 222, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9712, "own_turn": 8}
+{"idx": 196, "step": 28, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": 0.0607, "own_turn": 2}
+{"idx": 196, "step": 57, "item": "5", "seat": "p1", "turn": 7, "why": "big_next", "qa": -0.5153, "own_turn": 3}
+{"idx": 196, "step": 158, "item": "5", "seat": "p1", "turn": 13, "why": "big_next", "qa": 0.4075, "own_turn": 6}
+{"idx": 197, "step": 94, "item": "3", "seat": "p1", "turn": 10, "why": "T5:OP17-062", "qa": -0.7403, "own_turn": 5}
+{"idx": 197, "step": 19, "item": "5", "seat": "p1", "turn": 5, "why": "early", "qa": -0.4895, "own_turn": 2}
+{"idx": 197, "step": 120, "item": "5", "seat": "p1", "turn": 11, "why": "big_next", "qa": -0.8769, "own_turn": 5}
+{"idx": 198, "step": 47, "item": "3", "seat": "p1", "turn": 8, "why": "T4:OP17-062", "qa": 0.8814, "own_turn": 4}
+{"idx": 198, "step": 108, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9289, "own_turn": 6}
+{"idx": 198, "step": 162, "item": "3", "seat": "p1", "turn": 14, "why": "T7:OP17-061", "qa": 0.9968, "own_turn": 7}
+{"idx": 198, "step": 204, "item": "3", "seat": "p1", "turn": 16, "why": "T8:OP17-061", "qa": 0.9986, "own_turn": 8}
+{"idx": 198, "step": 178, "item": "5", "seat": "p1", "turn": 14, "why": "bk_on", "qa": 0.9971, "own_turn": 7}
+{"idx": 198, "step": 129, "item": "9", "seat": "p1", "turn": 12, "why": "bk_attack", "qa": 0.9848, "own_turn": 6}
+{"idx": 198, "step": 204, "item": "9", "seat": "p1", "turn": 16, "why": "bk_attack", "qa": 0.9986, "own_turn": 8}
+{"idx": 199, "step": 1, "item": "2", "seat": "p1", "turn": 0, "why": "keep", "qa": 0.129}
+{"idx": 199, "step": 18, "item": "3", "seat": "p1", "turn": 4, "why": "T2:OP17-073", "qa": 0.7243, "own_turn": 2}
+{"idx": 199, "step": 131, "item": "3", "seat": "p1", "turn": 12, "why": "T6:OP17-061", "qa": 0.9771, "own_turn": 6}
+{"idx": 199, "step": 37, "item": "5", "seat": "p1", "turn": 6, "why": "big_next", "qa": 0.8208, "own_turn": 3}

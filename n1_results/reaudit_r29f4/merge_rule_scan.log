@@ -1,0 +1,24 @@
+todo 457
+0 {"seed": 4461000, "step": 8, "dtype": "main:play", "same_as_record": true, "alt_differs": true, "alt_is_b": false, "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"ST03-008\"}", "chosen_desc": "{\
+20 {"seed": 4461004, "step": 47, "dtype": "main:attach", "same_as_record": true, "alt_differs": true, "alt_is_b": true, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"ST10-010\", \
+40 {"seed": 4461008, "step": 26, "dtype": "main:play", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"ST02-013\"}", "chosen_desc": "
+60 {"seed": 4461014, "step": 5, "dtype": "own_dialog:ARRANGE_DECK", "same_as_record": true, "alt_differs": true, "alt_is_b": false, "alt_desc": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected
+80 {"seed": 4461019, "step": 42, "dtype": "main:play", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP11-118\"}", "chosen_desc": "
+100 {"seed": 4461024, "step": 82, "dtype": "main:attach", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP14-074\"}
+120 {"seed": 4461027, "step": 105, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-087\"
+140 {"seed": 4461031, "step": 107, "dtype": "main:attach", "same_as_record": true, "alt_differs": true, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"EB01-001\",
+160 {"seed": 4461035, "step": 133, "dtype": "main:turn_end", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"TURN_END\"}", "chosen_desc": "{\"action_type\
+180 {"seed": 4461039, "step": 76, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP06-035\",
+200 {"seed": 4461044, "step": 31, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP13-100\",
+220 {"seed": 4461048, "step": 59, "dtype": "main:attach", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP10-002\"}
+240 {"seed": 4461051, "step": 111, "dtype": "own_dialog:ARRANGE_DECK", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selec
+260 {"seed": 4461056, "step": 155, "dtype": "main:attach", "same_as_record": true, "alt_differs": true, "alt_is_b": true, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 6, \"card\": \"OP10-004\"}"
+280 {"seed": 4461061, "step": 128, "dtype": "own_dialog:ARRANGE_DECK", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selec
+300 {"seed": 4461065, "step": 69, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-003\",
+320 {"seed": 4461069, "step": 58, "dtype": "main:activate_main", "same_as_record": true, "alt_differs": true, "alt_is_b": true, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP06-0
+340 {"seed": 4461073, "step": 69, "dtype": "main:attach", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP03-089\"}
+360 {"seed": 4461078, "step": 38, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP10-109\",
+380 {"seed": 4461082, "step": 93, "dtype": "main:attack", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP07-059\",
+400 {"seed": 4461087, "step": 17, "dtype": "main:attack", "same_as_record": true, "alt_differs": true, "alt_is_b": false, "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 3, \"card\": \"OP13-003\"}"
+420 {"seed": 4461091, "step": 67, "dtype": "main:activate_main", "same_as_record": true, "alt_differs": false, "alt_is_b": false, "alt_desc": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"OP15-032\"}"
+440 {"seed": 4461095, "step": 91, "dtype": "main:attach", "same_as_record": true, "alt_differs": true, "alt_is_b": false, "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP01-006\"}", "chosen_desc": 

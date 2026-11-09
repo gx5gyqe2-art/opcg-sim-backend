@@ -1,0 +1,19 @@
+value 2652064行（val 378772） policy 1054500点（val 150782） 93s
+warm-start: opcg_sim/data/learned/nrel_r27.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 1912706/2652064
+pair: 1417 対（holdout 206）λ=0.5 価値の重み 1.0 16 回ごとに 32 組
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 13385224行 12.7s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.518419868659487, "entropy_q_improved": 1.093331961064759}
+  ep0 step 5000/23000 mse 0.4916 ce 1.6989 277s
+  ep0 step 10000/23000 mse 0.4884 ce 1.6975 439s
+  ep0 step 15000/23000 mse 0.4869 ce 1.6997 592s
+  ep0 step 20000/23000 mse 0.4850 ce 1.6999 742s
+ep0 train mse 0.4841 ce 1.6997 | val v_mse 0.5613 v_sign 0.790 pi_top1 0.505 ce 1.667 834s
+  aux val huber 0.4331 tok 0.1194
+  pair {"tr": {"n": 1211, "v_mse": 0.1069, "d_mse": 0.0756, "d_corr": 0.3381, "d_slope": 0.2103, "dv_mean": -0.0444, "dt_mean": -0.0349}, "va": {"n": 206, "v_mse": 0.1873, "d_mse": 0.0677, "d_corr": 0.2522, "d_slope": 0.2344, "dv_mean": -0.0579, "dt_mean": -0.0383}}
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 716.476, "steps": 23000, "breakdown": {"budget_p": 2.397, "holdout": 1.858, "rel_p": 0.061, "rel_v": 28.852, "slice_p": 31.431, "slice_v": 46.667, "step_p": 0.1, "step_p_bwd": 184.268, "step_p_fwd": 110.517, "step_v": 0.177, "step_v_bwd": 181.639, "step_v_fwd": 128.388, "step_v_prep": 0.07}, "train_mse": 0.48407900463621895, "train_ce": 1.6996641125540557, "val_vmse": 0.5612936615943909, "val_vsign": 0.7903, "val_pi_top1": 0.505, "val_p_loss": 1.6668383407592773, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.518419868659487, "entropy_q_improved": 1.093331961064759}, "val_pi_top1_visits": 0.555, "val_p_loss_visits": 1.807836410522461, "aux_weight": 0.1, "val_aux": 0.43307276623320945, "val_aux_tok": 0.11940465778593094, "train_aux": [0.4097169041633606, 0.11134445667266846], "pair": {"tr": {"n": 1211, "v_mse": 0.1069, "d_mse": 0.0756, "d_corr": 0.3381, "d_slope": 0.2103, "dv_mean": -0.0444, "dt_mean": -0.0349}, "va": {"n": 206, "v_mse": 0.1873, "d_mse": 0.0677, "d_corr": 0.2522, "d_slope": 0.2344, "dv_mean": -0.0579, "dt_mean": -0.0383}}, "train_pair": [0.2036028802394867, 0.0972665548324585]}
+  ep0 を n1_results/value_teach/nrel_B_s2.npz に保存（暫定最良）
+best ep0 val v_mse 0.5613 を保存
+N_REL_TRAIN_DONE {"out": "n1_results/value_teach/nrel_B_s2.npz"}

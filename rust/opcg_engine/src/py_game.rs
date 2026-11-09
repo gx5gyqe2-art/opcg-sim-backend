@@ -643,6 +643,45 @@ impl Game {
         Ok(Game { session, names: self.names.clone() })
     }
 
+    /// **ドンを 1 枚だけ出し入れする**（WP `don-jitter`・`docs/search_efficiency_plan.md` §7.75・生成の切替
+    /// `record_gen --don-jitter` だけが呼ぶ）。`delta=+1`＝ドンデッキの 1 枚をアクティブへ（ドンデッキが空なら
+    /// 何もせず `None`）・`delta=-1`＝場のアクティブの 1 枚をドンデッキへ（無ければレストの 1 枚・どちらも無ければ `None`）。
+    /// 付いているドンは動かさない。効果の見返りは無い（イベントも誘発も積まない）。
+    /// `from_hidden` の作り直しと違い、**乱数・既知の札・この対局だけの状態はそのまま**。
+    /// 戻り値は動かしたドンの元の置き場（"deck"／"active"／"rested"）。
+    fn shift_don(&mut self, player_id: &str, delta: i32) -> PyResult<Option<String>> {
+        use crate::journal::{DonBoolField, DonZone};
+        let seat = self.seat_of(player_id)?;
+        let mut e = self.session.edit();
+        let (from, to) = match delta {
+            1 => (DonZone::Deck, DonZone::Active),
+            -1 => {
+                if !e.don_zone(seat, DonZone::Active).is_empty() {
+                    (DonZone::Active, DonZone::Deck)
+                } else {
+                    (DonZone::Rested, DonZone::Deck)
+                }
+            }
+            _ => return Err(PyValueError::new_err("shift_don: delta は +1 か -1")),
+        };
+        let n = e.don_zone(seat, from).len();
+        if n == 0 {
+            return Ok(None);
+        }
+        let d = e.don_zone_remove_at(seat, from, n - 1);
+        e.set_don_bool(d, DonBoolField::IsRest, false);
+        e.set_don_bool(d, DonBoolField::IsFrozen, false);
+        e.don_zone_push(seat, to, d);
+        Ok(Some(
+            match from {
+                DonZone::Deck => "deck",
+                DonZone::Active => "active",
+                _ => "rested",
+            }
+            .to_owned(),
+        ))
+    }
+
     /// **読み取り専用の複製**（手の値段の後続局面・`clock_succ.py`・`docs/reports/2026-10-10_clock_value.md` §1.2）。
     ///
     /// 真の盤面（完全情報）を写した別の対局を返す。乱数は `Replay`（混ぜない）・巻き戻しの記録は空。

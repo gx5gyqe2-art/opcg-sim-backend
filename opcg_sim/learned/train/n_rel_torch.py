@@ -28,6 +28,7 @@ import numpy as np
 import torch
 
 from opcg_sim.learned import n_eff as NE
+from opcg_sim.learned.train import dump_io as DIO
 from opcg_sim.learned import n_rel as NL
 from opcg_sim.learned import n_rel_feat as NR
 from opcg_sim.learned.n_rel import (
@@ -79,6 +80,14 @@ class TorchNRel(torch.nn.Module):
         if self.time:
             for p in NL.TIME_PARAMS:
                 setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
+        # 価値の出口のまっすぐな道（§7.78）も同じ流儀（`net.value_skip` のときだけ Parameter）。
+        self.value_skip = bool(getattr(net, "value_skip", False))
+        if self.value_skip:
+            self.Wvz = torch.nn.Parameter(_f32(net.Wvz))
+        # 理論の列（§7.82）も同じ流儀（`net.theory_in` のときだけ Parameter）。
+        self.theory_in = bool(getattr(net, "theory_in", False))
+        if self.theory_in:
+            self.W1t = torch.nn.Parameter(_f32(net.W1t))
         self.register_buffer("STATS", _f32(net.STATS))
         self.register_buffer("AB", _f32(net.AB))
         self.register_buffer("ABM", _f32(net.ABM))
@@ -201,7 +210,12 @@ class TorchNRel(torch.nn.Module):
         h = torch.zeros(B, N_TOK, D_H).index_copy(1, self.own, h_own).index_copy(1, self.opp, h_opp)
         return h * present[:, :, None], present
 
-    def body(self, sc, h, present):
+    def body(self, sc, h, present, want_z=False):
+        th = None
+        if self.theory_in:
+            if sc.shape[1] != D_SC + NL.D_TH:
+                raise ValueError(f"theory_in のネットには理論の列つきの sc（{D_SC}+{NL.D_TH} 列）が要る: {sc.shape[1]} 列")
+            sc, th = sc[:, :D_SC], sc[:, D_SC:]
         if self._sc_masked:
             sc = sc * self.sc_keep
         n = torch.clamp(present.sum(1, keepdim=True), min=1.0)
@@ -213,21 +227,33 @@ class TorchNRel(torch.nn.Module):
             mx = h_masked.max(1).values
             mx = torch.where(mx < -1e8, 0.0, mx)
         z = torch.cat([sc, mean, mx], 1)
-        r1 = torch.relu(z @ self.W1 + self.b1)
-        return torch.relu(r1 @ self.W2 + self.b2)
+        h1 = z @ self.W1 + self.b1
+        if th is not None:
+            h1 = h1 + th @ self.W1t              # 理論の列（§7.82・0 で始める）
+        r1 = torch.relu(h1)
+        e = torch.relu(r1 @ self.W2 + self.b2)
+        return (e, z) if want_z else e
+
+    def body_value(self, sc, h, present):
+        """(e, 価値の出口の tanh の前)。numpy 版 `NRelNet.body_value` と同じ式（切は今までの式そのまま）。"""
+        if not self.value_skip:
+            e = self.body(sc, h, present)
+            return e, (e @ self.Wv + self.bv)[:, 0]
+        e, z = self.body(sc, h, present, want_z=True)
+        return e, (e @ self.Wv + z @ self.Wvz + self.bv)[:, 0]
 
     def value(self, sc, ci, tok, rel_om, rel_oo):
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        return torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        _e, o = self.body_value(sc, h, present)
+        return torch.tanh(o)
 
     def value_with_aux(self, sc, ci, tok, rel_om, rel_oo):
         """(value, aux [B,10], aux_tok [B,6,3])。式は numpy 版 `NRelNet.value_with_aux` と同じ。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = torch.tanh(o)
         a = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
         ho = h[:, self.opp]
         at = torch.relu(ho @ self.Wy1 + self.by1) @ self.Wy2 + self.by2
@@ -241,13 +267,14 @@ class TorchNRel(torch.nn.Module):
         """共有表現 e → 時間軸の予測 [B,7]（numpy 版 `NRelNet.time_head` と同じ式）。"""
         return torch.relu(e @ self.Wu1 + self.bu1) @ self.Wu2 + self.bu2
 
-    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False, time=False):
+    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False, time=False,
+                    want_e=False):
         """(value, aux, aux_tok, plan, time)＝要るヘッドだけ計算し、要らないものは None
-        （共有部は 1 回）。"""
+        （共有部は 1 回）。`want_e` なら末尾に共有表現 e を足す（WP `value-teach` の案 A の頭が使う）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
-        e = self.body(sc, h, present)
-        v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        e, o = self.body_value(sc, h, present)
+        v = torch.tanh(o)
         pa = pt = pq = pu = None
         if aux:
             pa = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
@@ -257,7 +284,13 @@ class TorchNRel(torch.nn.Module):
             pq = self.plan_head(e)
         if time:
             pu = self.time_head(e)
+        if want_e:
+            return v, pa, pt, pq, pu, e
         return v, pa, pt, pq, pu
+
+    def res_head(self, e):
+        """共有表現 e → 資源の先読み [B,20]（WP `value-teach` の案 A・`value_teach.RES_COLS`）。"""
+        return torch.relu(e @ self.Wn1 + self.bn1) @ self.Wn2 + self.bn2
 
     # --- 方策 ---
     def cand_feats(self, tab, at, cid, tcid, tail):
@@ -383,7 +416,7 @@ class TorchTrainer:
     学習中の重みは `sync_to_numpy()` で書き戻す。"""
 
     def __init__(self, net, lr=5e-4, threads=None, betas=(0.9, 0.999), eps=1e-8, aux_weight=0.0,
-                 plan_weight=0.0, time_weight=0.0):
+                 plan_weight=0.0, time_weight=0.0, res_weight=0.0):
         self.net = net
         self.aux_weight = float(aux_weight)
         self.plan_weight = float(plan_weight)
@@ -394,6 +427,15 @@ class TorchTrainer:
         self.aux_loss = (0.0, 0.0)                # 直近の (aux, aux_tok)（エポック行に出す）
         self.plan_loss = (0.0, 0)                 # 直近の (方針損失, 有効行数)
         self.time_loss = (0.0, 0)                 # 直近の (時間軸損失, 有効行数)
+        # 資源の先読みの頭（WP `value-teach` の案 A）。`res_weight>0` のときだけ Parameter にする＝
+        # 0 なら optimizer が知りもしない＝今までの学習と 1 ビットも変わらない。
+        self.res_weight = float(res_weight)
+        self.res_loss = (0.0, 0)
+        self.pair_loss = (0.0, 0.0)               # 直近の (価値の mse, 対の差の mse)
+        if self.res_weight > 0.0:
+            from opcg_sim.learned.train import value_teach as VT
+            for k, a in VT.init_res_params(int(net.Wv.shape[0])).items():
+                setattr(self.tn, k, torch.nn.Parameter(_f32(a)))
         # 既定（threads が 0/None）は全コア。`n_rel_train` は import 時に OMP_NUM_THREADS=1 を
         # 立てる（numpy の BLAS はスレッドを増やすと**遅くなる**＝§4 の対照表）ので、torch の
         # 既定スレッド数もそれに引きずられて 1 になる。ここで明示的に上書きする。
@@ -427,6 +469,10 @@ class TorchTrainer:
             if self.tn.time:
                 for p in NL.TIME_PARAMS:
                     setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
+            if self.tn.value_skip:
+                self.net.Wvz = self.tn.Wvz.detach().numpy().copy()
+            if self.tn.theory_in:
+                self.net.W1t = self.tn.W1t.detach().numpy().copy()
 
     def _set_lr(self, lr):
         if lr != self._lr:
@@ -443,7 +489,7 @@ class TorchTrainer:
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
                    aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None,
-                   tm=None, tm_mask=None, time_w=None):
+                   tm=None, tm_mask=None, time_w=None, res=None, res_mask=None, vw=None, pd=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
@@ -454,8 +500,13 @@ class TorchTrainer:
         use_plan = bool(self.tn.plan and wq > 0.0 and plan is not None)
         wu = self.time_weight if time_w is None else float(time_w)
         use_time = bool(self.tn.time and wu > 0.0 and tm is not None and tm_mask is not None)
+        use_res = bool(self.res_weight > 0.0 and res is not None and res_mask is not None)
         self._mark("step_v_fwd")
-        if use_aux or use_plan or use_time:
+        if use_res:
+            v, pa, pt, pq, pu, e = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
+                                                       aux=use_aux, plan=use_plan, time=use_time,
+                                                       want_e=True)
+        elif use_aux or use_plan or use_time:
             v, pa, pt, pq, pu = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
                                                     aux=use_aux, plan=use_plan, time=use_time)
         else:
@@ -464,7 +515,11 @@ class TorchTrainer:
         # 報告する mse は numpy 版と同じ mean((v-z)²) そのもの（係数 0.5 は損失側だけ）。
         mse = ((v - tz) ** 2).mean()
         out = float(mse.detach())
-        loss = 0.5 * mse
+        if vw is None:
+            loss = 0.5 * mse
+        else:
+            # 行ごとの重み（§7.83・WP `don-weight`）: 損失だけ重みつき平均・報告する mse は重みなしのまま
+            loss = 0.5 * (_f32(vw) * (v - tz) ** 2).mean()
         if use_aux:
             la, lt = aux_loss_terms(pa, pt, _f32(aux), _f32(aux_tok), _f32(aux_mask))
             loss = loss + w * (la + lt)
@@ -479,9 +534,41 @@ class TorchTrainer:
             lu, nu = time_loss_terms(pu, _f32(tm), _f32(tm_mask))
             loss = loss + wu * lu
             self.time_loss = (float(lu.detach()), nu)
+        if use_res:
+            # 資源の先読み（WP `value-teach` の案 A）: `time` と同じ流儀（有効行の平均 Huber）
+            from opcg_sim.learned.train import value_teach as VT
+            lr_, nr_ = VT.res_loss_terms(self.tn.res_head(e), _f32(res), _f32(res_mask))
+            loss = loss + self.res_weight * lr_
+            self.res_loss = (float(lr_.detach()), nr_)
+        if pd is not None:
+            # 対の差の損失（§7.88・WP `pair-diff-loss`）: 倍率 × 0.5·Σ_対((v_m − v_l) − d)² ／ この回の価値の行数
+            from opcg_sim.learned.train import pair_diff as PDM
+            psc, pci, ptok, pdt, pfac = pd
+            B = pdt.shape[0]
+            pv = self.tn.value(_f32(psc), _i64(pci), _f32(ptok), None, None)
+            dd = PDM.diff_terms(pv, B, _f32(pdt))
+            loss = loss + float(pfac) * 0.5 * dd.sum() / tz.shape[0]
+            s_, n_ = getattr(self, "pd_loss", (0.0, 0))
+            self.pd_loss = (s_ + float(dd.detach().sum()), n_ + B)
         self._mark("step_v_bwd")
         self._update(loss, lr)
         return out
+
+    def pair_step(self, sc, ci, tok, t_a, t_b, lr, value_weight=1.0, lam=1.0):
+        """対照の対（WP `value-teach` の案 B）。行は [a の B 本, b の B 本]・`--ablate rel` 前提（R は渡さない）。"""
+        from opcg_sim.learned.train import value_teach as VT
+        v = self.tn.value(_f32(sc), _i64(ci), _f32(tok), None, None)
+        loss, mse, dmse = VT.pair_loss_terms(v, _f32(t_a), _f32(t_b), value_weight, lam)
+        self._update(loss, lr)
+        self.pair_loss = (float(mse.detach()), float(dmse.detach()))
+        return self.pair_loss
+
+    def res_params(self):
+        """案 A の頭の重み（numpy・保存用）。立っていなければ空。"""
+        if self.res_weight <= 0.0:
+            return {}
+        from opcg_sim.learned.train import value_teach as VT
+        return {k: getattr(self.tn, k).detach().numpy().copy() for k in VT.RES_PARAMS}
 
     def policy_step(self, sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget, pi, lr):
         """numpy 版と同じ引数の口（袋を毎回組み立てる＝従来どおり）。"""
@@ -547,8 +634,11 @@ class _Rows:
     float16／int16 でもそのまま動く）。"""
 
     def __init__(self, a, dtype):
-        self.a = np.asarray(a)
-        self.t = _maybe_tensor(self.a)
+        # 波をまたぐ memmap の view（`dump_io._Waves`）は**1 本にまとめない**＝RAM に載せない。
+        # `np.asarray` すると全波を連結した複製ができ、4 波（1,060 万行）で約 14GB になって
+        # 落ちた（2026-10-27・r28b）。1 波のときと同じく fancy index の経路で読む（値は同じ）。
+        self.a = a if isinstance(a, DIO._Waves) else np.asarray(a)
+        self.t = None if isinstance(self.a, DIO._Waves) else _maybe_tensor(self.a)
         self.dtype = dtype
 
     def _cast(self, out):

@@ -1,0 +1,193 @@
+{
+ "wp": "reaudit-r29f4",
+ "spec": "docs/search_efficiency_plan.md §7.84",
+ "report": "docs/reports/2026-11-06_reaudit_r29f4.md",
+ "base": "5e00c5b",
+ "net": "nrel_r29f4 (shipped, PLAY_* settings)",
+ "judges": {
+  "judge1": "r29f4 160 sims (key r13d in tool output)",
+  "judge2": "r28x4 160 sims (key r20)"
+ },
+ "engine_changed": false,
+ "blunder": {
+  "games": 100,
+  "seeds": [
+   4461000,
+   4461099
+  ],
+  "void": 0,
+  "points_judged": 1000,
+  "cand": 17,
+  "replicated": 11,
+  "verified": 10,
+  "replicated_and_verified": 7,
+  "rate": 0.007,
+  "ci95": [
+   0.0034,
+   0.0144
+  ],
+  "previous_rate_reaudit_wr": 0.0025,
+  "by_kind_both": {
+   "main": [
+    3,
+    470
+   ],
+   "window": [
+    3,
+    452
+   ],
+   "commit": [
+    1,
+    58
+   ],
+   "lethal": [
+    0,
+    20
+   ]
+  },
+  "types": {
+   "world_vote_bias": 3,
+   "static_window_value": 3,
+   "read_loss": 1,
+   "matching_or_replay": 0,
+   "rules": 0,
+   "default_resolution": 0
+  },
+  "points": [
+   "4461051:163",
+   "4461063:108",
+   "4461015:141",
+   "4461041:164",
+   "4461008:96",
+   "4461060:73",
+   "4461056:63"
+  ],
+  "window_unstable": [
+   49,
+   452
+  ],
+  "mean_q_merge_trial": {
+   "main_points": 457,
+   "move_changes": 173,
+   "judged_diff_when_alt_is_b": 0.0,
+   "ci95": [
+    -0.012,
+    0.012
+   ],
+   "n": 98
+  }
+ },
+ "defense": {
+  "games": 300,
+  "seeds": [
+   4462000,
+   4462299
+  ],
+  "void": 0,
+  "points": 10406,
+  "threat_ko": 482,
+  "threat_otsu": 350,
+  "miss_raw_ko": 23,
+  "miss_raw_otsu": 9,
+  "miss_verified_ko": 12,
+  "miss_verified_otsu": 6,
+  "from_commit": 0,
+  "kept_by_playout": 2,
+  "kept_by_playout_otsu": 1,
+  "kept_points": [
+   "4462251:172 (opponent attack-time optional effect, life 0, static dialog value)",
+   "4462001:131 (life-1 counter, short tree misread)"
+  ]
+ },
+ "commit": {
+  "games": 50,
+  "seeds": [
+   4463000,
+   4463049
+  ],
+  "void": 0,
+  "commit_points_own": 422,
+  "share_of_own": 0.0821,
+  "rethink_differs": 0.1967,
+  "calibration_differs": 0.1422,
+  "deep_root_fresh_vs_live": [
+   44,
+   39
+  ],
+  "deep_child_fresh_vs_live": [
+   37,
+   33
+  ],
+  "loss_type_found": false
+ },
+ "fix_candidates": [
+  {
+   "id": "A",
+   "what": "read opponent-turn defensive dialogs (attack-time optional confirm / select) with the short tree, not static value",
+   "recommend": true,
+   "estimate_elo": "+1 to +10 (wide)"
+  },
+  {
+   "id": "B",
+   "what": "short tree for life 2-3 battle windows",
+   "recommend": false
+  },
+  {
+   "id": "C",
+   "what": "world vote bias: merge worlds by mean value",
+   "recommend": false,
+   "reason": "break-even on 457 main points"
+  },
+  {
+   "id": "D",
+   "what": "tool: blunder_audit recheck KeyError verify_both (1 line)",
+   "recommend": true
+  }
+ ],
+ "shards": [
+  "claude/reaudit-r29f4-s01",
+  "s02",
+  "s03",
+  "s04",
+  "s05 (blunder judge)",
+  "s06 (commit)",
+  "s07",
+  "s08 (defense)"
+ ],
+ "notes": "see report §7",
+ "cross_check": {
+  "blunder_17cand": {
+   "new_referees": {
+    "recheck": 11,
+    "verify": 10,
+    "both": 7
+   },
+   "old_referees_r13d_r20": {
+    "recheck": 8,
+    "verify": 8,
+    "both": 5,
+    "rate": 0.005,
+    "ci95": [
+     0.0021,
+     0.0117
+    ]
+   },
+   "drop_with_old_referees": [
+    "4461041:164",
+    "4461060:73"
+   ]
+  },
+  "defense_12": {
+   "checker_counts_any_form": [
+    12,
+    6
+   ],
+   "kept_by_playout_both_form": 2,
+   "kept_by_playout_mover_only_form": 1,
+   "kept_in_both_forms": [
+    "4462251:172"
+   ]
+  },
+  "report_section": "§9"
+ }
+}

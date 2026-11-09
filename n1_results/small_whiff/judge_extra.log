@@ -1,0 +1,10 @@
+JUDGE todo 8 k=16 -> n1_results/small_whiff/points.jsonl
+JUDGE seed=4171077 step=186 alt=c reused=0 a-b=-0.0625 ci=[-0.2186, 0.3436] n=16 sec=223.7 (1/8 226s)
+JUDGE seed=4171057 step=57 alt=d reused=0 a-b=0.1875 ci=[-0.5085, 0.1335] n=16 sec=225.9 (2/8 228s)
+JUDGE seed=4171018 step=131 alt=d reused=0 a-b=-0.0 ci=[0.0, 0.0] n=16 sec=300.3 (3/8 302s)
+JUDGE seed=4171101 step=61 alt=d reused=0 a-b=0.25 ci=[-0.5847, 0.0847] n=16 sec=98.0 (4/8 324s)
+JUDGE seed=4171061 step=103 alt=c reused=0 a-b=-0.0625 ci=[-0.1543, 0.2793] n=16 sec=358.2 (5/8 360s)
+JUDGE seed=4171123 step=83 alt=c reused=0 a-b=-0.0 ci=[0.0, 0.0] n=16 sec=84.3 (6/8 387s)
+JUDGE seed=4171113 step=9 alt=d reused=0 a-b=-0.0 ci=[0.0, 0.0] n=16 sec=212.9 (7/8 441s)
+JUDGE seed=4171135 step=75 alt=d reused=0 a-b=-0.0 ci=[0.0, 0.0] n=16 sec=286.7 (8/8 611s)
+JUDGE_DONE

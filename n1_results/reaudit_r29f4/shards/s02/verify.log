@@ -1,0 +1,6 @@
+VERIFY todo 4 (done 0) k=24 both=True -> n1_results/reaudit_r29f4/shards/s02/verify.jsonl
+VERIFY seed=4461025 step=67 r13d=-0.0417 [-0.2914, 0.208] r20=0.0417 [-0.208, 0.2914] sec=275.2 (1/4 277s)
+VERIFY seed=4461028 step=147 r13d=0.375 [0.1771, 0.5729] r20=0.25 [0.073, 0.427] sec=318.7 (2/4 320s)
+VERIFY seed=4461031 step=71 r13d=0.1667 [-0.0882, 0.4215] r20=-0.1667 [-0.3926, 0.0592] sec=552.6 (3/4 554s)
+VERIFY seed=4461027 step=18 r13d=0.0417 [-0.1018, 0.1852] r20=0.1667 [-0.0592, 0.3926] sec=568.5 (4/4 570s)
+VERIFY_DONE

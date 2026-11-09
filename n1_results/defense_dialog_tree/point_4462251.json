@@ -1,0 +1,1513 @@
+{
+ "seed": 4462251,
+ "step": 172,
+ "who": "p1",
+ "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+ "life": [
+  0,
+  0
+ ],
+ "pending": "CONFIRM_OPTIONAL",
+ "legal": [
+  "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+ ],
+ "reads_audit_cfg": {
+  "off": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   }
+  ],
+  "life1": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.958,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.979,
+     -0.985
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.96,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.991,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.982
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.969,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.962,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.987
+    ]
+   }
+  ],
+  "all": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.958,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.979,
+     -0.985
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.96,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.991,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.982
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.969,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.962,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.987
+    ]
+   }
+  ],
+  "life1_fold": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.989,
+     -0.988
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.988,
+     -0.984
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.989,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.991,
+     -0.988
+    ]
+   }
+  ]
+ },
+ "reads_ship": {
+  "off": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 16,
+     "tree": false
+    },
+    "Q": [
+     -0.742,
+     -0.684
+    ]
+   }
+  ],
+  "life1": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.958,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.979,
+     -0.985
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.96,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.991,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.982
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.969,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.962,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.987
+    ]
+   }
+  ],
+  "all": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.958,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.979,
+     -0.985
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.96,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.991,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.982
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.969,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.962,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     0.985,
+     -0.987
+    ]
+   }
+  ],
+  "life1_fold": [
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.986
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.989,
+     -0.988
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.988,
+     -0.984
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.99,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.989,
+     -0.987
+    ]
+   },
+   {
+    "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+    "mv": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "window": {
+     "worlds": 2,
+     "tree": true
+    },
+    "Q": [
+     -0.991,
+     -0.988
+    ]
+   }
+  ]
+ },
+ "playout_real": {
+  "off": {
+   "n": 16,
+   "win": 0.0,
+   "lost_this_turn": 16,
+   "w": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "life1": {
+   "n": 16,
+   "win": 1.0,
+   "lost_this_turn": 0,
+   "w": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ]
+  },
+  "all": {
+   "n": 16,
+   "win": 1.0,
+   "lost_this_turn": 0,
+   "w": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ]
+  }
+ }
+}

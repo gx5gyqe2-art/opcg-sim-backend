@@ -1,0 +1,1212 @@
+{
+ "cases": 25,
+ "rows": [
+  {
+   "seed": 4171018,
+   "step": 131,
+   "turn": 15,
+   "name": "Ｘ・ドレーク",
+   "card": "OP17-075",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"EB04-031\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 1.0,
+   "wins_alt": 1.0,
+   "pairs": 16,
+   "reused": 8,
+   "runner": null,
+   "order": null,
+   "other_char": {
+    "desc": "打った手 − クイーンを出す手",
+    "played_minus_alt": -0.0,
+    "ci": [
+     -0.0,
+     -0.0
+    ],
+    "pairs": 16,
+    "wins_played": 1.0,
+    "wins_alt": 1.0
+   },
+   "first_works": false,
+   "first_what": "窓は出たが効く対象が無い（窓: CONFIRM_OPTIONAL）",
+   "here": [
+    false,
+    "窓は出たが効く対象が無い（窓: CONFIRM_OPTIONAL）"
+   ],
+   "d_exists": true,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    1123.0,
+    0.9996
+   ],
+   "alt_nq": [
+    716.0,
+    0.9997
+   ],
+   "fresh_same": true,
+   "verdict": "対象外（前段の取り違え）",
+   "type": "効果は払えたが使わなかった",
+   "reason": "前段（small-use）は、カード DB の名「Ｘ・ドレーク」（全角）とエンジンの確認の窓の名「X・ドレーク」（半角）が合わず、確認の窓を見落として『コストが払えない』と数えていた。実際は出した直後に効果（ドン!!−2：相手の手札 1 枚を捨てる）を使うかの確認が出て、CPU が『使わない』を選んだ。局面は勝ちが決まっていて（根の評価が全部 +1.000）、どの手でも 16 通りすべて勝ち。手札のクイーンを出す手とも差なし。"
+  },
+  {
+   "seed": 4171019,
+   "step": 193,
+   "turn": 16,
+   "name": "カポネ・ベッジ",
+   "card": "OP10-103",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"OP10-114\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 1.0,
+   "wins_alt": 1.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    4.0,
+    -0.8301
+   ],
+   "alt_nq": [
+    5036.0,
+    0.9619
+   ],
+   "fresh_same": false,
+   "verdict": "仕方ない",
+   "type": "詰みの手順の中",
+   "reason": "詰みの証明（どの配り方でも勝てる手順）が選んだ手の一部。代わりの手でも 16 通りすべて同じ結果。"
+  },
+  {
+   "seed": 4171028,
+   "step": 110,
+   "turn": 11,
+   "name": "ガン・フォール",
+   "card": "EB01-054",
+   "why": "cond_unmet",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP05-106\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0625,
+   "ci": [
+    -0.2793,
+    0.1543
+   ],
+   "wins_played": 0.25,
+   "wins_alt": 0.3125,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    3434.0,
+    0.0093
+   ],
+   "alt_nq": [
+    1237.0,
+    -0.1327
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した（ブロッカー）",
+   "reason": "登場時の KO は相手のライフ 1 枚以下のときだけのおまけ。【ブロッカー】の 4000 の体が目的。手札は他にフランキーだけで、代わりの手（シュラにドンを付ける）と差なし。"
+  },
+  {
+   "seed": 4171050,
+   "step": 21,
+   "turn": 5,
+   "name": "モンキー・Ｄ・ルフィ",
+   "card": "OP12-015",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP12-004\"}",
+   "alt_src": "root",
+   "played_minus_alt": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ],
+   "wins_played": 0.1562,
+   "wins_alt": 0.0938,
+   "pairs": 32,
+   "reused": 16,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    4160.0,
+    -0.8221
+   ],
+   "alt_nq": [
+    308.0,
+    -0.8066
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "手札のイベントは 1 枚（効果は 2 枚の公開が要る）。4000（ドン 2 枚付与で 6000）の体として出した。代わりの光月おでんを出す手と差なし（32 通りで +0.06）。"
+  },
+  {
+   "seed": 4171050,
+   "step": 37,
+   "turn": 7,
+   "name": "モンキー・Ｄ・ルフィ",
+   "card": "OP12-015",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP12-009\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    2766.0,
+    -0.867
+   ],
+   "alt_nq": [
+    650.0,
+    -0.8719
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "手札のイベントは 1 枚。代わりのジンベエも同じ『イベント 2 枚の公開』が要るカードで、効果の働く別の札が無い。差なし。"
+  },
+  {
+   "seed": 4171050,
+   "step": 38,
+   "turn": 7,
+   "name": "ジンベエ",
+   "card": "OP12-009",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP12-001\", \"targets\": [\"OP09-042\"]}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0625,
+   "wins_alt": 0.0625,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    1638.0,
+    -0.8644
+   ],
+   "alt_nq": [
+    755.0,
+    -0.8637
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "手札のイベントは 1 枚で、ターンのどの順番でも効果は払えない。差なし。"
+  },
+  {
+   "seed": 4171051,
+   "step": 81,
+   "turn": 9,
+   "name": "トニートニー・チョッパー",
+   "card": "OP07-066",
+   "why": "cond_unmet",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"ACTIVATE_MAIN\", \"card\": \"OP07-071\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0625,
+   "wins_alt": 0.0625,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    2843.0,
+    -0.5867
+   ],
+   "alt_nq": [
+    1392.0,
+    -0.5827
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した（ブロッカー）",
+   "reason": "ドンの枚数の条件（自分の場のドンが相手以下）は満たせない（自分 10・相手 8）。【ブロッカー】として出し、実際に 1 回ブロックした。差なし。"
+  },
+  {
+   "seed": 4171057,
+   "step": 57,
+   "turn": 7,
+   "name": "シャム",
+   "card": "OP03-027",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP03-021\", \"targets\": [\"OP13-079\"]}",
+   "alt_src": "root",
+   "played_minus_alt": 0.1562,
+   "ci": [
+    0.0011,
+    0.3114
+   ],
+   "wins_played": 0.3125,
+   "wins_alt": 0.1562,
+   "pairs": 32,
+   "reused": 16,
+   "runner": null,
+   "order": null,
+   "other_char": {
+    "desc": "打った手 − イゾウを出す手",
+    "played_minus_alt": 0.1875,
+    "ci": [
+     -0.1335,
+     0.5085
+    ],
+    "pairs": 16,
+    "wins_played": 0.3125,
+    "wins_alt": 0.125
+   },
+   "first_works": null,
+   "first_what": "ターンの最初には手札に無かった（このターンに引いた・手札に加えた）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": true,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    3054.0,
+    -0.8451
+   ],
+   "alt_nq": [
+    581.0,
+    -0.8974
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "効果の働く別のキャラが手札にあった",
+   "reason": "相手のキャラ（トップマン・ウォーキュリー聖・コスト 4）はシャムのレスト（コスト 2 以下）の対象外。手札のイゾウ（コスト 4 以下をレスト）なら効いた。判定は、シャムを出す手が代わり（クロでアタック）より有意に良く（32 通りで +0.16）、イゾウを出す手とも差なし（+0.19・有意ではない）。シャムは 4000・イゾウは 3000 の体。"
+  },
+  {
+   "seed": 4171058,
+   "step": 7,
+   "turn": 3,
+   "name": "シャム",
+   "card": "OP03-027",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP03-021\", \"targets\": [\"OP12-081\"]}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0625,
+   "ci": [
+    -0.185,
+    0.06
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0625,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    2478.0,
+    -0.7453
+   ],
+   "alt_nq": [
+    1223.0,
+    -0.7214
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "3 ターン目で相手の場が空・手札に『ブチ』が無い。手札は他にジャンゴとギンだけ。差なし。"
+  },
+  {
+   "seed": 4171058,
+   "step": 123,
+   "turn": 11,
+   "name": "イゾウ",
+   "card": "OP01-033",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP03-021\", \"targets\": [\"OP12-094\"]}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    1294.0,
+    -0.9951
+   ],
+   "alt_nq": [
+    1152.0,
+    -0.9943
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "負けの決まった局面",
+   "reason": "相手のキャラは全部コスト 6 以上（ドラゴン 2 体・ロビン）でレストの対象が無い。根の評価は −1.000 前後で、どの手でも 16 通りすべて負け。"
+  },
+  {
+   "seed": 4171061,
+   "step": 119,
+   "turn": 11,
+   "name": "ドンキホーテ・ロシナンテ",
+   "card": "OP16-070",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"TURN_END\"}",
+   "alt_src": "root",
+   "played_minus_alt": 0.125,
+   "ci": [
+    -0.12,
+    0.37
+   ],
+   "wins_played": 0.625,
+   "wins_alt": 0.5,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": {
+    "desc": "ターンの最初の判断点で、記録の手 − 先にこのキャラを出す手",
+    "played_minus_alt": -0.0625,
+    "ci": [
+     -0.2793,
+     0.1543
+    ],
+    "pairs": 16,
+    "wins_played": 0.3125,
+    "wins_alt": 0.375
+   },
+   "other_char": null,
+   "first_works": true,
+   "first_what": "効果が対象に効いた（RAMP_DON）（窓: CONFIRM_OPTIONAL）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    4144.0,
+    -0.5376
+   ],
+   "alt_nq": [
+    526.0,
+    -0.7693
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "出す順番",
+   "reason": "先にキャラへドンを付けてアタックしたため、出した後にレストにできるドンが 2 枚残らなかった。ターンの最初に出していれば効果（ドン追加）が働いた。ただし判定は順番を変えても差なし（−0.06）、ターン終了と比べても差なし。"
+  },
+  {
+   "seed": 4171063,
+   "step": 19,
+   "turn": 4,
+   "name": "マーガレット",
+   "card": "OP07-054",
+   "why": "negated",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP09-056\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.8125,
+   "wins_alt": 0.8125,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    3869.0,
+    0.3325
+   ],
+   "alt_nq": [
+    1121.0,
+    0.3018
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "登場時が無効の間に出した",
+   "reason": "相手のリーダー（ティーチ）の起動効果で、このターンの終わりまで登場時が無効。1 ターン待てば（相手がもう一度手札を捨てて無効にしなければ）1 枚引けた。2000 の【ブロッカー】の体としては働く。差なし。"
+  },
+  {
+   "seed": 4171063,
+   "step": 20,
+   "turn": 4,
+   "name": "Mr.3(ギャルディーノ)",
+   "card": "OP09-056",
+   "why": "negated",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"TURN_END\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.253,
+    0.253
+   ],
+   "wins_played": 0.8125,
+   "wins_alt": 0.8125,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    4248.0,
+    0.3343
+   ],
+   "alt_nq": [
+    872.0,
+    0.2222
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "登場時が無効の間に出した",
+   "reason": "同じ無効の中でのサーチ。1 ターン待てば働いた（相手がもう一度無効にしなければ）。体は 2000・ブロッカーなし。差なし（区間は ±0.25 と広い）。"
+  },
+  {
+   "seed": 4171077,
+   "step": 204,
+   "turn": 17,
+   "name": "ドール",
+   "card": "OP11-008",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"TURN_END\"}",
+   "alt_src": "root",
+   "played_minus_alt": 0.2188,
+   "ci": [
+    0.0273,
+    0.4102
+   ],
+   "wins_played": 0.7812,
+   "wins_alt": 0.5625,
+   "pairs": 32,
+   "reused": 16,
+   "runner": null,
+   "order": {
+    "desc": "ターンの最初の判断点で、記録の手 − 先にこのキャラを出す手",
+    "played_minus_alt": -0.0625,
+    "ci": [
+     -0.3436,
+     0.2186
+    ],
+    "pairs": 16,
+    "wins_played": 0.8125,
+    "wins_alt": 0.875
+   },
+   "other_char": null,
+   "first_works": true,
+   "first_what": "効果が対象に効いた（BUFF）（窓: CONFIRM_OPTIONAL・SEARCH_AND_SELECT）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    3888.0,
+    0.198
+   ],
+   "alt_nq": [
+    1232.0,
+    0.1613
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "出す順番",
+   "reason": "効果のコストは『手札 1 枚を捨てる』。同じターンに先にリッパーを出したので、ドールを出すと手札が 0 枚になり払えなかった。ターンの最初にドールを出していれば効果（相手のキャラ 1 枚のパワー −6000）の確認が出た。ただし判定は、出した手がターン終了より有意に良く（32 通りで +0.22）、ターンの最初に順番を変えた手とも差なし。"
+  },
+  {
+   "seed": 4171092,
+   "step": 34,
+   "turn": 5,
+   "name": "ガン・フォール",
+   "card": "EB01-054",
+   "why": "cond_unmet",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"TURN_END\"}",
+   "alt_src": "root",
+   "played_minus_alt": 0.2188,
+   "ci": [
+    -0.026,
+    0.4635
+   ],
+   "wins_played": 0.4062,
+   "wins_alt": 0.1875,
+   "pairs": 32,
+   "reused": 16,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    4936.0,
+    0.0304
+   ],
+   "alt_nq": [
+    110.0,
+    -0.1564
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した（ブロッカー）",
+   "reason": "相手のライフ 4 枚で KO の条件は満たせない。【ブロッカー】の体。代わり（ターン終了）より良い側に寄る（32 通りで +0.22・有意ではない）。"
+  },
+  {
+   "seed": 4171094,
+   "step": 8,
+   "turn": 3,
+   "name": "シャンクス",
+   "card": "OP12-007",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP12-001\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    878.0,
+    -0.9278
+   ],
+   "alt_nq": [
+    738.0,
+    -0.9173
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "3 ターン目で自分の場に『ロジャー海賊団』のキャラがいない。手札の他のキャラ（バギー）も同じ型で効果が働かない。差なし。"
+  },
+  {
+   "seed": 4171094,
+   "step": 114,
+   "turn": 11,
+   "name": "モンキー・Ｄ・ルフィ",
+   "card": "OP12-015",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP12-001\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 8,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    1080.0,
+    -0.999
+   ],
+   "alt_nq": [
+    652.0,
+    -0.9989
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "負けの決まった局面",
+   "reason": "手札のイベントは 0 枚で効果は払えない。根の評価は −1.000 で、どの手でも 16 通りすべて負け。"
+  },
+  {
+   "seed": 4171096,
+   "step": 14,
+   "turn": 4,
+   "name": "シャーロット・クラッカー",
+   "card": "OP17-104",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP17-102\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.125,
+   "ci": [
+    -0.2414,
+    -0.0086
+   ],
+   "wins_played": 0.8438,
+   "wins_alt": 0.9688,
+   "pairs": 32,
+   "reused": 16,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "違和感あり・損",
+   "a_nq": [
+    3134.0,
+    0.8092
+   ],
+   "alt_nq": [
+    1639.0,
+    0.8336
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損",
+   "type": "体として出した（もっと良い体があった）",
+   "reason": "4 枚のドンでコスト 3 を払うと 1 枚しか残らず、効果（ドン 2 枚をレストにしてライフ +1）は払えない。同じ 4000 の体なら、根の次点のシャーロット・オーブン（コスト 4・KO 時にトラッシュからキャラを登場）の方が判定で良かった（32 通りで −0.125）。ネットの事前の見込みがクラッカー 0.68・オーブン 0.19 と偏り、評価はオーブンが上（+0.834 対 +0.809）なのに訪問がクラッカーに集まった。"
+  },
+  {
+   "seed": 4171096,
+   "step": 26,
+   "turn": 6,
+   "name": "シャーロット・スムージー",
+   "card": "OP17-106",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP17-099\", \"targets\": [\"OP16-041\"]}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.6875,
+   "wins_alt": 0.6875,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    3325.0,
+    0.7271
+   ],
+   "alt_nq": [
+    633.0,
+    0.7139
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "6 枚のドンでコスト 5 を払うと 1 枚しか残らず、効果は払えない。手札の他のキャラで登場時が働くものは無い（モンドールは相手のコスト 1 以下のキャラがいない）。差なし。"
+  },
+  {
+   "seed": 4171101,
+   "step": 61,
+   "turn": 8,
+   "name": "ガン・フォール",
+   "card": "EB01-054",
+   "why": "cond_unmet",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"EB01-057\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.125,
+   "ci": [
+    -0.4772,
+    0.2272
+   ],
+   "wins_played": 0.4375,
+   "wins_alt": 0.5625,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": {
+    "desc": "打った手 − ワイパーを出す手",
+    "played_minus_alt": 0.25,
+    "ci": [
+     -0.0847,
+     0.5847
+    ],
+    "pairs": 16,
+    "wins_played": 0.4375,
+    "wins_alt": 0.1875
+   },
+   "first_works": false,
+   "first_what": "効果が動かない（窓も解決も無い）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": true,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    2651.0,
+    -0.0346
+   ],
+   "alt_nq": [
+    1180.0,
+    -0.0899
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "効果の働く別のキャラが手札にあった",
+   "reason": "相手のライフ 3 枚で KO の条件は満たせない。手札のワイパーなら登場時（山から登場）が働いた。判定はガン・フォール（【ブロッカー】）の方がむしろ良い側（ワイパーに +0.25・有意ではない）。"
+  },
+  {
+   "seed": 4171113,
+   "step": 9,
+   "turn": 3,
+   "name": "つる",
+   "card": "OP02-106",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP04-096\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 8,
+   "runner": null,
+   "order": null,
+   "other_char": {
+    "desc": "打った手 − ギャッツを出す手",
+    "played_minus_alt": -0.0,
+    "ci": [
+     -0.0,
+     -0.0
+    ],
+    "pairs": 16,
+    "wins_played": 0.0,
+    "wins_alt": 0.0
+   },
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": true,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    1651.0,
+    -0.9921
+   ],
+   "alt_nq": [
+    994.0,
+    -0.9924
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "体も効果も無い札を出した",
+   "reason": "3 ターン目で相手の場が空。つるはパワー 0（カウンター 2000）で、効果も体も働かない。手札のギャッツの登場時は形の上では動くが、相手の場が空なので意味は無い。人間なら手札に残してカウンターに使う形。根の評価は −0.99 前後でどの手でも 16 通りすべて負け。"
+  },
+  {
+   "seed": 4171123,
+   "step": 100,
+   "turn": 11,
+   "name": "レオ",
+   "card": "OP10-057",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"TURN_END\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": {
+    "desc": "ターンの最初の判断点で、記録の手 − 先にこのキャラを出す手",
+    "played_minus_alt": -0.0,
+    "ci": [
+     -0.0,
+     -0.0
+    ],
+    "pairs": 16,
+    "wins_played": 0.0,
+    "wins_alt": 0.0
+   },
+   "other_char": null,
+   "first_works": true,
+   "first_what": "効果が対象に効いた（MOVE_CARD,REST）（窓: CONFIRM_OPTIONAL・SEARCH_AND_SELECT・ARRANGE_DECK・SEARCH_AND_SELECT）",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    2893.0,
+    -0.9994
+   ],
+   "alt_nq": [
+    2227.0,
+    -0.9993
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "出す順番",
+   "reason": "先にリーダーのウソップでアタックしてレストにしたので、効果のコスト（リーダーかステージをレスト）が払えなかった。ターンの最初に出せば働いた。ただし自分のライフ 0・相手 5 で負けが決まっていて、どの手でも 16 通りすべて負け。"
+  },
+  {
+   "seed": 4171132,
+   "step": 4,
+   "turn": 3,
+   "name": "ライムジュース",
+   "card": "OP09-014",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 3, \"card\": \"OP09-001\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0625,
+   "ci": [
+    -0.3436,
+    0.2186
+   ],
+   "wins_played": 0.1875,
+   "wins_alt": 0.25,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    3213.0,
+    -0.1388
+   ],
+   "alt_nq": [
+    578.0,
+    -0.2235
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "3 ターン目で相手の場が空。手札の他のキャラ（シャンクス・ラッキー・ルウ）に登場時が働くものが無い。3000 の体。差なし。"
+  },
+  {
+   "seed": 4171135,
+   "step": 24,
+   "turn": 5,
+   "name": "モンキー・Ｄ・ルフィ",
+   "card": "OP12-015",
+   "why": "cost_unpayable",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP12-001\", \"targets\": [\"OP04-085\"]}",
+   "alt_src": "root",
+   "played_minus_alt": 0.0625,
+   "ci": [
+    -0.06,
+    0.185
+   ],
+   "wins_played": 0.1875,
+   "wins_alt": 0.125,
+   "pairs": 16,
+   "reused": 8,
+   "runner": null,
+   "order": null,
+   "other_char": null,
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": false,
+   "body": false,
+   "auto": "差なし",
+   "a_nq": [
+    3218.0,
+    -0.6987
+   ],
+   "alt_nq": [
+    518.0,
+    -0.7252
+   ],
+   "fresh_same": true,
+   "verdict": "仕方ない",
+   "type": "体として出した",
+   "reason": "手札のイベントは 1 枚。手札の他のキャラ（バギー・シャンクス）も効果が働かない。差なし。"
+  },
+  {
+   "seed": 4171135,
+   "step": 75,
+   "turn": 9,
+   "name": "バギー",
+   "card": "OP12-012",
+   "why": "no_target",
+   "alt": "b",
+   "alt_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP12-016\"}",
+   "alt_src": "root",
+   "played_minus_alt": -0.0,
+   "ci": [
+    -0.0,
+    -0.0
+   ],
+   "wins_played": 0.0,
+   "wins_alt": 0.0,
+   "pairs": 16,
+   "reused": 0,
+   "runner": null,
+   "order": null,
+   "other_char": {
+    "desc": "打った手 − ジンベエを出す手",
+    "played_minus_alt": -0.0,
+    "ci": [
+     -0.0,
+     -0.0
+    ],
+    "pairs": 16,
+    "wins_played": 0.0,
+    "wins_alt": 0.0
+   },
+   "first_works": null,
+   "first_what": "このターンの最初の手だった",
+   "here": [
+    false,
+    "効果が動かない（窓も解決も無い）"
+   ],
+   "d_exists": true,
+   "body": true,
+   "auto": "差なし",
+   "a_nq": [
+    634.0,
+    -0.9859
+   ],
+   "alt_nq": [
+    482.0,
+    -0.9883
+   ],
+   "fresh_same": true,
+   "verdict": "違和感あり・損は見えない",
+   "type": "効果の働く別のキャラが手札にあった",
+   "reason": "自分の場に『ロジャー海賊団』のキャラがいない。手札のジンベエ（イベント 2 枚の公開で速攻・パワー+1000）なら働いた。根の評価は −0.99 でどの手でも 16 通りすべて負け。"
+  }
+ ],
+ "verdict_counts": {
+  "対象外（前段の取り違え）": 1,
+  "仕方ない": 14,
+  "違和感あり・損は見えない": 9,
+  "違和感あり・損": 1
+ },
+ "type_counts": {
+  "効果は払えたが使わなかった": 1,
+  "詰みの手順の中": 1,
+  "体として出した（ブロッカー）": 3,
+  "体として出した": 8,
+  "効果の働く別のキャラが手札にあった": 3,
+  "負けの決まった局面": 2,
+  "出す順番": 3,
+  "登場時が無効の間に出した": 2,
+  "体として出した（もっと良い体があった）": 1,
+  "体も効果も無い札を出した": 1
+ },
+ "mean_played_minus_alt": {
+  "n": 25,
+  "mean": 0.0163,
+  "ci": [
+   -0.0177,
+   0.0502
+  ],
+  "sd": 0.0866
+ }
+}

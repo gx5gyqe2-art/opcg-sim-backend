@@ -27,7 +27,7 @@ use super::mcts::{
     C_PUCT, Q_MIN_FRAC, SERVE_SIMS,
 };
 use super::quiesce::{
-    best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
+    argmax_f64, best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
     Ctx, SearchState, TraceStep, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
 };
 use super::rng::SearchRng;
@@ -44,6 +44,19 @@ pub struct DecideOptions {
     pub dirichlet_eps: f64,
     /// `temp_turns`（0＝無効。turn <= これ のメイン窓で訪問分布からサンプルする）
     pub temp_turns: i32,
+    /// §7.73 `gen-explore`: `temp_turns` より後のメイン窓でも、1 手ごとにこの確率で訪問分布から
+    /// サンプルする（0＝無効＝乱数を引かない＝今までと 1 ビットも同じ）。
+    pub temp_late: f64,
+    /// §7.73 段 5（度合い）: 後半の温度で引くときの分布の指数。訪問の割合を `pow` 乗して正規化する
+    /// （1.0＝訪問に比例＝今までと 1 ビットも同じ・0.5＝平らに・0＝一様）。序盤の温度には効かない。
+    pub temp_late_pow: f64,
+    /// §7.79 WP `light-rollout`（**測定専用**・既定 0＝無効＝1 ビットも同じ）: メインの判断点の木の手を、
+    /// 根の事前分布（ネットの打ち方の割合）から選び直す。1＝割合が最大の手・2＝割合に比例して引く（温度 1）。
+    /// 探索の回数（`sims`）は別に決める（0 にすれば木は回らず、根を広げた 1 回の評価だけ）。
+    /// 窓・対話の決め方は変えない（1・2）。3＝割合から引く上に、戦闘の窓・効果の対話も根畳みの読み（配り直しの静的な読み）を
+    /// 使わず同じ根の事前分布から引く（木の中の箱畳みと静止探索も切るなら `box_battle`／`box_dialog`／`quiesce` を false で渡す）。
+    /// `temp_turns`／`temp_late` より後に掛かる（両方を渡したらこちらが勝つ）。
+    pub prior_pick: u8,
     /// `SERVE_BOX_COMMIT`
     pub box_commit: bool,
     /// `TREE_BOX_BATTLE`
@@ -166,6 +179,41 @@ pub struct DecideOptions {
     pub defense_proof_total: u64,
     /// 配り方を誰の視点で作るか（`defense_proof_view`・既定 [`DefenseView::Mine`]）。
     pub defense_proof_view: DefenseView,
+    /// 相手の手番の戦闘中に自分が答える効果の対話を短い木で読む（`defense_dialog_tree`・§7.85・
+    /// WP `rs-defense-dialog-tree`・既定 [`DefenseDialogTree::All`]〔2026-11-07・§7.87・WP `rs-ddt-default`〕・
+    /// `Off` は旧い形〔世界 K 本の静的な値〕に 1 bit も同じに戻る測定用）。
+    /// `Life1` は自分のライフが [`DecideOptions::window_tree_life`] 以下のときだけ、`All` はライフを問わず、
+    /// 相手の手番・戦闘中（`active_battle` が在る）に判断するのが自分の効果の対話（任意の効果の確認・
+    /// 探して選ぶ 等・ブロッカー／カウンターの選択ではないもの）で候補が 2 つ以上なら、戦闘の応手の
+    /// 短い木と同じ [`tree_branch_values`]（予算 `sims ÷ 候補の数`・世界は [`DecideOptions::window_tree_worlds`] まで）で比べる。
+    pub defense_dialog_tree: DefenseDialogTree,
+    /// 守りの対話の木で、候補を戦闘の終わりまで先に畳んでから木を回す形（`defense_dialog_fold`・§7.85・**測定専用**・既定 false）。
+    /// 既定（false）は候補を当てた直後の盤面から木を回す（対話の続きは木の中で読む）。true は戦闘の応手の木と同じ畳み方
+    /// （指示書の字面）。`defense_dialog_tree` が off なら効かない。
+    pub defense_dialog_fold: bool,
+}
+
+/// 相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DefenseDialogTree {
+    /// 読まない（2026-11-06 までの形・世界 K 本の静的な値・測定用）。
+    Off,
+    /// 自分のライフが `window_tree_life`（既定 1）以下のときだけ短い木（今の戦闘の応手と同じ線）。
+    Life1,
+    /// ライフを問わず全部短い木（既定・2026-11-07〜・§7.87）。
+    #[default]
+    All,
+}
+
+impl DefenseDialogTree {
+    pub fn from_name(s: &str) -> Option<DefenseDialogTree> {
+        match s {
+            "off" => Some(DefenseDialogTree::Off),
+            "life1" => Some(DefenseDialogTree::Life1),
+            "all" => Some(DefenseDialogTree::All),
+            _ => None,
+        }
+    }
 }
 
 /// 守りの証明の配り方の視点（§7.51）。
@@ -293,6 +341,9 @@ impl Default for DecideOptions {
             c_puct: C_PUCT,
             dirichlet_eps: 0.0,
             temp_turns: 0,
+            temp_late: 0.0,
+            temp_late_pow: 1.0,
+            prior_pick: 0,
             box_commit: true,
             box_battle: true,
             box_dialog: true,
@@ -330,6 +381,8 @@ impl Default for DecideOptions {
             defense_proof_nodes: DEFENSE_PROOF_NODES,
             defense_proof_total: DEFENSE_PROOF_TOTAL,
             defense_proof_view: DefenseView::Mine,
+            defense_dialog_tree: DefenseDialogTree::All,
+            defense_dialog_fold: false,
         }
     }
 }
@@ -436,6 +489,9 @@ pub struct DecideOut {
     pub window_read: Option<(usize, bool)>,
     /// 守りの証明の実績（§7.51・`defense_proof` で対象の窓だったときだけ・[`defense_pick`]）。
     pub defense_proof: Option<Value>,
+    /// 温度サンプルの印（§7.73・サンプルを引いたときだけ）: (1＝序盤の温度／2＝後半の低確率の温度,
+    /// 引いた手が貪欲に選ぶ手と違ったか)。
+    pub temp_pick: Option<(u8, bool)>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -1131,7 +1187,12 @@ fn window_choice(
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
-    let tree = !opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life);
+    let dialog_tree = defense_dialog_tree_applies(&mut s, name, opts.defense_dialog_tree, opts.window_tree_life);
+    let tree = (!opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life)) || dialog_tree;
+    // 守りの対話の木（§7.85）は既定では候補を当てた直後の盤面から木を回す（戦闘の終わりまで先に畳まない）:
+    // 畳むと、対話の続き（受けた後の「どれをレストにするか」等）を 1 段浅い静的な値で選んでしまい、
+    // 木が間違った続きの先を読む（4462251・`docs/reports/2026-11-06_defense_dialog_tree.md` §2）。
+    let tree_plies = if dialog_tree && !opts.defense_dialog_fold { 0 } else { QUIESCE_MAX_PLIES };
     let k = opts.effective_window_worlds();
     // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
     let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
@@ -1181,7 +1242,7 @@ fn window_choice(
         let vals = if tree {
             let sims = (opts.sims / m).max(1);
             let tseed = window_world_seed(seed0, wi) ^ 0x7EE5_EED0_0000_0001u64;
-            tree_branch_values(ctx, &mut ws, st, name, &wlegal, window, sims, opts.c_puct, tseed)?
+            tree_branch_values(ctx, &mut ws, st, name, &wlegal, window, tree_plies, sims, opts.c_puct, tseed)?
         } else {
             resolved_branch_values(
                 ctx,
@@ -1355,6 +1416,27 @@ fn window_tree_applies(s: &mut Session, name: Seat, life_max: i64) -> bool {
     }
 }
 
+/// 短い木で読む守りの効果の対話か（§7.85・[`DecideOptions::defense_dialog_tree`]）: 相手の手番・戦闘中
+/// （`active_battle` が在る）で、判断するのが `name` の効果の対話（中断スタックの対話＝ブロッカー／
+/// カウンターの選択・メインの手ではない）。`Life1` は `name` のライフ（枚数）が `life_max` 以下のときだけ。
+/// `Off` は常に false（今の形）。候補の数は呼び出し側が見る。
+fn defense_dialog_tree_applies(s: &mut Session, name: Seat, mode: DefenseDialogTree, life_max: i64) -> bool {
+    if mode == DefenseDialogTree::Off {
+        return false;
+    }
+    let st = s.state();
+    if st.active_battle.is_none() || st.turn_player == name || st.winner.is_some() {
+        return false;
+    }
+    if mode == DefenseDialogTree::Life1 && (st.player(name).life.len() as i64) > life_max {
+        return false;
+    }
+    match st.active_interaction() {
+        Some(it) => it.player == name,
+        None => false,
+    }
+}
+
 /// 各候補を戦闘の終わりまで畳んだ盤面から短い木を回し、その根の値（`name` から見た）で比べる（§7.42 の 3）。
 ///
 /// 畳み方は [`resolved_branch_values`] と同じ（同じ窓・同じ深さ・同じ CRN）。出口盤面が終局なら ±1、
@@ -1368,6 +1450,7 @@ fn tree_branch_values(
     name: Seat,
     legal: &[Move],
     window: Window,
+    max_plies: usize,
     sims: usize,
     c_puct: f64,
     seed: u64,
@@ -1378,7 +1461,7 @@ fn tree_branch_values(
         st,
         name,
         legal,
-        QUIESCE_MAX_PLIES,
+        max_plies,
         BOX_RESOLVE_DEPTH,
         window,
         &mut |s, st| {
@@ -2024,6 +2107,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         lethal_reply: None,
         window_read: None,
         defense_proof: None,
+        temp_pick: None,
     }
 }
 
@@ -2109,7 +2193,9 @@ fn decide_after_lethal(
         crate::rules::pending::pending_actor_action(&mut real),
         Some((_, "MAIN_ACTION"))
     );
-    if (in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real)) {
+    // §7.79 `prior_pick=3`（測定専用）: 窓も根畳みの読みを使わず、木の根（事前分布）から引く。
+    let windows_by_prior = opts.prior_pick >= 3;
+    if !windows_by_prior && ((in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real))) {
         if let Some(pick) = window_choice(ctx, state, name, opts, rng, st)? {
             // §7.42 の 1: 窓の続きは効果の対話の段・戦闘の応手の段だけ＝既定は積まない（次の判断点で読み直す）。
             if opts.box_commit && opts.window_carry_legacy {
@@ -2152,6 +2238,7 @@ fn decide_after_lethal(
                 lethal_reply: None,
                 window_read: pick.read,
                 defense_proof: pick.defense,
+                temp_pick: None,
             });
         }
     }
@@ -2183,6 +2270,7 @@ fn decide_after_lethal(
     };
     let mut groups = Vec::new();
     let mut sel_groups: Vec<SelectGroup> = Vec::new();
+    let mut temp_pick: Option<(u8, bool)> = None;
     if !run.legal.is_empty() {
         groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
         sel_groups = select_groups(state, ctx.masters, &run.legal, &groups);
@@ -2203,12 +2291,47 @@ fn decide_after_lethal(
                 rep = sel_groups[select_index(&sn, &sq, SelectRule::QMinN, floor)].rep;
             }
             // 生成の温度サンプリング（序盤は訪問分布から引く）
-            if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
+            let early = opts.temp_turns > 0 && state.turn_count <= opts.temp_turns;
+            // §7.73: 序盤より後も、1 手ごとに確率 `temp_late` で訪問分布から引く。
+            // `temp_late` が 0 なら乱数を引かない（既定の生成と 1 ビットも同じ）。
+            let late = !early
+                && opts.temp_late > 0.0
+                && rng.choice(&[1.0 - opts.temp_late.min(1.0), opts.temp_late.min(1.0)])? == 1;
+            if early || late {
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
                 let total: f64 = ns.iter().sum();
                 if total > 0.0 {
-                    let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
-                    rep = groups[rng.choice(&probs)?].rep;
+                    // 度合い（`temp_late_pow`）は後半の引きだけに効く。1.0 のときは割り算のまま
+                    // （`powf(1.0)` を通さない＝浮動小数の経路も今までと同じ）。
+                    let probs: Vec<f64> = if late && opts.temp_late_pow != 1.0 {
+                        let ws: Vec<f64> = ns
+                            .iter()
+                            .map(|n| if *n > 0.0 { (n / total).powf(opts.temp_late_pow.max(0.0)) } else { 0.0 })
+                            .collect();
+                        let wt: f64 = ws.iter().sum();
+                        ws.iter().map(|w| w / wt).collect()
+                    } else {
+                        ns.iter().map(|n| n / total).collect()
+                    };
+                    let greedy = rep;
+                    let gi = rng.choice(&probs)?;
+                    rep = groups[gi].rep;
+                    // 貪欲に選ぶ手と同じ候補（等価手マージ後のグループ）か
+                    let same = groups[gi].rep == greedy || groups[gi].idxs.contains(&greedy);
+                    temp_pick = Some((if early { 1 } else { 2 }, !same));
+                }
+            }
+            // §7.79: 根の事前分布から選び直す（既定 0 は何もしない＝乱数も引かない）。
+            if opts.prior_pick != 0 && run.p.len() == run.legal.len() {
+                let total: f64 = run.p.iter().map(|x| x.max(0.0)).sum();
+                if total > 0.0 {
+                    rep = if opts.prior_pick == 1 {
+                        argmax_f64(&run.p)
+                    } else {
+                        let probs: Vec<f64> = run.p.iter().map(|x| x.max(0.0) / total).collect();
+                        rng.choice(&probs)?
+                    };
+                    temp_pick = None;
                 }
             }
             mv = Some(run.legal[rep].clone());
@@ -2361,6 +2484,7 @@ fn decide_after_lethal(
         lethal_reply: reply,
         window_read: None,
         defense_proof: None,
+        temp_pick,
     })
 }
 
@@ -2379,6 +2503,10 @@ mod tests_window_read;
 #[cfg(test)]
 #[path = "tests_defense_proof.rs"]
 mod tests_defense_proof;
+
+#[cfg(test)]
+#[path = "tests_defense_dialog_tree.rs"]
+mod tests_defense_dialog_tree;
 
 #[cfg(test)]
 #[path = "tests_overflow_trigger.rs"]

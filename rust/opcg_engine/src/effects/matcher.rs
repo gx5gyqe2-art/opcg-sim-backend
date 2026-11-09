@@ -249,6 +249,8 @@ pub fn get_target_cards(
     let fl_trait_or_name = query.has_flag("TRAIT_OR_NAME");
     let fl_trait_or_trigger = query.has_flag("TRAIT_OR_TRIGGER");
     let fl_trait_partial = query.has_flag("TRAIT_PARTIAL");
+    // 「イベントか特徴《X》を持つカード」（EB05-007）＝種類 OR 特徴。
+    let fl_type_or_trait = query.has_flag("TYPE_OR_TRAIT");
 
     for cand in candidates {
         // Python: `if exclude_source and source_card is not None and card is source_card: continue`
@@ -320,6 +322,7 @@ pub fn get_target_cards(
                 && !query.card_type.iter().any(|t| t == master.ty.name())
                 && !fl_name_or_type
                 && !fl_name_or_typed_name
+                && !fl_type_or_trait
             {
                 continue;
             }
@@ -509,11 +512,12 @@ pub fn get_target_cards(
                 continue;
             }
             if !query.traits.is_empty() && !trait_in() {
-                // 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。
-                if !fl_trait_or_trigger {
-                    continue;
-                }
-                if !has_trigger(master, abilities) {
+                // 「イベントか特徴《X》を持つ」は種類 OR 特徴＝特徴が外れても種類が合えば通す。
+                if fl_type_or_trait {
+                    if !query.card_type.iter().any(|t| t == master.ty.name()) {
+                        continue;
+                    }
+                } else if !fl_trait_or_trigger || !has_trigger(master, abilities) {
                     continue;
                 }
             }

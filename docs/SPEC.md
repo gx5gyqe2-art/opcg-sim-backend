@@ -1364,6 +1364,21 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 アリーナは `--cand-defense-proof`（候補席）、器は `defense_audit.py --defense-proof`・`rs_decide_latency.py --extra '{"defense_proof": true}'`。
 計測（守りの再監査の局面・費用）は `docs/reports/2026-10-25_defense_proof.md`。
 
+**相手の手番の戦闘中に自分が答える効果の対話を短い木で読む**（2026-11-06・WP `rs-defense-dialog-tree`・`search_efficiency_plan.md` §7.85・
+opts の `defense_dialog_tree`＝`off`／`life1`／`all`・`decide.rs::defense_dialog_tree_applies`。
+**2026-11-07 から既定は `all`**〔ユーザ決定・WP `rs-ddt-default`・§7.87・本番アリーナ 2,688 ペアで `off` に +6.6 Elo［+2.9, +10.3］・
+`life1` は +1.9・費用は 1 手あたり +6.7%〕。`off` は旧い形〔世界 K 本の静的な値〕と 1 bit も同じに戻る**測定用**の値。
+窓の判断は読みの回数〔`sims`〕の設定に依らず掛かるので、**生成・アリーナ・serve の全部の打ち方が変わる＝物差しが動いた**
+〔2026-11-07 より前のアリーナ・教材の局はこの旗が `off` の打ち方。golden の a1 帯は作り直した・`docs/reports/2026-11-07_ddt_default.md`〕）:
+相手の手番・戦闘中（`active_battle` が在る）で、判断するのが自分の効果の対話（中断スタックの対話＝相手のアタック時の任意の効果の確認・
+探して選ぶ 等。ブロッカー／カウンターの選択は対象外＝上の 3 のまま）なら、上の 3 と同じ短い木（`sims ÷ 候補の数` 回・世界は
+`min(K, window_tree_worlds)`）で比べる。`life1` は自分のライフが `window_tree_life`（既定 1）以下のときだけ、`all` はライフを問わず。
+**候補を当てた直後の盤面から木を回す**（戦闘の終わりまで先に畳まない）: 畳むと対話の続き（受けた後に「どれをレストにするか」等）を
+1 段浅い静的な値で選び、間違った続きの先を木が読む（守りの再監査 4462251・172: 畳む形は受ける −0.99／断る −0.987 で断る、
+畳まない形は受ける +0.96〜+0.99 で受け、16 局の打ち比べは 0／16 → 16／16）。畳む形は測定専用の旗 `defense_dialog_fold`（既定 false）。
+アリーナは `--cand-defense-dialog-tree`（候補席）・`arena_shard --defense-dialog-tree`（基準席）、器は `defense_audit.py`／
+`rs_decide_latency.py` の `--defense-dialog-tree`・`blunder_audit.py winstab --opts`。計測は `docs/reports/2026-11-06_defense_dialog_tree.md`。
+
 ### 2.5.13 世界の木を同時に回すスレッド（Rust・opts の `world_threads`・2026-10-25〜）
 
 > 正本はコード（`rust/opcg_engine/src/search/decide.rs` の `run_worlds`）。経緯は `docs/search_efficiency_plan.md` §7.55
@@ -1418,8 +1433,22 @@ decide の世界 K 本（`worlds`・§20.7.1）の木は別々のスレッドで
 - 保護 `PREVENT_LEAVE`: `LEAVE`（あらゆる除去）／`EFFECT_KO`（KO 限定＝手札戻し等の非KO除去には効かない）／`BATTLE_KO`。除去ディスパッチは KO に `("LEAVE","EFFECT_KO")`、非KO除去に `("LEAVE",)` を照合。
 - 置換 `REPLACE_EFFECT`: 「代わりに〜」。`_can_satisfy_node` を満たせば `sub_effect` を実行し本来の除去をスキップ。`sub_effect` の実行・実行可能性判定の source は**離れるカード**（条件/ターン1回は能力保持カード）。「代わりに（そのカードを）ライフに加える」等が離れるカード自身を対象に取れる（OP11-101）。
 - 置換 `sub_effect` の中断は `_auto_resolve_replacement` が同期解決（任意=accept、対象=自動選択）。`active_interaction` は単一スロット設計。
+- **ダメージの置換**（2026-11-09・EB05-052「自分がダメージを受ける場合、代わりにこのキャラをトラッシュに置くことができる」・
+  `docs/reports/2026-11-09_card_fix_eb05.md`）: パーサは status `DAMAGE` の `REPLACE_EFFECT`（PASSIVE）を出す。エンジンは
+  リーダーへのダメージを **1 点ずつ**処理し（Rust `rules/battle.rs::run_damage`・バトルと効果のダメージの共通）、各点の前に
+  受ける側のリーダー・場のキャラの `DAMAGE` 置換を探す。任意（「できる」）なら受ける側へ確認（`CONFIRM_OPTIONAL`・
+  continuation `damage_replace`）——受ければ置換を実行してその 1 点を消し、断ればその 1 点を受ける。裁定:
+  ①【ダブルアタック】の 2 点は 1 点ごとに置換できる（置換するカードが場を離れれば 2 点目は聞かない）。
+  ②**ライフが 0 枚でも置換できる**（ダメージを受けなければ敗北の条件は成り立たない）。③【バニッシュ】も同じ
+  （置換すればライフは動かない）。④効果のダメージ（OP06-116 等）で中断したら効果の残り（「その後、〜」）は確認の後に続く。
+- **「相手によって」場を離れる場合**（EB05-061・OP15-098）: 相手の効果と**相手のアタック（バトル KO）の両方**を含む＝
+  status は `LEAVE,BATTLE_KO`。「相手の効果で」（`LEAVE` だけ）と区別する。効果側は相手の効果だけ（エンジンの
+  `opp_only_removal` が「相手によって」を相手専用と読む＝自分の効果の除去には置換しない）。
 
 ### 3.5 誘発・対話・コスト
+- 「自分の…キャラがKOされた時」の他カードのリスナー（Rust `triggers.rs::ko_listener_matches`）は本文の主語から
+  側・パワー・特徴・名前に加え、**属性（「属性(X)」「属性(X)か(Y)」）と「【ブロッカー】を持たない／持つ」**を読む
+  （2026-11-09・EB05-010。ブロッカーは元々のキーワードと KO の時点で残っている付与で判定）。
 - 誘発は `_pending_triggers` キュー経由。`move_card` がライフ離脱を `ON_LIFE_DECREASE` として積み、API境界/対話完了/戦闘・効果ダメージ末尾でドレイン（二重計上しない）。
 - **誘発は今解決中の効果を解決し切ってから解決する**（2026-10-22・WP `rs-trigger-order`・`docs/reports/2026-10-22_trigger_order.md`）。
   効果の実行スタックを処理している間（Rust `Session::resolving_depth` > 0）と、対話で中断した効果の残りが退避されている間

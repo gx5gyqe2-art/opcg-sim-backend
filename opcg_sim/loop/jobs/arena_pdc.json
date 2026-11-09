@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.89",
+ "ledger_grep": "WP `pdc-arena` の判定アリーナ",
+ "about": "対の差の損失の腕 C（nrel_pdc.ep1・r28x4 から r29f4 と同じ教材・4 形・倍率 183）vs r29f4 の判定アリーナ（両席 160 回・公平・3 条件・§7.89）",
+ "job": "arena-pdc-w{KK}",
+ "branch": "claude/arena-pdc-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/pair-diff-loss:n1_results/pair_diff_loss/nets/nrel_pdc.ep1.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r29f4.npz"
+ },
+ "out_dir": "arena_pdc",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "7101000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "pdc_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "7121000 + B*1000",
+   "args": [],
+   "out": "pdc_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "7141000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "pdc_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_pdc.ep1.npz (claude/pair-diff-loss)",
+  "baseline": "nrel_r29f4.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena pdc shard {KK}"
+}

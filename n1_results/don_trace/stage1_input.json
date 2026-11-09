@@ -1,0 +1,140 @@
+{
+ "pairs": 200,
+ "sign": {
+  "+1": 94,
+  "-1": 106
+ },
+ "card_idx_changed": 0,
+ "scalars": {
+  "2:don_active_me": {
+   "moved_rows": 200,
+   "mean_signed": 1.0,
+   "mean_abs": 1.0,
+   "range_before": [
+    2.0,
+    10.0
+   ]
+  },
+  "54:playable_chars_me": {
+   "moved_rows": 84,
+   "mean_signed": 0.064,
+   "mean_abs": 0.064,
+   "range_before": [
+    0.0,
+    0.9
+   ]
+  },
+  "60:onplay_live": {
+   "moved_rows": 2,
+   "mean_signed": 0.002,
+   "mean_abs": 0.004,
+   "range_before": [
+    0.0,
+    1.4
+   ]
+  },
+  "61:onplay_keep": {
+   "moved_rows": 1,
+   "mean_signed": -0.0008,
+   "mean_abs": 0.0008,
+   "range_before": [
+    0.0,
+    1.0
+   ]
+  },
+  "62:onplay_dead": {
+   "moved_rows": 2,
+   "mean_signed": -0.002,
+   "mean_abs": 0.004,
+   "range_before": [
+    0.0,
+    0.6
+   ]
+  },
+  "66:don_deck_me": {
+   "moved_rows": 200,
+   "mean_signed": -0.1,
+   "mean_abs": 0.1,
+   "range_before": [
+    0.0,
+    0.7
+   ]
+  },
+  "95:don_addable": {
+   "moved_rows": 9,
+   "mean_signed": 0.012,
+   "mean_abs": 0.012,
+   "range_before": [
+    0.0,
+    1.0
+   ]
+  },
+  "119:leader_power_max": {
+   "moved_rows": 165,
+   "mean_signed": 0.0825,
+   "mean_abs": 0.0825,
+   "range_before": [
+    0.8,
+    1.7
+   ]
+  },
+  "120:don_next_turn": {
+   "moved_rows": 165,
+   "mean_signed": 0.0825,
+   "mean_abs": 0.0825,
+   "range_before": [
+    0.3,
+    1.0
+   ]
+  },
+  "121:max_play_next_turn": {
+   "moved_rows": 56,
+   "mean_signed": 0.063,
+   "mean_abs": 0.063,
+   "range_before": [
+    0.0,
+    1.0
+   ]
+  }
+ },
+ "tokens": {
+  "playable_now": {
+   "moved_rows": 84,
+   "moved_slots": 129,
+   "mean_signed_per_row": 0.645
+  },
+  "cond_ok0": {
+   "moved_rows": 2,
+   "moved_slots": 4,
+   "mean_signed_per_row": -0.01
+  },
+  "cond_ok1": {
+   "moved_rows": 4,
+   "moved_slots": 4,
+   "mean_signed_per_row": -0.02
+  }
+ },
+ "net_value_shift": {
+  "nrel_r28x4.npz": {
+   "turn3_6_per_don": 0.178,
+   "all_per_don": 0.1322,
+   "n3_6": 97
+  },
+  "nrel_dja82.ep1.npz": {
+   "turn3_6_per_don": 0.1909,
+   "all_per_don": 0.1419,
+   "n3_6": 97
+  }
+ },
+ "normalization": {
+  "scalars[2..5] 自分・相手のアクティブ／レストのドン": "枚数そのまま（割らない・上限で切らない）",
+  "scalars[14..15] リーダーの付与ドン": "÷5",
+  "v9 ドンデッキの残り（自分・相手）": "÷10",
+  "v5 展開できる手札のキャラ数": "今のアクティブのドン以下のコストの手札キャラ数 ÷10",
+  "EXTRA don_addable": "n_rel_feat の EXTRA 列（付けられるドン）",
+  "EXTRA don_next_turn": "次の手番のドンの総数（10 で頭打ち）÷10",
+  "EXTRA max_play_next_turn／leader_power_max": "次の手番のドンで出せる最大コスト・付けたときのリーダーの最大パワー",
+  "tokens attached_don": "÷5",
+  "tokens playable_now／can_attack_now 等": "今のドンで出せる・使える旗（0／1）"
+ }
+}

@@ -306,7 +306,8 @@ class RsGame:
               window_worlds_legacy: Optional[bool] = None,
               window_tree_legacy: Optional[bool] = None,
               window_worlds: Optional[int] = None,
-              confirm_trigger_legacy: Optional[bool] = None):
+              confirm_trigger_legacy: Optional[bool] = None,
+              defense_dialog_tree: Optional[str] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -372,6 +373,9 @@ class RsGame:
         `confirm_trigger_legacy`（省略可・§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**）＝トリガーの発動確認
         （ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけにする旧い形。本番アリーナの基準席用。
         **省略（None）／False＝渡さない＝Rust の既定**（発動する／しないの 2 手を読む）。
+        `defense_dialog_tree`（省略可・§7.85・WP `rs-defense-dialog-tree`）＝相手の手番の戦闘中に自分が
+        答える効果の対話を短い木で読む範囲（"off"＝旧い形・測定用／"life1"＝自分のライフ ≤ 1 だけ／"all"）。**省略（None）＝渡さない＝
+        Rust の既定（all・2026-11-07〜・§7.87）**。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -390,7 +394,8 @@ class RsGame:
                                 window_worlds_legacy=window_worlds_legacy,
                                 window_tree_legacy=window_tree_legacy,
                                 window_worlds=window_worlds,
-                                confirm_trigger_legacy=confirm_trigger_legacy)
+                                confirm_trigger_legacy=confirm_trigger_legacy,
+                                defense_dialog_tree=defense_dialog_tree)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -417,7 +422,8 @@ class RsGame:
                window_worlds_legacy: Optional[bool] = None,
                window_tree_legacy: Optional[bool] = None,
                window_worlds: Optional[int] = None,
-               confirm_trigger_legacy: Optional[bool] = None):
+               confirm_trigger_legacy: Optional[bool] = None,
+              defense_dialog_tree: Optional[str] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -506,6 +512,9 @@ class RsGame:
         # トリガーを断らない旧い形（§7.44 の (B)・測定専用）。None／False＝渡さない＝Rust の既定（2 手）。
         if confirm_trigger_legacy:
             opts["confirm_trigger_legacy"] = True
+        # 相手の手番の戦闘中の効果の対話を短い木で（§7.85・測定用）。None＝渡さない＝Rust の既定（off）。
+        if defense_dialog_tree is not None:
+            opts["defense_dialog_tree"] = str(defense_dialog_tree)
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
         # 読むのは盤面の複製（`Game.fork`＝状態をそのまま写す・探索は状態しか読まない＝手は 1 bit も

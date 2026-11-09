@@ -59,6 +59,8 @@ def main(argv=None):
     ap.add_argument("--confirm-trigger-legacy", action="store_true",
                     help="両席とも、トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・測定専用）")
     ap.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
+    ap.add_argument("--defense-dialog-tree", default=None, choices=("off", "life1", "all"),
+                    help="両席とも、相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85・off＝旧い形・省略＝既定 all〔§7.87〕）")
     ap.add_argument("--extra", default=None,
                     help="decide の opts に足す JSON（例 '{\"window_tree_life\": 2}'・§7.42 の対象の広げ方の費用を見る）")
     ap.add_argument("--knowledge", action="store_true",
@@ -92,6 +94,8 @@ def main(argv=None):
         kw["window_worlds"] = a.window_worlds
     if a.confirm_trigger_legacy:
         kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない旧い形）
+    if a.defense_dialog_tree:
+        kw["defense_dialog_tree"] = a.defense_dialog_tree  # §7.85
     if a.extra:
         kw.update(json.loads(a.extra))
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)

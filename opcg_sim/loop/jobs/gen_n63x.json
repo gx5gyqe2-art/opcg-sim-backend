@@ -1,0 +1,71 @@
+{
+ "kind": "gen",
+ "section": "§7.73",
+ "ledger_grep": "波 62x・63x",
+ "about": "波 63x の生成（WP gen-explore・生成役 r27 の自己対戦・波 60 と同じ設定＋後半の低確率の温度・32 シャード × 480 局）",
+ "job": "n63x-w{K}",
+ "branch": "claude/n63x-w{K}",
+ "base": {
+  "branch": "claude/gen-explore",
+  "commit": "151ea2c5847a1de2077f1be387e88dcb29c6657c"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "2790000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n63x_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r27.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10",
+  "--temp-late",
+  "0.2",
+  "--explore-z",
+  "game"
+ ],
+ "log": "~/n63x_w{K}.log",
+ "copy_logs": [
+  "~/n63x_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--temp-late\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r27.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "temp_late": 0.2,
+  "explore_z": "game"
+ },
+ "commit_message": "gen wave 63x shard {K}"
+}

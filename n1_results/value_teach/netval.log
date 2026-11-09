@@ -1,0 +1,15 @@
+kaido24 nrel_r27.npz ネットの差 -0.0165 打ち続けた差 0.1615 相関 -0.118 b を高く見る点 8 / 24
+kaido24 nrel_ctrl.npz ネットの差 0.0455 打ち続けた差 0.1615 相関 0.067 b を高く見る点 17 / 24
+kaido24 nrel_A.npz ネットの差 0.0364 打ち続けた差 0.1615 相関 0.095 b を高く見る点 17 / 24
+kaido24 nrel_B.npz ネットの差 0.0255 打ち続けた差 0.1615 相関 0.012 b を高く見る点 17 / 24
+kaido24 nrel_AB.npz ネットの差 0.0214 打ち続けた差 0.1615 相関 0.087 b を高く見る点 18 / 24
+rocks53 nrel_r27.npz ネットの差 0.0268 打ち続けた差 0.1899 相関 0.154 b を高く見る点 25 / 53
+rocks53 nrel_ctrl.npz ネットの差 0.0332 打ち続けた差 0.1899 相関 0.253 b を高く見る点 31 / 53
+rocks53 nrel_A.npz ネットの差 0.0579 打ち続けた差 0.1899 相関 0.256 b を高く見る点 37 / 53
+rocks53 nrel_B.npz ネットの差 0.0792 打ち続けた差 0.1899 相関 0.141 b を高く見る点 40 / 53
+rocks53 nrel_AB.npz ネットの差 0.0758 打ち続けた差 0.1899 相関 0.171 b を高く見る点 40 / 53
+pairs nrel_r27.npz {"hold": {"n": 206, "corr": 0.325, "slope": 0.33, "d_mse": 0.0677, "sign_agree": 0.655}, "train": {"n": 1211, "corr": 0.154, "slope": 0.139, "d_mse": 0.1066, "sign_agree": 0.529}}
+pairs nrel_ctrl.npz {"hold": {"n": 206, "corr": 0.311, "slope": 0.309, "d_mse": 0.0673, "sign_agree": 0.682}, "train": {"n": 1211, "corr": 0.144, "slope": 0.128, "d_mse": 0.106, "sign_agree": 0.537}}
+pairs nrel_A.npz {"hold": {"n": 206, "corr": 0.292, "slope": 0.289, "d_mse": 0.0686, "sign_agree": 0.655}, "train": {"n": 1211, "corr": 0.137, "slope": 0.123, "d_mse": 0.1067, "sign_agree": 0.539}}
+pairs nrel_B.npz {"hold": {"n": 206, "corr": 0.286, "slope": 0.267, "d_mse": 0.0665, "sign_agree": 0.664}, "train": {"n": 1211, "corr": 0.316, "slope": 0.203, "d_mse": 0.0784, "sign_agree": 0.581}}
+pairs nrel_AB.npz {"hold": {"n": 206, "corr": 0.309, "slope": 0.282, "d_mse": 0.064, "sign_agree": 0.691}, "train": {"n": 1211, "corr": 0.317, "slope": 0.208, "d_mse": 0.0787, "sign_agree": 0.588}}

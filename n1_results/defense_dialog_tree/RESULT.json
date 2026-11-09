@@ -1,0 +1,23 @@
+{
+ "wp": "rs-defense-dialog-tree",
+ "section": "§7.85",
+ "branch": "claude/rs-defense-dialog-tree",
+ "report": "docs/reports/2026-11-06_defense_dialog_tree.md",
+ "flag": {"key": "defense_dialog_tree", "values": ["off", "life1", "all"], "default": "off",
+          "read_from": "right after the candidate (no fold); fold form = defense_dialog_fold=true (measurement only)"},
+ "tool_fix": "blunder_audit.py recheck_point: _G.get('verify_both')",
+ "point_4462251": {"off": {"move": "decline 8/8", "playout_real_win": 0.0, "lost_this_turn": 16},
+                   "life1": {"move": "accept 8/8", "playout_real_win": 1.0, "lost_this_turn": 0},
+                   "all": {"move": "accept 8/8", "playout_real_win": 1.0},
+                   "life1_fold": {"move": "decline 8/8", "q": [-0.99, -0.987]}},
+ "point_4461056": {"off": {"move": "accept 8/8", "playout_real": 0.75, "playout_fair": 0.75},
+                   "life1": "not applicable (life 3)",
+                   "all": {"move": "decline 8/8", "playout_real": 0.875, "playout_fair": 0.8125}},
+ "defense_reaudit": {"seeds": "4462000-4462299", "diverged_games": {"life1": 52, "all": 119},
+                     "verified_miss_ko_otsu": {"life1": {"off": [6, 3], "on": [0, 0]}, "all": {"off": [9, 4], "on": [4, 1]}},
+                     "kept_by_playout": {"life1": {"off": 2, "on": 0}, "all": {"off": 2, "on": 0}},
+                     "new_points_all": ["4462116:83", "4462168:134", "4462168:138"]},
+ "latency_mean_sec": {"off": 0.641, "life1": 0.650, "all": 0.684},
+ "gate": {"cargo": "643 passed", "pytest": "914 passed, 16 skipped", "golden": "unchanged", "audit_cross_void": 0},
+ "arena_job": "opcg_sim/loop/jobs/arena_ddt.json (life1 seed 4471000+, all seed 4511000+, 32 shards x 84 pairs each)"
+}

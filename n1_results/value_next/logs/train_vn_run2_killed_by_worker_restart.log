@@ -1,0 +1,27 @@
+z-mode next_v0: {"by": "turn", "replaced": 8919161, "kept": 1793599, "rows": 10712760, "corr_teacher_z": 0.7297989687119207, "teacher_mean": 0.14795008301734924, "teacher_std": 0.7659021615982056, "same_turn": 0, "later_turn": 8919161, "by_kind": {"main": 3942896, "window": 4171328, "commit": 804937}}
+z-mode next_v0: 次の自分の手番の頭の根の値で差し替えた行 8919161/10712760（残り 1793599 は z のまま・相関 +0.730・同じ手番 0・後の手番 8919161）
+value 10712760行（val 1529015） policy 4205907点（val 601519） 313s
+warm-start: opcg_sim/data/learned/nrel_r28x4.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 7768342/10712760
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 51957438行 63.9s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5156222242110573, "entropy_q_improved": 1.1035714532504517}
+  ep0 step 5000/92192 mse 0.1456 ce 1.6747 674s
+  ep0 step 10000/92192 mse 0.1447 ce 1.6737 949s
+  ep0 step 15000/92192 mse 0.1446 ce 1.6734 1224s
+  ep0 step 20000/92192 mse 0.1443 ce 1.6732 1521s
+  ep0 step 25000/92192 mse 0.1440 ce 1.6732 1795s
+  ep0 step 30000/92192 mse 0.1438 ce 1.6721 2069s
+  ep0 step 35000/92192 mse 0.1438 ce 1.6718 2361s
+  ep0 step 40000/92192 mse 0.1436 ce 1.6714 2654s
+  ep0 step 45000/92192 mse 0.1436 ce 1.6714 2939s
+  ep0 step 50000/92192 mse 0.1435 ce 1.6715 3207s
+  ep0 step 55000/92192 mse 0.1434 ce 1.6712 3473s
+  ep0 step 60000/92192 mse 0.1433 ce 1.6710 3762s
+  ep0 step 65000/92192 mse 0.1433 ce 1.6709 4032s
+  ep0 step 70000/92192 mse 0.1433 ce 1.6708 4306s
+  ep0 step 75000/92192 mse 0.1432 ce 1.6706 4567s
+  ep0 step 80000/92192 mse 0.1431 ce 1.6705 4817s
+  ep0 step 85000/92192 mse 0.1431 ce 1.6702 5070s
+  ep0 step 90000/92192 mse 0.1431 ce 1.6697 5329s

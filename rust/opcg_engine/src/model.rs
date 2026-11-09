@@ -1111,6 +1111,32 @@ pub struct Continuation {
     pub removal_replace: Option<RemovalReplaceContinuation>,
     /// ORDER_TRIGGERS（同時に誘発した効果の解決順）が並べる待ち行列。
     pub order_queue: Option<crate::journal::TriggerQueue>,
+    /// 任意のダメージ置換（「自分がダメージを受ける場合、代わりに〜できる」EB05-052）の確認。
+    pub damage_replace: Option<DamageReplaceContinuation>,
+}
+
+/// ダメージ（リーダーへの 1 点ずつ）の処理の途中状態。任意のダメージ置換の確認で中断したとき、
+/// 残りの点数と失ったライフを持って再開する（[`crate::rules::battle::run_damage`]）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DamageReplaceContinuation {
+    /// ダメージを受ける席。
+    pub damaged: Seat,
+    /// ダメージを与える側（ライフが無いのにダメージを受けたときの勝者）。
+    pub dealer: Seat,
+    /// 残りの点数（確認中の 1 点を含む）。
+    pub remaining: i32,
+    /// ここまでに失ったライフの枚数。
+    pub life_lost: i32,
+    /// バトルのダメージなら攻撃の情報（無ければ効果のダメージ）。
+    pub battle: Option<BattleDamage>,
+}
+
+/// バトルのダメージの欄（[`DamageReplaceContinuation::battle`]）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BattleDamage {
+    pub attacker: CardIdx,
+    pub target: CardIdx,
+    pub banish: bool,
 }
 
 /// 任意の効果除去置換（「KOされる代わりに〜できる」）の continuation。

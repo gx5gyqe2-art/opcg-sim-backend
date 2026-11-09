@@ -1,155 +1,60 @@
 {
- "job": "policy-attn-long",
+ "job": "value-split-b",
+ "section": "§7.74",
  "status": "done",
- "branch": "claude/policy-attn-long",
- "spec": "docs/search_efficiency_plan.md §7.57（本線 claude/cpu-spec-improvements-yw91jd @ daf3abf・台帳 2+429）",
- "report": "docs/reports/2026-10-25_policy_attn_long.md",
- "code": "変更なし（本線の opcg_sim/learned/train/n_rel_attn_desk.py をそのまま使用）。n1_results/policy_attn_long/summarize.py（表の出力・1 回きり）",
- "make_test": "green（torch を PYTHONPATH に入れない構成・cargo test 637 passed＋pytest 831 passed, 62 skipped〔skip は全部 torch の任意依存〕）",
- "material": {
-  "A_w53": {
-   "shards": "claude/n53-w01〜w16 の 64 シャード（生成役 r23・§7.52 と同じ）",
-   "value_rows": 1297134,
-   "policy_points": 522817,
-   "threads": 2,
-   "where": "このセッション"
-  },
-  "B_w5354": {
-   "shards": "上＋claude/n54-w01〜w16 の 64 シャード（生成役 r24）＝128 シャード",
-   "value_rows": 2626205,
-   "policy_points": 1060238,
-   "threads": 4,
-   "where": "Sonnet の作業セッション 2 本（claude/policy-attn-long-w54-base・-w54-attn・各約 4.8 時間・回収後アーカイブ）"
-  },
-  "val": "holdout seed%7 の先頭 20,000 点／20,000 行・全組で同じ点（全部波 53）"
+ "branch": "claude/value-split-b",
+ "report": "docs/reports/2026-11-03_value_split_epochs.md",
+ "results_dir": "n1_results/value_split",
+ "gate": "make test green（2026-11-03 17:48・cargo test 640 passed・pytest 894 passed 14 skipped・付録の道具 1 ファイルを足したため 1 回だけ回した）",
+ "what": "r28x4 を土台に波 70f＋71f（535 万行）で α 2e-4・4 周／β 1e-4・4 周を訓練し、各周の重み 8 本＋r28x4＋r29f4 を同じ試験台（ドンの比 tvval・6キング 53 点 rocks・検証の誤差）にかけた。付録: 波 70f のドンの総数の規則からの外れ（don_variation.py）。",
+ "invariants": {
+  "r27_tvval_matches_7_71": true,
+  "r27_b_close": 0.115,
+  "r28x4_b_close": 0.078,
+  "r28x4_b_close_ratio": 0.23,
+  "note_r28x4": "§7.73 の『r28x4 0.26』は 2 波の r28x の値（0.088・0.262）。4 波の r28x4 は本計測が初めて＝0.23 を正本にする",
+  "r29f4_b_close": 0.113,
+  "r29f4_b_close_ratio": 0.34
  },
- "conditions": {
-  "epochs": 16,
-  "lr": 0.0005,
-  "bs_v": 256,
-  "bs_p": 64,
-  "ablate": "rel",
-  "pi_teacher": "visits",
-  "aux_heads": "off",
-  "attn": "§7.52 と同じ（d=64・4 頭・トークン 2 層＋候補→トークン 1 層＋候補どうし 2 層）",
-  "control": "B の材料で r24 から・今の頭・lr 2e-4・4 周（base_r24_w5354）"
+ "train": {
+  "waves": ["n70f", "n71f"],
+  "rows_value": 5353107, "rows_value_holdout": 764389, "points_policy": 2102485,
+  "common_args": "train_r29f4.json の common_args と同じ（--epochs 4・--save-each-epoch・warm-start r28x4）",
+  "alpha_lr2e-4": {"val_vmse": [0.3594, 0.3473, 0.3581, 0.3570], "val_vsign": [0.870, 0.876, 0.871, 0.873], "val_pi_top1": [0.498, 0.506, 0.497, 0.504], "train_mse": [0.4712, 0.4637, 0.4586, 0.4544], "best_ep": 1, "sec_per_epoch": 1200},
+  "beta_lr1e-4": {"val_vmse": [0.3554, 0.3473, 0.3550, 0.3530], "val_vsign": [0.871, 0.874, 0.873, 0.875], "val_pi_top1": [0.502, 0.505, 0.501, 0.501], "train_mse": [0.4715, 0.4656, 0.4619, 0.4589], "best_ep": 1}
  },
- "gap_attn_minus_base_val_ce": {
-  "A_first4": -0.0163,
-  "A_last4": -0.0156,
-  "B_first4": -0.0137,
-  "B_last4": -0.0153,
-  "A_ep15": -0.0151,
-  "B_ep15": -0.0147
+ "testbeds": {
+  "tvval_b_close_ratio": {"r28x4": 0.23, "r29f4": 0.34, "alpha_ep1_4": [0.33, 0.26, 0.22, 0.18], "beta_ep1_4": [0.30, 0.30, 0.29, 0.23]},
+  "tvval_b_close_diff": {"r28x4": 0.078, "r29f4": 0.113, "alpha_ep1_4": [0.110, 0.088, 0.073, 0.060], "beta_ep1_4": [0.102, 0.103, 0.100, 0.077]},
+  "rocks53_chose_b": {"r28x4": 6, "r29f4": 4, "alpha_ep1_4": [6, 5, 3, 2], "beta_ep1_4": [6, 5, 6, 4]},
+  "rocks53_q_diff": {"r28x4": -0.074, "r29f4": -0.096, "alpha_ep1_4": [-0.130, -0.085, -0.055, -0.059], "beta_ep1_4": [-0.092, -0.132, -0.087, -0.052]},
+  "rocks53_share_b": {"r28x4": 0.101, "r29f4": 0.099, "alpha_ep1_4": [0.078, 0.073, 0.068, 0.048], "beta_ep1_4": [0.099, 0.068, 0.095, 0.066]}
  },
- "gap_attn_minus_base_train_probe_ce": {
-  "A_first4": -0.0155,
-  "A_last4": -0.031,
-  "B_first4": -0.0171,
-  "B_last4": -0.031
+ "conclusion": {
+  "ratio_vs_epochs": "周を重ねるほど比は単調に縮む（2e-4: 0.33 → 0.18・1e-4: 0.30 → 0.23）。1 周目の 0.33 は土台 0.23 からの過渡で、当てはめが進むと土台を通り越して縮む",
+  "ratio_vs_lr": "速さ半分は縮みを遅らせるだけ（3 周まで 0.29〜0.30・4 周で 0.23）。同じ周数では速さ半分の方が比は大きいが、周を重ねれば同じ向き",
+  "ratio_vs_validation": "検証の誤差の最良（2 周目・0.3473）の後も比は縮み続け、訓練の誤差の低下に連れて動く＝汎化ではなく当てはまりが決める",
+  "prediction_play_cause_pm005": "外れ（周で −0.15 動く）",
+  "prediction_fit_cause_plus01": "外れ（向きが逆・速さ半分は同じ周数でなら字面どおり +0.05 だが周を重ねれば縮む）",
+  "reading": "当てはめの縮みは実在するが訓練の量・速さの不足ではなく、教材に当てはまるほど進む。計測 A の暫定（教材の打ち方でも差は 0.24〜0.35 残る）と合わせ、ドン 1 枚の偏微分が教材から同定されにくい形（付録）が次の候補。直し先は周・速さ・時間の解像度ではない"
  },
- "best_val_ce": {
-  "A_base": 1.8542,
-  "A_attn": 1.8383,
-  "B_base": 1.8447,
-  "B_attn": 1.8296,
-  "r24_itself": 1.8606,
-  "r24_retrain_A_4ep": 1.8354,
-  "r24_retrain_B_4ep": 1.8352
+ "appendix_don_variation_n70f": {
+  "rows": 2642087, "sum10_share": 0.975, "nonzero_share_all": 0.128, "nonzero_share_main_my": 0.125, "nonzero_share_window_opp": 0.147,
+  "nonzero_share_purple_leaders": 0.542, "nonzero_share_non_purple_leaders": 0.0034,
+  "diff_me_minus_opp_my_turn": {"+1": 0.481, "0": 0.353}, "diff_minus_rule_diff_zero": 0.769,
+  "corr_total_vs_turn": 0.82, "mode_share_within_seat_turn": 0.87,
+  "reading": "ドンの総数は手番数でほぼ決まり、同じ手番でドンだけ違う行は紫を含むリーダー（教材の 23%）にしか実質的に無い。仮説（同じ盤面でドンだけ違う対が教材にほとんど無い）はこの数えで支持される"
  },
- "mis_last4": {
-  "A_base": 0.0745,
-  "A_attn": 0.07,
-  "B_base": 0.0718,
-  "B_attn": 0.0672,
-  "order_gap_A": -0.0006,
-  "order_gap_B": -0.0001
+ "artifacts": {
+  "nets": "n1_results/value_split/nets/nrel_vsb_{a,b}.ep{0..3}.npz（同梱しない・結果ブランチだけ）",
+  "logs": ["n1_results/value_split/train_vsb_a.log", "n1_results/value_split/train_vsb_b.log", "n1_results/value_split/don_variation_n70f.log"],
+  "tvval": "n1_results/value_split/tvval_*.json", "rocks": "n1_results/value_split/rocks_*.jsonl", "summary": "n1_results/value_split/summary.json",
+  "tool": "tests/scripts/don_variation.py（付録・TEST_SPEC §3 に 1 行）"
  },
- "final_epoch": {
-  "base_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.8201,
-   "train_probe_ce": 1.8068,
-   "val_ce": 1.8563,
-   "val_top1": 0.5222,
-   "val_mis": 0.0732,
-   "val_mis_atk": 0.0275,
-   "val_mis_order": 0.0203,
-   "val_mis_play": 0.0096,
-   "val_mis_other": 0.0158,
-   "val_vmse": 0.9019,
-   "sec": 383.1
-  },
-  "attn_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.7888,
-   "train_probe_ce": 1.776,
-   "val_ce": 1.8411,
-   "val_top1": 0.5355,
-   "val_mis": 0.0696,
-   "val_mis_atk": 0.027,
-   "val_mis_order": 0.0194,
-   "val_mis_play": 0.0084,
-   "val_mis_other": 0.0147,
-   "val_vmse": 1.0142,
-   "sec": 721.2
-  },
-  "base_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.8229,
-   "train_probe_ce": 1.8181,
-   "val_ce": 1.8463,
-   "val_top1": 0.5269,
-   "val_mis": 0.0714,
-   "val_mis_atk": 0.0282,
-   "val_mis_order": 0.0193,
-   "val_mis_play": 0.0092,
-   "val_mis_other": 0.0147,
-   "val_vmse": 0.7176,
-   "sec": 680.3
-  },
-  "attn_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.7943,
-   "train_probe_ce": 1.7851,
-   "val_ce": 1.8316,
-   "val_top1": 0.5402,
-   "val_mis": 0.0683,
-   "val_mis_atk": 0.0259,
-   "val_mis_order": 0.0205,
-   "val_mis_play": 0.0089,
-   "val_mis_other": 0.013,
-   "val_vmse": 0.786,
-   "sec": 1017.7
-  },
-  "base_r24_w5354": {
-   "ep": 3,
-   "train_ce_run": 1.8162,
-   "train_probe_ce": 1.8092,
-   "val_ce": 1.8352,
-   "val_top1": 0.5387,
-   "val_mis": 0.0694,
-   "val_mis_atk": 0.0246,
-   "val_mis_order": 0.0208,
-   "val_mis_play": 0.0091,
-   "val_mis_other": 0.015,
-   "val_vmse": 0.5067,
-   "sec": 642.9
-  }
- },
- "forecast_check": {
-  "gap_opens_to_-0.02_-0.03_p0.3": "外れ（最後の 4 周の平均 A −0.0156・B −0.0153。開いたのは訓練側だけ −0.031）",
-  "scratch_attn_below_r24_p0.1": "A では外れ（1.8383＝r24 から再訓練 1.838 に並ぶだけ）・B では僅差で当たり（1.8305 対 同じ材料で r24 から 1.8352）"
- },
- "judgment": "差は −0.02 より小さいまま（−0.015 で一定）・順番の取り違えは減らない＝「頭の形では伸びない」を確定。本実装へは進まない（推薦）。1 手の時間の見積もりは §7.52 のまま（×2.5 前後・軽い版 ×1.3）。",
- "reading": "注意の頭の得は学ぶ速さの一定の 0.015 で、長く回しても開かない（両方とも周 6〜8 で頭打ち・残りの力は訓練側の覚え込みに使われる）。一から育てた注意の頭が r24 の積み上げと同じ種類の得を一度で取れる（B で r24 から再訓練を 0.005 下回る）が、§7.52 では r24 に足しても差 0.000＝足し算にならない。",
  "notes": [
-  "組 B（波 54 を足した組）は波 54 の前半 w01〜w16（64 シャード）だけを足した。波 54 は 32 シャードあるが、全部だと材料 3 倍で 16 周の注意の頭が 1 日を超えるため。前半同士で材料をちょうど倍にした",
-  "組 B は時間の都合で Sonnet の作業セッション 2 本に分けた（定型の訓練・CLAUDE.md の Sonnet の決まり）。結果ブランチ claude/policy-attn-long-w54-base・-w54-attn に push させ、jsonl とログをこのブランチへ写した。両セッションは回収後にアーカイブした",
-  "「r24 を下回るか」を同じ材料で比べるため、指示書に無い対照 base_r24_w5354（B の材料で r24 から・今の頭・4 周）を足した。A の材料の対照は §7.52 の base_r24 を使った",
-  "指示書の『r24 の 1.838』は r24 から再訓練した値（§7.52 の base_r24 周 3 1.8382）と読んだ。r24 そのもの（訓練前）は同じ検証点で 1.8606",
-  "組 A は 2 スレッドずつ 2 本並べたため §7.52（1 スレッド）と僅かに数字が違う（周 0 は同じ・周 1 の今の頭 1.8680 → 1.8698）",
-  "torch 2.14.1+cu130 を ~/torch_env（PYTHONPATH）に入れて訓練し、ゲートは torch を入れない構成で回した（§7.53・§7.54 と同じ扱い）。torch を入れた構成では tests/test_n_rel_train_torch.py::test_grads_match_numpy が数値の許容差で 1 件落ちる（コードは変えていないので本線の既知の件・この torch の版との相性）",
-  "台帳（docs/cpu_theory_gap.md）・計画（§7.57）の書き換えはコーディネータに任せた"
+  "訓練は 2 本を並べず順に回した（1 本の RSS が約 11GB＝cgroup 14GB に 2 本は載らない）。1 周 約 20 分・2 本で約 3 時間",
+  "検証の誤差は同じ 2 波の取り置きに対する値（評価帯では測っていない）",
+  "試験台の列は 1 種・読みの乱数 1 本（前の報告どおり 6キングの列は ±0.05 揺れる）",
+  "コードは付録の道具 1 ファイルだけ（訓練器・試験台・エンジンは変えていない）"
  ]
 }

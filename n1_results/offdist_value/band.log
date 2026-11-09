@@ -1,0 +1,6 @@
+holdout 行 381761（seed%7==0・98s）
+  [policy] nrel_r27.npz top1_visits 0.542 ce_visits 1.848 top1_q_improved 0.505 ce_q_improved 1.717 | gate mass 0.235 argmax 0.240 data 0.235 (n 5410)
+  [policy] nrel_ctrl.npz top1_visits 0.534 ce_visits 1.848 top1_q_improved 0.501 ce_q_improved 1.711 | gate mass 0.237 argmax 0.239 data 0.235 (n 5410)
+  [policy] nrel_fold.npz top1_visits 0.534 ce_visits 1.846 top1_q_improved 0.501 ce_q_improved 1.710 | gate mass 0.236 argmax 0.242 data 0.235 (n 5410)
+  [policy] 98s
+BANDDONE

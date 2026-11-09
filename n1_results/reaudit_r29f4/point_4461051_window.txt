@@ -1,0 +1,36 @@
+169 p2 now -> {"action_type": "SELECT_COUNTER", "card": "OP11-017"} | window {"worlds": 2, "tree": true}
+     -0.055 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.055 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.055 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.094 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+169 p2 tree-style(legacy3) -> {"action_type": "SELECT_COUNTER", "card": "OP11-017"} | window null
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.733 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+   actual: {"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": "0963fa32-cc55-40f1-89a7-5337bf10ec63"}
+170 p2 now -> {"action_type": "SELECT_COUNTER", "card": "OP11-017"} | window {"worlds": 2, "tree": true}
+     -0.030 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.030 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.068 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+170 p2 tree-style(legacy3) -> {"action_type": "SELECT_COUNTER", "card": "OP11-017"} | window null
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP11-017"}
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.733 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+   actual: {"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": "0a0ad2a0-493a-470b-84e4-b05e30bf09e9"}
+171 p2 now -> {"action_type": "SELECT_COUNTER", "card": "OP03-089"} | window {"worlds": 2, "tree": true}
+     +0.041 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.012 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+171 p2 tree-style(legacy3) -> {"action_type": "SELECT_COUNTER", "card": "OP03-089"} | window null
+     -0.695 {"action_type": "SELECT_COUNTER", "card": "OP03-089"}
+     -0.733 {"action_type": "SELECT_COUNTER", "card": "OP11-008"}
+     -1.000 {"action_type": "PASS"}
+   actual: {"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": "4641b06f-9124-4759-adb1-a74fca038034"}
+172 p2 now -> {"action_type": "PASS"} | window null
+172 p2 tree-style(legacy3) -> {"action_type": "PASS"} | window null
+   actual: {"kind": "battle", "action_type": "PASS", "card_uuid": null}

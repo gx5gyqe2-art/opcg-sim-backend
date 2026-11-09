@@ -1,0 +1,17 @@
+  pdc_real_w01.jsonl           174.0/350 = 0.4971 void 0
+  pdc_real_w02.jsonl           182.0/350 = 0.5200 void 0
+  pdc_real_w03.jsonl           159.0/350 = 0.4543 void 0
+  pdc_real_w04.jsonl           161.0/350 = 0.4600 void 0
+  pdc_real_w05.jsonl           172.0/350 = 0.4914 void 0
+  pdc_real_w06.jsonl           180.0/350 = 0.5143 void 0
+  pdc_real_w07.jsonl           183.0/350 = 0.5229 void 0
+  pdc_real_w08.jsonl           175.0/350 = 0.5000 void 0
+  pdc_real_w09.jsonl           186.0/350 = 0.5314 void 0
+  pdc_real_w10.jsonl           180.0/350 = 0.5143 void 0
+  pdc_real_w11.jsonl           169.0/350 = 0.4829 void 0
+  pdc_real_w12.jsonl           168.0/350 = 0.4800 void 0
+  pdc_real_w13.jsonl           183.0/350 = 0.5229 void 0
+  pdc_real_w14.jsonl           173.0/350 = 0.4943 void 0
+  pdc_real_w15.jsonl           161.0/350 = 0.4600 void 0
+  pdc_real_w16.jsonl           164.0/350 = 0.4686 void 0
+[real] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2770.0, "wr": 0.4946, "ci95": [0.4849, 0.5044], "elo": -3.7, "elo95": [-10.5, 3.1], "promoted": false, "shards": 16, "dup_seeds": 0}

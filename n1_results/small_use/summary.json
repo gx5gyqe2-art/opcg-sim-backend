@@ -1,0 +1,568 @@
+{
+ "plays": 737,
+ "judged_points": 400,
+ "overall": {
+  "worked": 603,
+  "whiff_luck": 13,
+  "vanilla": 8,
+  "whiff_choice": 62,
+  "na": 29,
+  "whiff_visible": 22
+ },
+ "by_clause": {
+  "on_play:target": {
+   "n": 42,
+   "worked": 27,
+   "whiff_choice": 6,
+   "whiff_visible": 9,
+   "worked_rate": 0.643,
+   "whiff_visible_rate": 0.214,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.143,
+   "na_rate": 0.0
+  },
+  "on_play:search": {
+   "n": 312,
+   "worked": 299,
+   "whiff_luck": 11,
+   "whiff_visible": 2,
+   "worked_rate": 0.958,
+   "whiff_visible_rate": 0.006,
+   "whiff_luck_rate": 0.035,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 0.0
+  },
+  "blocker": {
+   "n": 189,
+   "whiff_choice": 40,
+   "worked": 112,
+   "na": 37,
+   "worked_rate": 0.593,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.212,
+   "na_rate": 0.196
+  },
+  "on_play:play": {
+   "n": 23,
+   "worked": 16,
+   "whiff_choice": 3,
+   "whiff_visible": 4,
+   "worked_rate": 0.696,
+   "whiff_visible_rate": 0.174,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.13,
+   "na_rate": 0.0
+  },
+  "passive": {
+   "n": 72,
+   "na": 72,
+   "worked_rate": 0.0,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 1.0
+  },
+  "on_play:draw": {
+   "n": 57,
+   "worked": 53,
+   "whiff_visible": 1,
+   "whiff_choice": 3,
+   "worked_rate": 0.93,
+   "whiff_visible_rate": 0.018,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.053,
+   "na_rate": 0.0
+  },
+  "on_attack": {
+   "n": 58,
+   "whiff_choice": 24,
+   "worked": 34,
+   "worked_rate": 0.586,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.414,
+   "na_rate": 0.0
+  },
+  "on_play:other": {
+   "n": 29,
+   "worked": 20,
+   "whiff_luck": 1,
+   "whiff_visible": 7,
+   "whiff_choice": 1,
+   "worked_rate": 0.69,
+   "whiff_visible_rate": 0.241,
+   "whiff_luck_rate": 0.034,
+   "whiff_choice_rate": 0.034,
+   "na_rate": 0.0
+  },
+  "activate": {
+   "n": 81,
+   "worked": 64,
+   "whiff_choice": 17,
+   "worked_rate": 0.79,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.21,
+   "na_rate": 0.0
+  },
+  "on_play:arrange": {
+   "n": 9,
+   "worked": 9,
+   "worked_rate": 1.0,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 0.0
+  },
+  "on_play:don": {
+   "n": 25,
+   "worked": 22,
+   "whiff_choice": 1,
+   "whiff_visible": 2,
+   "worked_rate": 0.88,
+   "whiff_visible_rate": 0.08,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.04,
+   "na_rate": 0.0
+  },
+  "trigger_other": {
+   "n": 13,
+   "na": 3,
+   "worked": 10,
+   "worked_rate": 0.769,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 0.231
+  },
+  "on_ko": {
+   "n": 30,
+   "whiff_luck": 7,
+   "na": 14,
+   "worked": 9,
+   "worked_rate": 0.3,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.233,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 0.467
+  },
+  "on_play:recover": {
+   "n": 2,
+   "worked": 2,
+   "worked_rate": 1.0,
+   "whiff_visible_rate": 0.0,
+   "whiff_luck_rate": 0.0,
+   "whiff_choice_rate": 0.0,
+   "na_rate": 0.0
+  }
+ },
+ "why": {
+  "on_play:target": {
+   "worked:target": 27,
+   "whiff_choice:declined": 6,
+   "whiff_visible:cost_unpayable": 2,
+   "whiff_visible:cond_unmet": 3,
+   "whiff_visible:no_target": 4
+  },
+  "on_play:search": {
+   "worked:search": 299,
+   "whiff_luck:search_miss": 11,
+   "whiff_visible:negated": 1,
+   "whiff_visible:cost_unpayable": 1
+  },
+  "blocker": {
+   "whiff_choice:had_chance_no_block": 40,
+   "worked:blocked": 112,
+   "na:no_attack_faced": 10,
+   "na:left_before_chance": 27
+  },
+  "on_play:play": {
+   "worked:play": 16,
+   "whiff_choice:chose_none": 3,
+   "whiff_visible:cost_unpayable": 4
+  },
+  "passive": {
+   "na:passive": 72
+  },
+  "on_play:draw": {
+   "worked:draw": 53,
+   "whiff_visible:negated": 1,
+   "whiff_choice:declined": 3
+  },
+  "on_attack": {
+   "whiff_choice:never_attacked": 18,
+   "worked:on_attack": 34,
+   "whiff_choice:attacked_cond_unmet": 6
+  },
+  "on_play:other": {
+   "worked:other": 20,
+   "whiff_luck:no_event": 1,
+   "whiff_visible:cost_unpayable": 4,
+   "whiff_visible:no_target": 3,
+   "whiff_choice:declined": 1
+  },
+  "activate": {
+   "worked:activated": 64,
+   "whiff_choice:never_activated": 17
+  },
+  "on_play:arrange": {
+   "worked:arrange": 9
+  },
+  "on_play:don": {
+   "worked:don": 22,
+   "whiff_choice:declined": 1,
+   "whiff_visible:cond_unmet": 1,
+   "whiff_visible:cost_unpayable": 1
+  },
+  "trigger_other": {
+   "na:not_judged": 3,
+   "worked:triggered": 10
+  },
+  "on_ko": {
+   "whiff_luck:left_without_ko_effect": 7,
+   "na:not_koed": 14,
+   "worked:ko_resolved": 9
+  },
+  "on_play:recover": {
+   "worked:recover": 2
+  }
+ },
+ "body": {
+  "used": 385,
+  "rate": 0.522,
+  "attacked": 277,
+  "blocked": 112
+ },
+ "only_played": {
+  "n": 88,
+  "by_overall": {
+   "whiff_luck": 9,
+   "vanilla": 3,
+   "whiff_choice": 40,
+   "na": 24,
+   "whiff_visible": 12
+  }
+ },
+ "on_play": {
+  "n": 499,
+  "worked": 448,
+  "whiff_luck": 12,
+  "whiff_choice": 14,
+  "whiff_visible": 25
+ },
+ "gain": {
+  "body:unused": {
+   "n": 201,
+   "mean": 0.0063,
+   "ci": [
+    -0.0146,
+    0.0273
+   ],
+   "sd": 0.1515
+  },
+  "body:used": {
+   "n": 199,
+   "mean": 0.0057,
+   "ci": [
+    -0.0188,
+    0.0301
+   ],
+   "sd": 0.176
+  },
+  "on_play:none": {
+   "n": 128,
+   "mean": 0.0049,
+   "ci": [
+    -0.0164,
+    0.0262
+   ],
+   "sd": 0.1229
+  },
+  "on_play:whiff_choice": {
+   "n": 11,
+   "mean": 0.0795,
+   "ci": [
+    -0.111,
+    0.2701
+   ],
+   "sd": 0.3225
+  },
+  "on_play:whiff_luck": {
+   "n": 9,
+   "mean": 0.0556,
+   "ci": [
+    0.0125,
+    0.0986
+   ],
+   "sd": 0.0659
+  },
+  "on_play:whiff_visible": {
+   "n": 10,
+   "mean": -0.05,
+   "ci": [
+    -0.1042,
+    0.0042
+   ],
+   "sd": 0.0874
+  },
+  "on_play:worked": {
+   "n": 242,
+   "mean": 0.0037,
+   "ci": [
+    -0.0186,
+    0.026
+   ],
+   "sd": 0.177
+  },
+  "on_play_kind:arrange|worked": {
+   "n": 7,
+   "mean": 0.125,
+   "ci": [
+    0.0181,
+    0.2319
+   ],
+   "sd": 0.1443
+  },
+  "on_play_kind:don|worked": {
+   "n": 14,
+   "mean": -0.0536,
+   "ci": [
+    -0.1554,
+    0.0482
+   ],
+   "sd": 0.1944
+  },
+  "on_play_kind:draw|whiff_choice": {
+   "n": 3,
+   "mean": -0.0417,
+   "ci": [
+    -0.1233,
+    0.04
+   ],
+   "sd": 0.0722
+  },
+  "on_play_kind:draw|whiff_visible": {
+   "n": 1,
+   "mean": 0.0,
+   "ci": [
+    null,
+    null
+   ]
+  },
+  "on_play_kind:draw|worked": {
+   "n": 33,
+   "mean": 0.0606,
+   "ci": [
+    0.0011,
+    0.1201
+   ],
+   "sd": 0.1743
+  },
+  "on_play_kind:other|whiff_luck": {
+   "n": 1,
+   "mean": 0.125,
+   "ci": [
+    null,
+    null
+   ]
+  },
+  "on_play_kind:other|whiff_visible": {
+   "n": 1,
+   "mean": -0.25,
+   "ci": [
+    null,
+    null
+   ]
+  },
+  "on_play_kind:other|worked": {
+   "n": 8,
+   "mean": -0.0469,
+   "ci": [
+    -0.1387,
+    0.045
+   ],
+   "sd": 0.1326
+  },
+  "on_play_kind:play|whiff_choice": {
+   "n": 2,
+   "mean": -0.0625,
+   "ci": [
+    -0.43,
+    0.305
+   ],
+   "sd": 0.2652
+  },
+  "on_play_kind:play|whiff_visible": {
+   "n": 4,
+   "mean": -0.0312,
+   "ci": [
+    -0.0925,
+    0.03
+   ],
+   "sd": 0.0625
+  },
+  "on_play_kind:play|worked": {
+   "n": 7,
+   "mean": 0.0179,
+   "ci": [
+    -0.0811,
+    0.1169
+   ],
+   "sd": 0.1336
+  },
+  "on_play_kind:recover|worked": {
+   "n": 2,
+   "mean": -0.125,
+   "ci": [
+    -0.37,
+    0.12
+   ],
+   "sd": 0.1768
+  },
+  "on_play_kind:search|whiff_luck": {
+   "n": 8,
+   "mean": 0.0469,
+   "ci": [
+    0.002,
+    0.0917
+   ],
+   "sd": 0.0647
+  },
+  "on_play_kind:search|worked": {
+   "n": 159,
+   "mean": -0.0038,
+   "ci": [
+    -0.0311,
+    0.0234
+   ],
+   "sd": 0.1754
+  },
+  "on_play_kind:target|whiff_choice": {
+   "n": 6,
+   "mean": 0.1875,
+   "ci": [
+    -0.1335,
+    0.5085
+   ],
+   "sd": 0.4012
+  },
+  "on_play_kind:target|whiff_visible": {
+   "n": 4,
+   "mean": -0.0312,
+   "ci": [
+    -0.0925,
+    0.03
+   ],
+   "sd": 0.0625
+  },
+  "on_play_kind:target|worked": {
+   "n": 12,
+   "mean": -0.0104,
+   "ci": [
+    -0.1328,
+    0.1119
+   ],
+   "sd": 0.2162
+  },
+  "only_played:no": {
+   "n": 350,
+   "mean": 0.0022,
+   "ci": [
+    -0.0147,
+    0.0191
+   ],
+   "sd": 0.1614
+  },
+  "only_played:yes": {
+   "n": 50,
+   "mean": 0.0325,
+   "ci": [
+    -0.0174,
+    0.0824
+   ],
+   "sd": 0.18
+  },
+  "overall:na": {
+   "n": 18,
+   "mean": 0.0,
+   "ci": [
+    -0.0443,
+    0.0443
+   ],
+   "sd": 0.0959
+  },
+  "overall:vanilla": {
+   "n": 4,
+   "mean": -0.125,
+   "ci": [
+    -0.2982,
+    0.0482
+   ],
+   "sd": 0.1768
+  },
+  "overall:whiff_choice": {
+   "n": 33,
+   "mean": 0.0492,
+   "ci": [
+    -0.023,
+    0.1215
+   ],
+   "sd": 0.2118
+  },
+  "overall:whiff_luck": {
+   "n": 10,
+   "mean": 0.0375,
+   "ci": [
+    -0.0148,
+    0.0898
+   ],
+   "sd": 0.0844
+  },
+  "overall:whiff_visible": {
+   "n": 9,
+   "mean": -0.0417,
+   "ci": [
+    -0.0994,
+    0.0161
+   ],
+   "sd": 0.0884
+  },
+  "overall:worked": {
+   "n": 326,
+   "mean": 0.0039,
+   "ci": [
+    -0.0139,
+    0.0217
+   ],
+   "sd": 0.1641
+  },
+  "worked_any:no": {
+   "n": 74,
+   "mean": 0.0152,
+   "ci": [
+    -0.0222,
+    0.0526
+   ],
+   "sd": 0.1642
+  },
+  "worked_any:yes": {
+   "n": 326,
+   "mean": 0.0039,
+   "ci": [
+    -0.0139,
+    0.0217
+   ],
+   "sd": 0.1641
+  },
+  "all": {
+   "n": 400,
+   "mean": 0.006,
+   "ci": [
+    -0.0101,
+    0.022
+   ],
+   "sd": 0.1639
+  }
+ }
+}

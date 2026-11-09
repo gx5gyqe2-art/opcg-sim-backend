@@ -188,7 +188,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「【トリガー】を持つ（キャラ/カード）」対象フィルタ: トリガー能力所持に限定（matcher が絞り込む）。
     # 全対象種別で効くよう parse_target に置く（従来は discard ルールのみで、PLAY_CARD 等に
     # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
-    if re.search(_nfc(r'【トリガー】を持つ'), tgt_text):
+    # 「特徴《X》と【トリガー】を両方持つ」（EB05-005）は特徴 AND トリガー所持。
+    if re.search(_nfc(r'【トリガー】を(?:両方)?持つ'), tgt_text):
         tq.flags.add("HAS_TRIGGER")
         # 「《特徴》か【トリガー】を持つ（キャラ）」= 特徴 OR トリガー所持（OP05-002）。
         if re.search(_nfc(r'か【トリガー】を持つ'), tgt_text):
@@ -256,6 +257,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.flags.add("NAME_OR_COLORTYPE")
 
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
+    # 「属性(特)か(知)」（EB05-057）: 「か(Y)」で続く属性も OR で拾う（従来は 2 つ目が脱落）。
+    for _chain in re.finditer(_nfc(ParserKeyword.ATTRIBUTE + r'[((][^))]+[))]((?:か[((][^))]+[))])+)'), tgt_text):
+        attrs.extend(re.findall(r'[((]([^))]+)[))]', _chain.group(1)))
     tq.attributes.extend(attrs)
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
@@ -283,6 +287,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
     # 両立しない条件（斬かつ緑のイベント）で対象が常に空になっていた。属性句の直後に
     # 「か」が続く場合に OR とみなす（matcher が属性一致 or 残りフィルタ一致で照合）。
+    # 「イベントか特徴《X》を持つカード」（EB05-007）= 種類 OR 特徴。単純 AND ではイベントかつ
+    # 《X》のカードしか数えなかった。matcher が種類一致 or 特徴一致で照合する。
+    if re.search(_nfc(r'(?:イベント|キャラ|ステージ)か特徴[《<『]'), tgt_text):
+        tq.flags.add("TYPE_OR_TRAIT")
+
     if tq.attributes and (tq.card_type or tq.colors) and \
             re.search(_nfc(r'属性[((][^))]+[))]を持つ(?:カード|キャラ)か'), tgt_text):
         tq.flags.add("ATTR_OR_TYPE")
@@ -613,7 +622,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             if query.card_type and card.master.type.name not in query.card_type:
                 # NAME_OR_TYPE（「「名前」か<種類>」）は種類不一致でも名前一致なら通すため、
                 # ここでは弾かず下の OR 判定に委ねる。
-                if "NAME_OR_TYPE" not in query.flags:
+                if "NAME_OR_TYPE" not in query.flags and "TYPE_OR_TRAIT" not in query.flags:
                     continue
 
             # 【修正】card.master.colors (List[Color]) の各値を確認するように変更
@@ -697,7 +706,11 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if _excluded(): continue
 
-            if query.traits and not _trait_hit():
+            if (query.traits and not _trait_hit() and "TYPE_OR_TRAIT" in query.flags):
+                # 「イベントか特徴《X》を持つ」（EB05-007）: 特徴が外れても種類が合えば通す。
+                if card.master.type.name not in query.card_type:
+                    continue
+            elif query.traits and not _trait_hit():
                 # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
                 # トリガー所持なら通す（OP05-002）。それ以外は従来どおり除外。
                 if "TRAIT_OR_TRIGGER" not in query.flags:

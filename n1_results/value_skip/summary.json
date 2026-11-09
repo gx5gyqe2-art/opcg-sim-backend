@@ -1,0 +1,220 @@
+{
+ "tvval": {
+  "nrel_r28x4.npz": {
+   "a_head": 0.1363,
+   "b_close": 0.0782,
+   "c_oppend": 0.0901,
+   "d_next": 0.1394,
+   "a_head_ratio": 0.403,
+   "b_close_ratio": 0.231,
+   "c_oppend_ratio": 0.267,
+   "d_next_ratio": 0.413
+  },
+  "nrel_r29f4.ep0.npz": {
+   "a_head": 0.2005,
+   "b_close": 0.1134,
+   "c_oppend": 0.1225,
+   "d_next": 0.2142,
+   "a_head_ratio": 0.593,
+   "b_close_ratio": 0.335,
+   "c_oppend_ratio": 0.362,
+   "d_next_ratio": 0.634
+  },
+  "nrel_r29f4.ep1.npz": {
+   "a_head": 0.1897,
+   "b_close": 0.1066,
+   "c_oppend": 0.1201,
+   "d_next": 0.1999,
+   "a_head_ratio": 0.561,
+   "b_close_ratio": 0.315,
+   "c_oppend_ratio": 0.355,
+   "d_next_ratio": 0.591
+  },
+  "nrel_vskip.ep0.npz": {
+   "a_head": 0.2123,
+   "b_close": 0.1087,
+   "c_oppend": 0.1199,
+   "d_next": 0.2199,
+   "a_head_ratio": 0.628,
+   "b_close_ratio": 0.322,
+   "c_oppend_ratio": 0.355,
+   "d_next_ratio": 0.651
+  },
+  "nrel_vskip.ep1.npz": {
+   "a_head": 0.1824,
+   "b_close": 0.11,
+   "c_oppend": 0.119,
+   "d_next": 0.1851,
+   "a_head_ratio": 0.54,
+   "b_close_ratio": 0.326,
+   "c_oppend_ratio": 0.352,
+   "d_next_ratio": 0.548
+  }
+ },
+ "train": {
+  "r29f4_ctrl_rows": {
+   "value": 10712760,
+   "val": 1529015
+  },
+  "nrel_r29f4_ctrl.ep0.npz": {
+   "train_mse": 0.4753,
+   "val_vmse": 0.3531,
+   "val_vsign": 0.873,
+   "val_pi_top1": 0.4915,
+   "val_p_loss": 1.7112
+  },
+  "nrel_r29f4_ctrl.ep1.npz": {
+   "train_mse": 0.4694,
+   "val_vmse": 0.3735,
+   "val_vsign": 0.8631,
+   "val_pi_top1": 0.5012,
+   "val_p_loss": 1.7035
+  },
+  "vskip_rows": {
+   "value": 10712760,
+   "val": 1529015
+  },
+  "nrel_vskip.ep0.npz": {
+   "train_mse": 0.4755,
+   "val_vmse": 0.3553,
+   "val_vsign": 0.8717,
+   "val_pi_top1": 0.4948,
+   "val_p_loss": 1.7098
+  },
+  "nrel_vskip.ep1.npz": {
+   "train_mse": 0.4695,
+   "val_vmse": 0.3694,
+   "val_vsign": 0.8631,
+   "val_pi_top1": 0.5035,
+   "val_p_loss": 1.7051
+  }
+ },
+ "rows_turn3_6": {
+  "outcome_z": 0.5424,
+  "nrel_r28x4.npz": {
+   "turn3_6": 0.2818,
+   "turn7_10": 0.1432,
+   "all": 0.213,
+   "turn3_6_holdout": 0.3058,
+   "turn3_6_trained": 0.2779
+  },
+  "nrel_r29f4.ep0.npz": {
+   "turn3_6": 0.3009,
+   "turn7_10": 0.1477,
+   "all": 0.2261,
+   "turn3_6_holdout": 0.3227,
+   "turn3_6_trained": 0.2974
+  },
+  "nrel_r29f4.ep1.npz": {
+   "turn3_6": 0.3056,
+   "turn7_10": 0.1538,
+   "all": 0.2283,
+   "turn3_6_holdout": 0.3269,
+   "turn3_6_trained": 0.3022
+  },
+  "nrel_vskip.ep0.npz": {
+   "turn3_6": 0.2987,
+   "turn7_10": 0.1474,
+   "all": 0.224,
+   "turn3_6_holdout": 0.3124,
+   "turn3_6_trained": 0.2967
+  },
+  "nrel_vskip.ep1.npz": {
+   "turn3_6": 0.2979,
+   "turn7_10": 0.152,
+   "all": 0.2228,
+   "turn3_6_holdout": 0.3128,
+   "turn3_6_trained": 0.2956
+  }
+ },
+ "band": {
+  "band_n70f": {
+   "nrel_r28x4.npz": {
+    "v_mse": 0.4734,
+    "v_sign": 0.8287
+   },
+   "nrel_r29f4.ep0.npz": {
+    "v_mse": 0.4734,
+    "v_sign": 0.83
+   },
+   "nrel_r29f4.ep1.npz": {
+    "v_mse": 0.4748,
+    "v_sign": 0.8291
+   },
+   "nrel_vskip.ep0.npz": {
+    "v_mse": 0.4735,
+    "v_sign": 0.8296
+   },
+   "nrel_vskip.ep1.npz": {
+    "v_mse": 0.4746,
+    "v_sign": 0.8287
+   }
+  },
+  "band_n74c": {
+   "nrel_r28x4.npz": {
+    "v_mse": 0.4739,
+    "v_sign": 0.8299
+   },
+   "nrel_r29f4.ep0.npz": {
+    "v_mse": 0.4749,
+    "v_sign": 0.8297
+   },
+   "nrel_r29f4.ep1.npz": {
+    "v_mse": 0.475,
+    "v_sign": 0.8295
+   },
+   "nrel_vskip.ep0.npz": {
+    "v_mse": 0.4755,
+    "v_sign": 0.8296
+   },
+   "nrel_vskip.ep1.npz": {
+    "v_mse": 0.4755,
+    "v_sign": 0.829
+   }
+  }
+ },
+ "logit_parts": {
+  "nrel_vskip.ep0.npz": {
+   "shared": 0.3931,
+   "skip": 0.0308,
+   "total": 0.4239
+  },
+  "nrel_vskip.ep1.npz": {
+   "shared": 0.4002,
+   "skip": 0.0337,
+   "total": 0.4339
+  }
+ },
+ "weights": {
+  "nrel_vskip.ep0.npz": {
+   "l2": 0.52506,
+   "abs_max": 0.09745,
+   "by_part_abs_sum": {
+    "scalars": 2.49998,
+    "tok_mean": 3.46321,
+    "tok_max": 1.96342
+   },
+   "skip_logit_group_diff": {
+    "all_cols": 0.0308,
+    "don_cols": 0.0214,
+    "scalars": 0.02169,
+    "tokens": 0.00911
+   }
+  },
+  "nrel_vskip.ep1.npz": {
+   "l2": 0.77619,
+   "abs_max": 0.16247,
+   "by_part_abs_sum": {
+    "scalars": 3.41173,
+    "tok_mean": 5.31837,
+    "tok_max": 2.75358
+   },
+   "skip_logit_group_diff": {
+    "all_cols": 0.03369,
+    "don_cols": 0.03573,
+    "scalars": 0.03352,
+    "tokens": 0.00017
+   }
+  }
+ }
+}

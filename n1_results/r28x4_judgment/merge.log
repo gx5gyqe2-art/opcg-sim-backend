@@ -1,0 +1,68 @@
+  r28x4_real_w01.jsonl         187.0/350 = 0.5343 void 0
+  r28x4_real_w02.jsonl         186.0/350 = 0.5314 void 0
+  r28x4_real_w03.jsonl         187.0/350 = 0.5343 void 0
+  r28x4_real_w04.jsonl         168.0/350 = 0.4800 void 0
+  r28x4_real_w05.jsonl         175.0/350 = 0.5000 void 0
+  r28x4_real_w06.jsonl         173.0/350 = 0.4943 void 0
+  r28x4_real_w07.jsonl         182.0/350 = 0.5200 void 0
+  r28x4_real_w08.jsonl         178.0/350 = 0.5086 void 0
+  r28x4_real_w09.jsonl         178.0/350 = 0.5086 void 0
+  r28x4_real_w10.jsonl         186.0/350 = 0.5314 void 0
+  r28x4_real_w11.jsonl         181.0/350 = 0.5171 void 0
+  r28x4_real_w12.jsonl         183.0/350 = 0.5229 void 0
+  r28x4_real_w13.jsonl         183.0/350 = 0.5229 void 0
+  r28x4_real_w14.jsonl         184.0/350 = 0.5257 void 0
+  r28x4_real_w15.jsonl         198.0/350 = 0.5657 void 0
+  r28x4_real_w16.jsonl         184.0/350 = 0.5257 void 0
+[real] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2913.0, "wr": 0.5202, "ci95": [0.5102, 0.5301], "elo": 14.0, "elo95": [7.1, 21.0], "promoted": false, "shards": 16, "dup_seeds": 0}
+  r28x4_mirror_w01.jsonl       169.0/350 = 0.4829 void 0
+  r28x4_mirror_w02.jsonl       183.0/350 = 0.5229 void 0
+  r28x4_mirror_w03.jsonl       188.0/350 = 0.5371 void 0
+  r28x4_mirror_w04.jsonl       191.0/350 = 0.5457 void 0
+  r28x4_mirror_w05.jsonl       191.0/350 = 0.5457 void 0
+  r28x4_mirror_w06.jsonl       185.0/350 = 0.5286 void 0
+  r28x4_mirror_w07.jsonl       185.0/350 = 0.5286 void 0
+  r28x4_mirror_w08.jsonl       194.0/350 = 0.5543 void 0
+  r28x4_mirror_w09.jsonl       176.0/350 = 0.5029 void 0
+  r28x4_mirror_w10.jsonl       174.0/350 = 0.4971 void 0
+  r28x4_mirror_w11.jsonl       181.0/350 = 0.5171 void 0
+  r28x4_mirror_w12.jsonl       180.0/350 = 0.5143 void 0
+  r28x4_mirror_w13.jsonl       180.0/350 = 0.5143 void 0
+  r28x4_mirror_w14.jsonl       176.0/350 = 0.5029 void 0
+  r28x4_mirror_w15.jsonl       185.0/350 = 0.5286 void 0
+  r28x4_mirror_w16.jsonl       183.0/350 = 0.5229 void 0
+[mirror] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2921.0, "wr": 0.5216, "ci95": [0.5103, 0.5329], "elo": 15.0, "elo95": [7.1, 22.9], "promoted": false, "shards": 16, "dup_seeds": 0}
+  r28x4_synth2_w01.jsonl       186.0/350 = 0.5314 void 0
+  r28x4_synth2_w02.jsonl       184.0/350 = 0.5257 void 0
+  r28x4_synth2_w03.jsonl       170.0/350 = 0.4857 void 0
+  r28x4_synth2_w04.jsonl       182.0/350 = 0.5200 void 0
+  r28x4_synth2_w05.jsonl       175.0/350 = 0.5000 void 0
+  r28x4_synth2_w06.jsonl       175.0/350 = 0.5000 void 0
+  r28x4_synth2_w07.jsonl       176.0/350 = 0.5029 void 0
+  r28x4_synth2_w08.jsonl       174.0/350 = 0.4971 void 0
+  r28x4_synth2_w09.jsonl       170.0/350 = 0.4857 void 0
+  r28x4_synth2_w10.jsonl       174.0/350 = 0.4971 void 0
+  r28x4_synth2_w11.jsonl       184.0/350 = 0.5257 void 0
+  r28x4_synth2_w12.jsonl       181.0/350 = 0.5171 void 0
+  r28x4_synth2_w13.jsonl       174.0/350 = 0.4971 void 0
+  r28x4_synth2_w14.jsonl       179.0/350 = 0.5114 void 0
+  r28x4_synth2_w15.jsonl       187.0/350 = 0.5343 void 0
+  r28x4_synth2_w16.jsonl       191.0/350 = 0.5457 void 0
+[synth2] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 2862.0, "wr": 0.5111, "ci95": [0.5011, 0.521], "elo": 7.7, "elo95": [0.8, 14.6], "promoted": false, "shards": 16, "dup_seeds": 0}
+
+== paired r28x4 - r28
+real: n=2800 r28x4_judgment 0.5202 r28_judgment 0.4984 diff_wr +0.0218 ±0.0135  Elo diff ≈ +15.1 [+5.8..]
+mirror: n=2800 r28x4_judgment 0.5216 r28_judgment 0.4763 diff_wr +0.0454 ±0.0157  Elo diff ≈ +31.5 [+20.6..]
+synth2: n=2800 r28x4_judgment 0.5111 r28_judgment 0.4907 diff_wr +0.0204 ±0.0136  Elo diff ≈ +14.1 [+4.7..]
+== paired r28x4 - r28m
+real: n=2800 r28x4_judgment 0.5202 r28m_judgment 0.5038 diff_wr +0.0164 ±0.0135  Elo diff ≈ +11.4 [+2.1..]
+mirror: n=2800 r28x4_judgment 0.5216 r28m_judgment 0.4804 diff_wr +0.0413 ±0.0153  Elo diff ≈ +28.7 [+18.1..]
+synth2: n=2800 r28x4_judgment 0.5111 r28m_judgment 0.4909 diff_wr +0.0202 ±0.0134  Elo diff ≈ +14.0 [+4.7..]
+== paired r28x4 - r28b
+real: n=2800 r28x4_judgment 0.5202 r28b_judgment 0.5043 diff_wr +0.0159 ±0.0137  Elo diff ≈ +11.1 [+1.5..]
+mirror: n=2800 r28x4_judgment 0.5216 r28b_judgment 0.4971 diff_wr +0.0245 ±0.0151  Elo diff ≈ +17.0 [+6.5..]
+synth2: n=2800 r28x4_judgment 0.5111 r28b_judgment 0.4988 diff_wr +0.0123 ±0.0134  Elo diff ≈ +8.6 [-0.7..]
+== paired r28x4 - r28x
+real: n=2800 r28x4_judgment 0.5202 r28x_judgment 0.5086 diff_wr +0.0116 ±0.0135  Elo diff ≈ +8.1 [-1.3..]
+mirror: n=2800 r28x4_judgment 0.5216 r28x_judgment 0.4934 diff_wr +0.0282 ±0.0155  Elo diff ≈ +19.6 [+8.8..]
+synth2: n=2800 r28x4_judgment 0.5111 r28x_judgment 0.4888 diff_wr +0.0223 ±0.0132  Elo diff ≈ +15.5 [+6.3..]

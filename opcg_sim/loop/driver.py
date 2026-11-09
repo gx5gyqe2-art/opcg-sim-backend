@@ -63,7 +63,8 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
              first_player: Optional[str] = None,
              observer: Optional[Callable[..., None]] = None,
              post: Optional[Callable[..., None]] = None,
-             swap: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+             swap: Optional[Callable[..., Any]] = None,
+             pre: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
     """1 局を打ち切りまで進める。
 
     `seats` は `{"p1": SeatSpec, "p2": SeatSpec}`。`observer(game, name, turn, step, out, move)`
@@ -80,6 +81,10 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
     選択は「木が決めたそのまま」で、実対局に出る手だけが変わる。差し替えた側は箱の残り手順
     （`out["commit"]`）を捨てる責任を持つ（差し替え後の対話は既定解決）。`None`（既定）なら
     1 bit も変わらない。
+
+    `pre(game, name, turn, step)` は**決める前**（`decide` の前）に呼ぶ、盤面を書き換えてよい唯一の入口
+    （WP `don-jitter`・`search_efficiency_plan.md` §7.75: 手番の頭にドンを 1 枚出し入れする）。書き換えた盤面で
+    そのまま `decide` から続ける。`None`（既定）なら 1 bit も変わらない。
 
     戻り値 `{"winner": "p1"|"p2"|None, "turns": int, "steps": int, "acts": {...}}`。
     `winner=None`（上限手数・要求が尽きた）は呼び出し側で void 扱いにする。
@@ -98,6 +103,8 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
         spec = seats[name]
         turn = int(game.turn_count or 0)
         carry = carries[name].get(turn, name)
+        if pre is not None:
+            pre(game, name, turn, steps)
         out = E.decide_with_rethink(lambda o: game.decide(name, o),
                                     spec.decide_opts(seed, turn, name, carry),
                                     getattr(spec, "rethink_ratio", None),

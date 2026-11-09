@@ -1,0 +1,74 @@
+{
+ "kind": "gen",
+ "section": "§7.75",
+ "ledger_grep": "波 82j",
+ "about": "波 82j の生成（WP don-jitter 段 2・生成役 r28x4・波 70f と同じ設定〔後半 4 割の温度〕に --don-jitter 1.0〔全局で 1 回・手番 3〜10 の頭にドン ±1〕・16 シャード × 240 局＝3,840 局・試験の教材）",
+ "job": "n82j-w{K}",
+ "branch": "claude/n82j-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd",
+  "commit": "83f22ff8ac7bb2332d258c692c40f062dc1dfb99"
+ },
+ "shards": 16,
+ "hours": 1.0,
+ "vars": {
+  "BASE": "3480000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 2,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n82j_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10",
+  "--temp-late",
+  "0.4",
+  "--explore-z",
+  "game",
+  "--don-jitter",
+  "1.0"
+ ],
+ "log": "~/n82j_w{K}.log",
+ "copy_logs": [
+  "~/n82j_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--don-jitter\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+  "games": 240,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "temp_late": 0.4,
+  "explore_z": "game",
+  "don_jitter": 1.0
+ },
+ "commit_message": "gen wave 82j shard {K}"
+}

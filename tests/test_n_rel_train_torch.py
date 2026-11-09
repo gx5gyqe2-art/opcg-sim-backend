@@ -404,6 +404,44 @@ def test_epoch_batches_match_step_by_step_path(env, dump):
                               getattr(tr2.tn, p).detach().numpy()), p
 
 
+def test_epoch_batches_keep_multi_wave_views_lazy(env, dump):
+    """波をまたぐ view（`dump_io._Waves`）は RAM に 1 本にまとめず、切り出したバッチは同じ値。
+
+    `np.asarray` で全波を連結すると 4 波（1,060 万行）で約 14GB になり訓練が落ちた
+    （2026-10-27・r28b）。まとめない経路でも 1 本の配列のときとバッチが 1 bit も変わらないこと。"""
+    from opcg_sim.learned.train import n_rel_torch as TT
+    from opcg_sim.learned.train import dump_io as DIO
+    V, P, C, ptr = dump["V"], dump["P"], dump["C"], dump["ptr"]
+    cuts = (0, 37, 38, 101, len(V["z"]))                 # 長さ 1 の part も混ぜる
+    Vw = dict(V)
+    for k in ("sc", "ci", "tok", "z"):
+        Vw[k] = DIO._Waves([V[k][a:b] for a, b in zip(cuts, cuts[1:])])
+    budget = NT.budget_feats_all(V, P, C, ptr, dump["ptab_ret"])
+    net = NT.NRelNet(env["tables"], seed=13); net.ablate = set(ABLATE)
+    tail = NT.cand_tail_all(net, C)
+    rng = np.random.default_rng(5)
+    order_v = rng.permutation(len(V["z"]))[:96]
+    order_p = rng.permutation(len(P["len"]))[:32]
+    a = TT.EpochBatches(V, P, C, ptr, budget, tail, None, net.ablate)
+    b = TT.EpochBatches(Vw, P, C, ptr, budget, tail, None, net.ablate)
+    assert b.v_tok.t is None and isinstance(b.v_tok.a, DIO._Waves)
+    for src in (a, b):
+        src.begin(order_v, 24, order_p, 8)
+    def flat(xs):
+        for x in xs:
+            if isinstance(x, TT.PolicyBatch):
+                yield from (getattr(x, k) for k in TT.PolicyBatch.__slots__)
+            else:
+                yield x
+
+    for i in range(4):
+        for xa, xb in zip(flat(a.value(i) + a.policy(i)), flat(b.value(i) + b.policy(i))):
+            if xa is None or isinstance(xa, int):
+                assert xa == xb
+            else:
+                assert torch.equal(torch.as_tensor(xa), torch.as_tensor(xb))
+
+
 def test_ragged_index_matches_concatenate(dump):
     """候補行 index の作り方（cumsum 1 回）が従来の内包表記＋concatenate と同じ。"""
     from opcg_sim.learned.train import n_rel_torch as TT

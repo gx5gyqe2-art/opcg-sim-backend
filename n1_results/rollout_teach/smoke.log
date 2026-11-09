@@ -1,0 +1,3 @@
+PLAY shard=1/30 局 8/8・盤面 32 workers=4 -> n1_results/rollout_teach/rows_smoke.jsonl
+[8/8 局] 盤面 32/32・失敗 0・78s・残り見込み 0 分
+PLAY_DONE 盤面 32・失敗 0・78s

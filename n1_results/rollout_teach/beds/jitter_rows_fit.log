@@ -1,0 +1,9 @@
+nrel_fit_mean.ep0.npz {'turn3_6': 0.357, 'turn7_10': 0.1475, 'all': 0.2505, 'turn3_6_holdout': 0.3796, 'turn3_6_trained': 0.3533}
+nrel_fit_mean.ep1.npz {'turn3_6': 0.3742, 'turn7_10': 0.1514, 'all': 0.2648, 'turn3_6_holdout': 0.3968, 'turn3_6_trained': 0.3705}
+nrel_fit_mean.ep2.npz {'turn3_6': 0.38, 'turn7_10': 0.1546, 'all': 0.2688, 'turn3_6_holdout': 0.4063, 'turn3_6_trained': 0.3757}
+nrel_fit_mean.ep3.npz {'turn3_6': 0.4048, 'turn7_10': 0.1546, 'all': 0.2812, 'turn3_6_holdout': 0.4335, 'turn3_6_trained': 0.4001}
+nrel_fit_z.ep0.npz {'turn3_6': 0.3531, 'turn7_10': 0.1106, 'all': 0.2296, 'turn3_6_holdout': 0.356, 'turn3_6_trained': 0.3528}
+nrel_fit_z.ep1.npz {'turn3_6': 0.3989, 'turn7_10': 0.1215, 'all': 0.2507, 'turn3_6_holdout': 0.4037, 'turn3_6_trained': 0.3984}
+nrel_fit_z.ep2.npz {'turn3_6': 0.4128, 'turn7_10': 0.1179, 'all': 0.241, 'turn3_6_holdout': 0.3892, 'turn3_6_trained': 0.4172}
+nrel_fit_z.ep3.npz {'turn3_6': 0.416, 'turn7_10': 0.1161, 'all': 0.2525, 'turn3_6_holdout': 0.4158, 'turn3_6_trained': 0.4164}
+z {'turn3_6': {'plus': 0.2936, 'minus': -0.2487, 'diff': 0.5424, 'ci95': 0.0856, 'n': [957, 985]}, 'turn7_10': {'plus': 0.0891, 'minus': -0.1053, 'diff': 0.1944, 'ci95': 0.0931, 'n': [696, 1187]}, 'all': {'plus': 0.2075, 'minus': -0.1703, 'diff': 0.3779, 'ci95': 0.0628, 'n': [1653, 2172]}, 'turn3_6_holdout': {'plus': 0.2727, 'minus': -0.2148, 'diff': 0.4875, 'ci95': 0.2281, 'n': [143, 135]}, 'turn3_6_trained': {'plus': 0.2973, 'minus': -0.2541, 'diff': 0.5514, 'ci95': 0.0924, 'n': [814, 850]}}

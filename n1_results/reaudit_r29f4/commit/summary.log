@@ -1,0 +1,9 @@
+{"games": 50, "void": 0, "commit_share": {"own": {"k": 422, "n": 5137, "rate": 0.0821}, "opp": {"k": 0, "n": 2941, "rate": 0.0}, "all": {"k": 422, "n": 8078, "rate": 0.0522}}}
+== by_side
+  own                                        pts=  422 diff=0.1967 desc=0.1967 cal=0.1422 | root fb=44/39 child fb=37/33 | cal root 30/30 child 27/24
+== by_type
+  own:attach                                 pts=  249 diff=0.2249 desc=0.2249 cal=0.1406 | root fb=29/27 child fb=25/23 | cal root 20/15 child 16/16
+  own:attack                                 pts=  173 diff=0.1561 desc=0.1561 cal=0.1445 | root fb=15/12 child fb=12/10 | cal root 10/15 child 11/8
+== by_src
+  box@own                                    pts=  422 diff=0.1967 desc=0.1967 cal=0.1422 | root fb=44/39 child fb=37/33 | cal root 30/30 child 27/24
+-> n1_results/reaudit_r29f4/commit/summary.json

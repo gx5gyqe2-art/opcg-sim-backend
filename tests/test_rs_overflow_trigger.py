@@ -41,8 +41,13 @@ def _games():
 
 
 def _board(g):
-    db = D.load_db()
-    p1, p2 = D.build_pair(db, g["leaders"][0], g["leaders"][1], g["seed"], g["decks"])
+    # デッキは記録時の中身を固定して使う（2026-11-09・合成デッキはカードの母集団で中身が変わり、
+    # DB にカードが足されると記録の手が合わなくなるため）。`deck_lists` が無い記録だけ組み直す。
+    if g.get("deck_lists"):
+        p1, p2 = (tuple(x) for x in g["deck_lists"])
+    else:
+        db = D.load_db()
+        p1, p2 = D.build_pair(db, g["leaders"][0], g["leaders"][1], g["seed"], g["decks"])
     game = DR.new_game(g["seed"], p1, p2)
     for mv in g["moves"]:
         _apply(game, json.loads(game.pending_json())["player_id"], mv)

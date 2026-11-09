@@ -1,0 +1,74 @@
+{
+ "kind": "gen",
+ "section": "§7.89",
+ "ledger_grep": "波 83f〜84f",
+ "about": "波 84f の生成（§7.89・生成役 r29f4・波 70f〜73f と同じ設定〔後半の散らす頻度 4 割〕・守りの対話の木は既定・32 シャード × 480 局・次の世代〔対の差の損失を入れる〕の教材 2 波のうちの 1 本）",
+ "job": "n84f-w{K}",
+ "branch": "claude/n84f-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "7020000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n84f_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r29f4.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10",
+  "--temp-late",
+  "0.4",
+  "--explore-z",
+  "game"
+ ],
+ "log": "~/n84f_w{K}.log",
+ "copy_logs": [
+  "~/n84f_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--temp-late\""
+  },
+  {
+   "file": "rust/opcg_engine/src/search/decide.rs",
+   "grep": "defense_dialog_tree: DefenseDialogTree::All,"
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r29f4.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "temp_late": 0.4,
+  "explore_z": "game"
+ },
+ "commit_message": "gen wave 84f shard {K}"
+}

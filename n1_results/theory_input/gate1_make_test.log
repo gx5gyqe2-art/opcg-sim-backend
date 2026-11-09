@@ -1,0 +1,26 @@
+START 13:37:42
+        g = CMP.combine(wv, wp, nf_v, nf_p)
+        # 全パラメータについて勾配が出ていること（どこかが黙って 0 のままなら照合の意味が無い）
+        assert set(wv["max_rel"]) and set(wp["max_rel"])
+        # 絶対値 1e-4 未満か、**丸めの下限**（同じ numpy を加算順だけ変えた差）の 5 倍以内。
+        # 下限より良くなることはあり得ないので、絶対値だけで落とすと合成バッチの引きに左右される。
+>       assert g["pass_1e-4_at_1e-4"] or g["within_noise_floor_1e-4"], \
+            (g["max_rel"], g["noise_floor"]["max_rel"])
+E       AssertionError: ({'1e-06': 0.005470343887457507, '1e-04': 0.00019857362606628444}, {'1e-06': 0.0007046042127088099, '1e-04': 3.785293089766514e-05})
+E       assert (False or False)
+
+tests/test_n_rel_train_torch.py:202: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_n_rel_train_torch.py::test_grads_match_numpy - AssertionErr...
+1 failed, 937 passed in 81.69s (0:01:21)
+make: *** [Makefile:29: test] Error 1
+TEST_EXIT 2 13:41:08
+rm -f /tmp/audit_cross_0.jsonl
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
+  --candidate "" --pairs 120 --bands 1 --max-pairs 120 --workers 4 --sims 32 \
+  --leaders random --decks synth --seed-base 0 \
+  --out /tmp/audit_cross_0.jsonl
+消化済み 0/120 ペア・残り 120
+今回 120 ペア（61s）・累計 120/120
+ARENA_RESUME_FINAL {"pairs": 120, "games": 240, "void": 0, "wins": 120.0, "wr": 0.5, "ci95": [0.5, 0.5], "elo": -0.0, "promoted": false, "candidate": ""}
+AUDIT_EXIT 0 13:42:09

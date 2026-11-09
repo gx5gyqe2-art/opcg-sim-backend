@@ -327,6 +327,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ、相手の手番の守りの窓（自分のライフ ≤ 2・候補の値が平らか張り付き）で、各候補の後に"
                          "相手から見た詰みの証明を回し、どの配り方でも相手が勝つ候補を外して選ぶ"
                          "（`docs/search_efficiency_plan.md` §7.51・測定用）。省略＝既定（off）")
+    ap.add_argument("--cand-defense-dialog-tree", default=None, choices=("off", "life1", "all"),
+                    help="候補席だけ、相手の手番の戦闘中に自分が答える効果の対話（相手のアタック時の任意の効果の確認・"
+                         "探して選ぶ 等）を短い木で読む（`docs/search_efficiency_plan.md` §7.85・測定用）。"
+                         "life1＝自分のライフ ≤ 1 だけ・all＝ライフを問わず・off＝旧い形（静的な値）。省略＝既定（all・2026-11-07〜・§7.87）")
     ap.add_argument("--cand-window-worlds", type=int, default=None,
                     help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
@@ -350,6 +354,7 @@ CAND_VALUE_FLAGS = {
     "cand_lethal_proof": "lethal_proof",
     "cand_lethal_root_nodes": "lethal_nodes",
     "cand_window_worlds": "window_worlds",
+    "cand_defense_dialog_tree": "defense_dialog_tree",
     # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
     "cand_rethink_ratio": "rethink_ratio",
     "cand_rethink_worlds": "rethink_worlds",

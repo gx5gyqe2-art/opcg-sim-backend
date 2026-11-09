@@ -1,0 +1,60 @@
+{
+ "kind": "gen",
+ "section": "§7.73",
+ "ledger_grep": "波 74c〜77c",
+ "about": "波 75c の生成（WP gen-explore 段 4 の対照・生成役 r28x4・波 66x〜69x と同じ設定だが後半の散らしなし〔最初の 4 ターンだけの温度＝従来の生成〕・32 シャード × 480 局・r29c の教材 4 波のうちの 1 本）",
+ "job": "n75c-w{K}",
+ "branch": "claude/n75c-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd",
+  "commit": "21950237239a90e67086d294a85c567b167afd33"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "3030000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n75c_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10"
+ ],
+ "log": "~/n75c_w{K}.log",
+ "copy_logs": [
+  "~/n75c_w{K}.log"
+ ],
+ "require": [],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r28x4.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real"
+ },
+ "commit_message": "gen wave 75c shard {K}"
+}

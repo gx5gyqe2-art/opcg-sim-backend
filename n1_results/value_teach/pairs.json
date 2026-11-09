@@ -1,0 +1,22 @@
+{
+ "shard": null,
+ "jobs": 1485,
+ "ok": 1417,
+ "all": 1639,
+ "leak_excluded": 154,
+ "fails": {
+  "blunder_audit|ValueError: ドン!!を付与する対象のカードが見つ": 6,
+  "blunder_audit|ValueError: 不適切なアクションです。期待されてい": 9,
+  "blunder_audit|ended": 50,
+  "main_read|ended": 2,
+  "window_read_all|ended": 1
+ },
+ "by_src": {
+  "blunder_audit": 862,
+  "main_read": 110,
+  "matchup_5": 219,
+  "matchup_kr": 36,
+  "rocks_bounce": 104,
+  "window_read_all": 86
+ }
+}

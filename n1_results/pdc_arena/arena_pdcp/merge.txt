@@ -1,0 +1,34 @@
+候補席の探索設定: {"budget": 0, "lethal_proof": "root", "sims": 1280, "worlds": 8}
+  pdcp_real_w01.jsonl          84.0/168 = 0.5000 void 0
+  pdcp_real_w02.jsonl          91.0/168 = 0.5417 void 0
+  pdcp_real_w03.jsonl          82.0/168 = 0.4881 void 0
+  pdcp_real_w04.jsonl          92.0/168 = 0.5476 void 0
+  pdcp_real_w05.jsonl          86.0/168 = 0.5119 void 0
+  pdcp_real_w06.jsonl          82.0/168 = 0.4881 void 0
+  pdcp_real_w07.jsonl          94.0/168 = 0.5595 void 0
+  pdcp_real_w08.jsonl          89.0/168 = 0.5298 void 0
+  pdcp_real_w09.jsonl          87.0/168 = 0.5179 void 0
+  pdcp_real_w10.jsonl          77.0/168 = 0.4583 void 0
+  pdcp_real_w11.jsonl          79.0/168 = 0.4702 void 0
+  pdcp_real_w12.jsonl          89.0/168 = 0.5298 void 0
+  pdcp_real_w13.jsonl          78.0/168 = 0.4643 void 0
+  pdcp_real_w14.jsonl          84.0/168 = 0.5000 void 0
+  pdcp_real_w15.jsonl          90.0/168 = 0.5357 void 0
+  pdcp_real_w16.jsonl          87.0/168 = 0.5179 void 0
+  pdcp_real_w17.jsonl          87.0/168 = 0.5179 void 0
+  pdcp_real_w18.jsonl          79.0/168 = 0.4702 void 0
+  pdcp_real_w19.jsonl          79.0/168 = 0.4702 void 0
+  pdcp_real_w20.jsonl          84.0/168 = 0.5000 void 0
+  pdcp_real_w21.jsonl          80.0/168 = 0.4762 void 0
+  pdcp_real_w22.jsonl          79.0/168 = 0.4702 void 0
+  pdcp_real_w23.jsonl          84.0/168 = 0.5000 void 0
+  pdcp_real_w24.jsonl          93.0/168 = 0.5536 void 0
+  pdcp_real_w25.jsonl          83.0/168 = 0.4940 void 0
+  pdcp_real_w26.jsonl          81.0/168 = 0.4821 void 0
+  pdcp_real_w27.jsonl          86.0/168 = 0.5119 void 0
+  pdcp_real_w28.jsonl          69.0/168 = 0.4107 void 0
+  pdcp_real_w29.jsonl          83.0/168 = 0.4940 void 0
+  pdcp_real_w30.jsonl          85.0/168 = 0.5060 void 0
+  pdcp_real_w31.jsonl          82.0/168 = 0.4881 void 0
+  pdcp_real_w32.jsonl          80.0/168 = 0.4762 void 0
+[pdcp] ARENA_MERGE_FINAL {"pairs": 2688, "games": 5376, "void": 0, "wins": 2685.0, "wr": 0.4994, "ci95": [0.4897, 0.5092], "elo": -0.4, "elo95": [-7.1, 6.4], "promoted": false, "shards": 32, "dup_seeds": 0, "cand_opts": [{"budget": 0, "lethal_proof": "root", "sims": 1280, "worlds": 8}]}

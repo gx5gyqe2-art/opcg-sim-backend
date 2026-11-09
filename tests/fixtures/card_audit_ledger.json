@@ -1840,6 +1840,446 @@
    "text_sha": "cf9e9381fc864727",
    "verdict": "ok"
   },
+  "EB05-001": {
+   "ast_sha": "cb5ec1e956510f64",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "8110fdbf15f29dde",
+   "reviewed": "2026-11-09",
+   "text_sha": "8b20e860305ba706",
+   "verdict": "ok"
+  },
+  "EB05-002": {
+   "ast_sha": "4cabb9077cde8184",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "8eafa755b9d64965",
+   "reviewed": "2026-11-09",
+   "text_sha": "31b3fc35b7bb8fd3",
+   "verdict": "ok"
+  },
+  "EB05-004": {
+   "ast_sha": "9331066045b8756f",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "5e5f49344d102fb0",
+   "reviewed": "2026-11-09",
+   "text_sha": "cd842e1b5a34798b",
+   "verdict": "ok"
+  },
+  "EB05-005": {
+   "ast_sha": "ce12a2970a457250",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「特徴《革命軍》と【トリガー】を両方持つ」の【トリガー】タグ除去を止め HAS_TRIGGER（TRAIT_OR_TRIGGER なし＝AND）に。起動メインの QUALIFIER_GAP は起動自体が任意で決着（従来どおり）",
+   "probe_sha": "dd433160350277e0",
+   "reviewed": "2026-11-09",
+   "text_sha": "81461034b5ec3f4e",
+   "verdict": "ok"
+  },
+  "EB05-006": {
+   "ast_sha": "0303f9734e3e1e86",
+   "note": "[厳格レビュー] 2026-11-09 修正: 陣営指定なしの「キャラ1枚までを、…パワー±N」を player=ALL に（atoms._buff_target・DB でこの形は本カードだけ）。コスト（ライフ上1枚を手札 任意）・ターン1回・選択肢2つは一致",
+   "probe_sha": "7c038e87ef23d253",
+   "reviewed": "2026-11-09",
+   "text_sha": "ef578eab6d768c37",
+   "verdict": "ok"
+  },
+  "EB05-007": {
+   "ast_sha": "299a8b0a8c3de47d",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「イベントか特徴《パンクハザード》を持つカード」を TYPE_OR_TRAIT（種類 OR 特徴・Rust/Python の matcher）に。ACTION_NOT_FIRED はプローブ盤面の手札にイベントが2枚しかなく「合計3枚」の公開が払えないため（実装の欠陥ではない）。ターン終了時の+5000は一致",
+   "probe_sha": "c2e140bf8044cadd",
+   "reviewed": "2026-11-09",
+   "text_sha": "e47463ad8a627743",
+   "verdict": "ok"
+  },
+  "EB05-008": {
+   "ast_sha": "08cecac4aab8a132",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "892b69a3ba3c869d",
+   "reviewed": "2026-11-09",
+   "text_sha": "4409d773f5630089",
+   "verdict": "ok"
+  },
+  "EB05-009": {
+   "ast_sha": "55f9aa00d232b151",
+   "note": "全句対応・元々のパワーは ORIGINAL_POWER 旗（matcher.rs:245） [厳格レビュー]",
+   "probe_sha": "6007ad0c80336afe",
+   "reviewed": "2026-11-09",
+   "text_sha": "1a28d390a11b88f6",
+   "verdict": "ok"
+  },
+  "EB05-010": {
+   "ast_sha": "9e59a463b741af41",
+   "note": "[厳格レビュー] 2026-11-09 修正（エンジン）: triggers.rs ko_listener_matches が「属性(X)」（find_attributes・(X)か(Y) も）と「【ブロッカー】を持たない／持つ」（元々のキーワード＋残っている付与）を判定。UNCOVERED_TEXT はエンジンが raw_text から読む句。起動メイン（パワー6000以下・属性(知)のキャラ1枚までアクティブ）は一致。実対局テストで(知)非ブロッカーのみ誘発を確認",
+   "probe_sha": "132302a95453d19f",
+   "reviewed": "2026-11-09",
+   "text_sha": "3ca7c2c9c83e73f5",
+   "verdict": "ok"
+  },
+  "EB05-011": {
+   "ast_sha": "b7929214e7027c94",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "5210103c03acf1d7",
+   "reviewed": "2026-11-09",
+   "text_sha": "9ac40bb406101abc",
+   "verdict": "ok"
+  },
+  "EB05-012": {
+   "ast_sha": "1b71899041ec999f",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "7c4fe4a3545cab78",
+   "reviewed": "2026-11-09",
+   "text_sha": "154e93153900d20c",
+   "verdict": "ok"
+  },
+  "EB05-013": {
+   "ast_sha": "523ca2dad80ef8ab",
+   "note": "全句対応・《魚人族》か《人魚族》は traits の any 一致 [厳格レビュー]",
+   "probe_sha": "4b32e22bda3fabe1",
+   "reviewed": "2026-11-09",
+   "text_sha": "9ce95982a51f537b",
+   "verdict": "ok"
+  },
+  "EB05-014": {
+   "ast_sha": "3a5c8921ccb67331",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "7a766a82f8ef05c7",
+   "reviewed": "2026-11-09",
+   "text_sha": "ed4a469d4ddba05d",
+   "verdict": "ok"
+  },
+  "EB05-016": {
+   "ast_sha": "dd0272b84efb7dd0",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "dae0dbc062cb5250",
+   "reviewed": "2026-11-09",
+   "text_sha": "3b3ed9af5cc98ce3",
+   "verdict": "ok"
+  },
+  "EB05-017": {
+   "ast_sha": "08cb4c0ac7e625fc",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "2dcda125e8992a27",
+   "reviewed": "2026-11-09",
+   "text_sha": "8c5f30cbc233ff28",
+   "verdict": "ok"
+  },
+  "EB05-018": {
+   "ast_sha": "005fae5e6bc1bca7",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "b6abf1ebf58907c7",
+   "reviewed": "2026-11-09",
+   "text_sha": "0195bf05e48df1c5",
+   "verdict": "ok"
+  },
+  "EB05-019": {
+   "ast_sha": "3d223343f49e9df9",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "d59e9fabae42f46d",
+   "reviewed": "2026-11-09",
+   "text_sha": "e0bcbbdaaf96ba44",
+   "verdict": "ok"
+  },
+  "EB05-020": {
+   "ast_sha": "80f9b9e015f8b772",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "a58693043d03bf61",
+   "reviewed": "2026-11-09",
+   "text_sha": "331a6dcb5346c6b9",
+   "verdict": "ok"
+  },
+  "EB05-021": {
+   "ast_sha": "e6b9987cdab82aaa",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "059402d6d40bf0d2",
+   "reviewed": "2026-11-09",
+   "text_sha": "a73684575045685c",
+   "verdict": "ok"
+  },
+  "EB05-022": {
+   "ast_sha": "5c60578c22fe1e40",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "0cd41e0ca2c67f27",
+   "reviewed": "2026-11-09",
+   "text_sha": "aad585aec5757e40",
+   "verdict": "ok"
+  },
+  "EB05-023": {
+   "ast_sha": "6ee578fe248982f9",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "61f4f545e27a88a1",
+   "reviewed": "2026-11-09",
+   "text_sha": "f588fc5827814ea5",
+   "verdict": "ok"
+  },
+  "EB05-024": {
+   "ast_sha": "5d5f53dcb3605936",
+   "note": "全句対応・コスト+2 は COST_REDUCTION +2（OP12-089 等と同形） [厳格レビュー]",
+   "probe_sha": "2b0fdd9712b80339",
+   "reviewed": "2026-11-09",
+   "text_sha": "385f46cadf729921",
+   "verdict": "ok"
+  },
+  "EB05-025": {
+   "ast_sha": "d33ffc35ba49b1d2",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "91faab78b13692df",
+   "reviewed": "2026-11-09",
+   "text_sha": "d3951b26cfbfddff",
+   "verdict": "ok"
+  },
+  "EB05-027": {
+   "ast_sha": "ef8cc6b84f9b2083",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "de14ac1d24f607be",
+   "reviewed": "2026-11-09",
+   "text_sha": "e31e79573c3bff5c",
+   "verdict": "ok"
+  },
+  "EB05-028": {
+   "ast_sha": "e47911fa659648e6",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "d56f3999799fa2ad",
+   "reviewed": "2026-11-09",
+   "text_sha": "6317d57696b073c8",
+   "verdict": "ok"
+  },
+  "EB05-029": {
+   "ast_sha": "8a5decc499b7526d",
+   "note": "[厳格レビュー] 2026-11-09 修正: 新ルール negate_then_bounce で NEGATE_EFFECT（このターン中・相手コスト6以下1枚まで・save_id）→ 同じ対象を BOUNCE（ref_id）。コスト（手札1枚捨て 任意）・【トリガー】は一致",
+   "probe_sha": "42d9a2859401d556",
+   "reviewed": "2026-11-09",
+   "text_sha": "678510861bc05c34",
+   "verdict": "ok"
+  },
+  "EB05-030": {
+   "ast_sha": "f9ac8c87d26ac535",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "fe6748fe31e3529d",
+   "reviewed": "2026-11-09",
+   "text_sha": "470586bf692a1525",
+   "verdict": "ok"
+  },
+  "EB05-031": {
+   "ast_sha": "9969b4015df7d0ea",
+   "note": "全句対応・分岐条件は ORIGINAL_POWER+power_min8000。任意 QUALIFIER_GAP は起動メイン自体が任意で決着 [厳格レビュー]",
+   "probe_sha": "3b953d59211963f8",
+   "reviewed": "2026-11-09",
+   "text_sha": "163f54f89b39d97b",
+   "verdict": "ok"
+  },
+  "EB05-033": {
+   "ast_sha": "284428c981826b57",
+   "note": "全句対応・DON_COUNT_COMPARE LE 6＝自分≤相手−6 (cond.rs offset_threshold) [厳格レビュー]",
+   "probe_sha": "a8a7681fde8f0339",
+   "reviewed": "2026-11-09",
+   "text_sha": "3fd17d843cb7997c",
+   "verdict": "ok"
+  },
+  "EB05-034": {
+   "ast_sha": "c4da16eb69adaa5c",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "01da470c7c67351f",
+   "reviewed": "2026-11-09",
+   "text_sha": "a98843a48f5a5c4d",
+   "verdict": "ok"
+  },
+  "EB05-035": {
+   "ast_sha": "194096681492c4aa",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "e0db66532790c0ab",
+   "reviewed": "2026-11-09",
+   "text_sha": "964c9ca6a3317817",
+   "verdict": "ok"
+  },
+  "EB05-036": {
+   "ast_sha": "b65458c0978c06e4",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "e8f28dffbdda9006",
+   "reviewed": "2026-11-09",
+   "text_sha": "ab2194ef643f475b",
+   "verdict": "ok"
+  },
+  "EB05-037": {
+   "ast_sha": "25bbbf10aa23d7ed",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "76e92c33ac1ec5e1",
+   "reviewed": "2026-11-09",
+   "text_sha": "ab20b8767c2940a9",
+   "verdict": "ok"
+  },
+  "EB05-038": {
+   "ast_sha": "212826690abfa4cf",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "81359fdc12054828",
+   "reviewed": "2026-11-09",
+   "text_sha": "cd1e32ec38ed2b74",
+   "verdict": "ok"
+  },
+  "EB05-039": {
+   "ast_sha": "e6b63720fcba376c",
+   "note": "全句対応を確認 [厳格レビュー]",
+   "probe_sha": "9fd3570181f59b29",
+   "reviewed": "2026-11-09",
+   "text_sha": "14c2a679f7230787",
+   "verdict": "ok"
+  },
+  "EB05-040": {
+   "ast_sha": "d8e9b72de3830056",
+   "note": "全句一致（RETURN_DON ACTIVE 任意コスト・リーダー特徴の分岐が引く/捨てる両方を支配・カウンター+2000）[厳格レビュー]",
+   "probe_sha": "00d0ad354c8af1e6",
+   "reviewed": "2026-11-09",
+   "text_sha": "5368b8819316413f",
+   "verdict": "ok"
+  },
+  "EB05-042": {
+   "ast_sha": "d6abdf7e45e9d111",
+   "note": "全句一致（2引き2捨て）[厳格レビュー]",
+   "probe_sha": "03a622f0fea0f269",
+   "reviewed": "2026-11-09",
+   "text_sha": "9c8b5e18e529373f",
+   "verdict": "ok"
+  },
+  "EB05-043": {
+   "ast_sha": "510e210d0ecd4163",
+   "note": "全句一致（相手コスト6以下キャラ1枚まで・KOかレストの選択肢2つ）[厳格レビュー]",
+   "probe_sha": "6f2f4b588ae5c7c0",
+   "reviewed": "2026-11-09",
+   "text_sha": "614ff700f9177784",
+   "verdict": "ok"
+  },
+  "EB05-044": {
+   "ast_sha": "c85d80519bd7a969",
+   "note": "全句一致（AND: リーダー『B・W』部分一致＋相手のコスト0(cost_min=max=0)キャラ GE1・相手リーダー-1000このターン）[厳格レビュー]",
+   "probe_sha": "25c4dffe01aa57c4",
+   "reviewed": "2026-11-09",
+   "text_sha": "75dfdf4ecfb8ddab",
+   "verdict": "ok"
+  },
+  "EB05-045": {
+   "ast_sha": "4aef00bb85b94f4e",
+   "note": "全句一致（自分の『B・W』含むキャラ1枚までKO／KO時: 上3枚・1枚まで手札・残りトラッシュ）[厳格レビュー]",
+   "probe_sha": "d5cf8996a964c5a9",
+   "reviewed": "2026-11-09",
+   "text_sha": "7eacdabad5568037",
+   "verdict": "ok"
+  },
+  "EB05-046": {
+   "ast_sha": "e6de60e791f725f6",
+   "note": "全句一致（相手の元々のパワー8000以上=ORIGINAL_POWER power_min・ブロッカー＋3000／任意捨て→トラッシュ10以上でリーダー元々のパワー7000 POWER_OVERRIDE このターン）[厳格レビュー]",
+   "probe_sha": "528ecfd3f6dffaef",
+   "reviewed": "2026-11-09",
+   "text_sha": "be647478d531a7e3",
+   "verdict": "ok"
+  },
+  "EB05-047": {
+   "ast_sha": "408e7d9d77acfa25",
+   "note": "全句一致（PASSIVE コスト+12 は先例 OP17-085 等と同形・任意捨て→トラッシュのコスト2以下キャラ1枚まで登場）[厳格レビュー]",
+   "probe_sha": "0ce32b98f76946f0",
+   "reviewed": "2026-11-09",
+   "text_sha": "f53382c1af331113",
+   "verdict": "ok"
+  },
+  "EB05-048": {
+   "ast_sha": "955a77387ba03403",
+   "note": "全句一致（ドン1レスト＋『B・W』キャラ1枚KOのコスト・相手コスト0キャラすべてBLOCKER_DISABLEこのターン・カウンター+3000）[厳格レビュー]",
+   "probe_sha": "1993cb4bbd4d6437",
+   "reviewed": "2026-11-09",
+   "text_sha": "6d6320ac29003612",
+   "verdict": "ok"
+  },
+  "EB05-049": {
+   "ast_sha": "145e1c683b8a99a5",
+   "note": "全句一致（《スリラーバーク海賊団》KOコスト・相手キャラ1枚までコスト-3このターン／リーダーかキャラ1枚まで+4000このバトル）[厳格レビュー]",
+   "probe_sha": "63b053a41b7b0e51",
+   "reviewed": "2026-11-09",
+   "text_sha": "1b2602cc2bfdf28c",
+   "verdict": "ok"
+  },
+  "EB05-050": {
+   "ast_sha": "3a37bafc5a6eecee",
+   "note": "全句一致（上4枚・属性(知)1枚まで手札・残り好きな順でデッキ下・トリガーで登場時発動）[厳格レビュー]",
+   "probe_sha": "c8de4db79d125a68",
+   "reviewed": "2026-11-09",
+   "text_sha": "053db2f66cea406f",
+   "verdict": "ok"
+  },
+  "EB05-051": {
+   "ast_sha": "58812e75fad09bc1",
+   "note": "全句一致（cost_max_dynamic=LIFE_COUNT_BOTH の相手キャラ1枚までレスト・トリガー登場）[厳格レビュー]",
+   "probe_sha": "7f72aaedb4f5c845",
+   "reviewed": "2026-11-09",
+   "text_sha": "ccbf9f742cdabbca",
+   "verdict": "ok"
+  },
+  "EB05-052": {
+   "ast_sha": "25c160f65b54bb2c",
+   "note": "[厳格レビュー] 2026-11-09 修正: ダメージの置換を新設（パーサ status=DAMAGE の REPLACE_EFFECT・sub TRASH このキャラ 任意／エンジン rules/battle.rs run_damage がバトル・効果の両方のダメージで 1 点ごとに確認）。継続効果の再計算での自壊は解消（REPLACE_EFFECT は no-op）。【ダブルアタック】は 1 点ずつ・ライフ0でも置換できる裁定。【トリガー】（2枚引き1枚捨て）は一致。実対局テスト test_play_flow_eb05.py",
+   "probe_sha": "e8ea9ca59ddb11f9",
+   "reviewed": "2026-11-09",
+   "text_sha": "765db92996a01e8a",
+   "verdict": "ok"
+  },
+  "EB05-053": {
+   "ast_sha": "c345858896c6c68e",
+   "note": "全句一致（アタック時ターン1回＋相手手札9以上→手札1枚までライフ上／トリガー: 任意捨て→ライフ2以下で登場）[厳格レビュー]",
+   "probe_sha": "8441ad62d4b8a09f",
+   "reviewed": "2026-11-09",
+   "text_sha": "969972a65c2e588e",
+   "verdict": "ok"
+  },
+  "EB05-054": {
+   "ast_sha": "618d1c839556fe3d",
+   "note": "全句一致（トリガー: 手札からパワー4000(min=max)《ビッグ・マム海賊団》キャラ2枚まで登場）[厳格レビュー]",
+   "probe_sha": "3278b1f566a91d10",
+   "reviewed": "2026-11-09",
+   "text_sha": "392c5c42f508ae95",
+   "verdict": "ok"
+  },
+  "EB05-055": {
+   "ast_sha": "6c7c941f9dd8520f",
+   "note": "全句一致（自分のターン中＋リーダー属性(知)→デッキ上1枚までライフ HEAL 任意／トリガーは EB05-053 と同形）[厳格レビュー]",
+   "probe_sha": "0d1582a8ddac82ef",
+   "reviewed": "2026-11-09",
+   "text_sha": "dd303f45d7693c58",
+   "verdict": "ok"
+  },
+  "EB05-056": {
+   "ast_sha": "40707aa46246bd78",
+   "note": "全句一致（【トリガー】持ち(HAS_TRIGGER)1枚の任意捨て→リーダー「ニコ・ロビン」なら2枚引く・トリガー登場）[厳格レビュー]",
+   "probe_sha": "aa03d5d247596e70",
+   "reviewed": "2026-11-09",
+   "text_sha": "e409a77ed0681faf",
+   "verdict": "ok"
+  },
+  "EB05-057": {
+   "ast_sha": "0d25aacc2fa15ff7",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「属性(特)か(知)」の 2 つ目を拾う（matcher.parse_target の属性 OR 連鎖・DB でこの形は本カードだけ）。attributes=[特,知] リーダーかキャラ1枚・レストのドン1枚まで・ターン1回、【トリガー】は一致",
+   "probe_sha": "9e61f89e0469b11b",
+   "reviewed": "2026-11-09",
+   "text_sha": "2c3a57bcdd9af15f",
+   "verdict": "ok"
+  },
+  "EB05-059": {
+   "ast_sha": "587cfacc4c0ae9f4",
+   "note": "全句一致（1引き・自分の元々のパワー4000(ORIGINAL_POWER)《ビッグ・マム海賊団》キャラすべて次の相手のエンドフェイズ終了時までバトルKO不可=UNTIL_NEXT_TURN_END BATTLE_KO／トリガー）[厳格レビュー]",
+   "probe_sha": "556608ad04330923",
+   "reviewed": "2026-11-09",
+   "text_sha": "1012733d7a45bb0e",
+   "verdict": "ok"
+  },
+  "EB05-060": {
+   "ast_sha": "348d33db2843098d",
+   "note": "全句一致（コスト5以上《エッグヘッド》キャラの任意トラッシュ→デッキ上1枚までライフ／カウンター: ライフ1枚表向き任意→リーダーかキャラ1枚まで+4000）[厳格レビュー]",
+   "probe_sha": "62ff17d7a787845a",
+   "reviewed": "2026-11-09",
+   "text_sha": "ace6f869eb249eaa",
+   "verdict": "ok"
+  },
+  "EB05-061": {
+   "ast_sha": "38bc78c363718866",
+   "note": "[厳格レビュー] 2026-11-09 修正: 「相手によって場を離れる」を LEAVE,BATTLE_KO に（parser _repl_status_of）＋エンジン opp_only_removal が「相手によって」も相手専用と読む（自分の効果の除去には置換しない）。他の句（元々のパワー6000以下・ターン1回・ライフ上1枚手札 任意・登場時の赤コスト2以下登場）は一致。実対局テストでバトルKOの置換を確認",
+   "probe_sha": "5da8948dcbf7a4fb",
+   "reviewed": "2026-11-09",
+   "text_sha": "f5767040bcf42b0c",
+   "verdict": "ok"
+  },
   "OP01-001": {
    "ast_sha": "3b42dc314766777c",
    "note": "[厳格レビュー]",
@@ -14553,10 +14993,10 @@
    "verdict": "ok"
   },
   "OP15-098": {
-   "ast_sha": "2378ab7d2cd8bbb2",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "8f409d65d4a7386f",
+   "note": "[厳格レビュー] 2026-11-09 修正（EB05-061 と同じ類型）: 「相手によって場を離れる」が LEAVE,BATTLE_KO になり相手のアタックによるバトルKOも置換できる。元々のパワー6000以上・《空島》の限定は条件の対象クエリ（実対局テストで 4000 の非空島は置換しないことを確認）",
    "probe_sha": "1bd42a55acd607d2",
-   "reviewed": "2026-10-01",
+   "reviewed": "2026-11-09",
    "text_sha": "4965558f64d5ad9b",
    "verdict": "ok"
   },
@@ -17366,6 +17806,118 @@
    "probe_sha": "7c4fe4a3545cab78",
    "reviewed": "2026-10-01",
    "text_sha": "12c6e6ae1da5300b",
+   "verdict": "ok"
+  },
+  "P-136": {
+   "ast_sha": "58773ba430aeda54",
+   "note": "全句一致（このキャラをレストのコスト→《麦わらの一味》リーダーかキャラ1枚にレストのドン1枚まで付与）[厳格レビュー]",
+   "probe_sha": "bada3ff8ba150857",
+   "reviewed": "2026-11-09",
+   "text_sha": "6eaa41c93bf3087b",
+   "verdict": "ok"
+  },
+  "P-137": {
+   "ast_sha": "c84b206e49c0f0e0",
+   "note": "全句一致（ダブルアタックは keywords・アタック時レストのドン1枚まで付与）[厳格レビュー]",
+   "probe_sha": "facd5e80011b78e6",
+   "reviewed": "2026-11-09",
+   "text_sha": "0540321ed811ac00",
+   "verdict": "ok"
+  },
+  "P-138": {
+   "ast_sha": "26bc33216aebfae2",
+   "note": "全句一致（相手のターン中このキャラ+2000）[厳格レビュー]",
+   "probe_sha": "c4f5c9fdceb993a7",
+   "reviewed": "2026-11-09",
+   "text_sha": "d66dbe4110c9c09a",
+   "verdict": "ok"
+  },
+  "P-139": {
+   "ast_sha": "95d544c65d81056f",
+   "note": "全句一致（登場時ドン1枚まで付与・ドン!!×1 アタック時1枚引く）[厳格レビュー]",
+   "probe_sha": "a4a46f46de397ff6",
+   "reviewed": "2026-11-09",
+   "text_sha": "3d206656d93825d5",
+   "verdict": "ok"
+  },
+  "P-140": {
+   "ast_sha": "614080737a58a81b",
+   "note": "全句一致（ブロッカー・登場時レストのドン2枚まで付与）[厳格レビュー]",
+   "probe_sha": "03a72d648953ce4f",
+   "reviewed": "2026-11-09",
+   "text_sha": "e333b0f29a8fb023",
+   "verdict": "ok"
+  },
+  "P-141": {
+   "ast_sha": "128e73da81190c18",
+   "note": "全句一致（速攻・登場時相手リーダーかキャラ1枚まで-1000このターン）[厳格レビュー]",
+   "probe_sha": "a2f06a0d8c06107a",
+   "reviewed": "2026-11-09",
+   "text_sha": "f9fbf18b1df7adb6",
+   "verdict": "ok"
+  },
+  "P-142": {
+   "ast_sha": "d481d7afec2d98e8",
+   "note": "全句一致（自分の元々のパワー8000以下《麦わらの一味》キャラがKOされる場合=EFFECT_KO,BATTLE_KO（修飾なし＝原因を問わない）・代わりにこのステージをトラッシュ 任意・置換の中身は DEFERRED）[厳格レビュー]",
+   "probe_sha": "1bd42a55acd607d2",
+   "reviewed": "2026-11-09",
+   "text_sha": "b6dad8fe78efd9fb",
+   "verdict": "ok"
+  },
+  "P-143": {
+   "ast_sha": "d2746a147fef2da7",
+   "note": "[厳格レビュー] 2026-11-09 修正: 句点直後の注釈「(このカードは登場したターンにアタックできる)」を説明括弧のセグメントとして切り離す（parse_card_text）＝余分な PERMANENT 速攻が消え、このターン中の速攻付与だけ。条件（コスト0のキャラがいる）は一致",
+   "probe_sha": "b351f8ac075daf13",
+   "reviewed": "2026-11-09",
+   "text_sha": "1f899bd150433630",
+   "verdict": "ok"
+  },
+  "P-144": {
+   "ast_sha": "a25ef3e7ff96f245",
+   "note": "全句一致（『B・W』含むキャラ1枚の任意KOコスト→1枚引く）[厳格レビュー]",
+   "probe_sha": "147b638c1911f701",
+   "reviewed": "2026-11-09",
+   "text_sha": "9a62c08ec04d2620",
+   "verdict": "ok"
+  },
+  "P-145": {
+   "ast_sha": "d1f2ac7b0642663f",
+   "note": "全句一致（1引き1捨て／KO時 相手手札6以上→相手が自身の手札2枚捨て chooser=OPPONENT）[厳格レビュー]",
+   "probe_sha": "32c1ee4014f7d1d7",
+   "reviewed": "2026-11-09",
+   "text_sha": "6ceea2f4e3376335",
+   "verdict": "ok"
+  },
+  "P-146": {
+   "ast_sha": "3ba5a1dff748672e",
+   "note": "全句一致（KO時1枚引き・相手コスト0(min=max=0)キャラ1枚までレスト）[厳格レビュー]",
+   "probe_sha": "6d68e05beb365b36",
+   "reviewed": "2026-11-09",
+   "text_sha": "b66d7bf79a942bce",
+   "verdict": "ok"
+  },
+  "P-147": {
+   "ast_sha": "e8dcee4e4914876d",
+   "note": "全句一致（コスト0か8以上=COST_0_OR_GE_8 旗・誰のキャラでも(ALL)・このキャラ+2000／KO時トラッシュの『B・W』含むキャラ1枚まで手札）[厳格レビュー]",
+   "probe_sha": "59c1122f7f4d4cfd",
+   "reviewed": "2026-11-09",
+   "text_sha": "037026adb1e36668",
+   "verdict": "ok"
+  },
+  "P-148": {
+   "ast_sha": "825a06ef8c52492d",
+   "note": "全句一致（ブロッカー・起動メイン ターン1回 AND コスト0か8以上(COST_0_OR_GE_8・ALL)→レストのドン1枚まで付与）[厳格レビュー]",
+   "probe_sha": "facd5e80011b78e6",
+   "reviewed": "2026-11-09",
+   "text_sha": "dfab56f878c1b3db",
+   "verdict": "ok"
+  },
+  "P-149": {
+   "ast_sha": "bc1b64b1969135ed",
+   "note": "UNKNOWN_TAG は誤検出: 【キャラ:速攻】は【速攻:キャラ】の語順違いの表記揺れ。解析は PASSIVE GRANT_KEYWORD status=速攻:キャラ（エンジンの KW_RUSH_CHAR と一致）。条件「コスト0か8以上のキャラがいる」は COST_0_OR_GE_8 旗（matcher.rs:372）・誰のでも・キャラで一致 [厳格レビュー]",
+   "probe_sha": "47cea59223bc932e",
+   "reviewed": "2026-11-09",
+   "text_sha": "36f9ac2add4d0714",
    "verdict": "ok"
   },
   "P-150": {

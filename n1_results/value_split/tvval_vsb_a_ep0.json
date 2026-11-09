@@ -1,0 +1,28 @@
+{
+ "points": 24,
+ "truth": 0.338,
+ "nets": {
+  "nrel_vsb_a.ep0.npz": {
+   "a_head": {
+    "mean": 0.1734,
+    "ratio": 0.513,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1104,
+    "ratio": 0.327,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1163,
+    "ratio": 0.344,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.174,
+    "ratio": 0.515,
+    "n": 24
+   }
+  }
+ }
+}

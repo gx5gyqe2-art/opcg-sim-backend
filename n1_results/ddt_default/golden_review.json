@@ -1,0 +1,549 @@
+[
+ {
+  "seed": 5000150,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000151,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000152,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000153,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000154,
+  "same": false,
+  "first_div_step": 74,
+  "qual_points": 8,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「イゾウ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p1",
+  "steps_off": 138,
+  "steps_all": 136
+ },
+ {
+  "seed": 5000155,
+  "same": true,
+  "qual_points": 4
+ },
+ {
+  "seed": 5000156,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000157,
+  "same": false,
+  "first_div_step": 63,
+  "qual_points": 3,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「ナミ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p2",
+  "winner_all": "p2",
+  "steps_off": 124,
+  "steps_all": 129
+ },
+ {
+  "seed": 5000158,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000159,
+  "same": true,
+  "qual_points": 1
+ },
+ {
+  "seed": 5000160,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000161,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000162,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000163,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000164,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000165,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000166,
+  "same": true,
+  "qual_points": 4
+ },
+ {
+  "seed": 5000167,
+  "same": false,
+  "first_div_step": 51,
+  "qual_points": 10,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「ドンキホーテ・ドフラミンゴ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p1",
+  "steps_off": 126,
+  "steps_all": 124
+ },
+ {
+  "seed": 5000168,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000169,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000170,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000171,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000172,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000173,
+  "same": false,
+  "first_div_step": 96,
+  "qual_points": 4,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p1",
+  "turn_player": "p2",
+  "battle": true,
+  "msg": "「ミス・ウェンズデー」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p1",
+  "steps_off": 122,
+  "steps_all": 121
+ },
+ {
+  "seed": 5000174,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000175,
+  "same": false,
+  "first_div_step": 44,
+  "qual_points": 15,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「イゾウ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p2",
+  "steps_off": 114,
+  "steps_all": 132
+ },
+ {
+  "seed": 5000176,
+  "same": false,
+  "first_div_step": 86,
+  "qual_points": 4,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p1",
+  "turn_player": "p2",
+  "battle": true,
+  "msg": "「イゾウ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p2",
+  "winner_all": "p2",
+  "steps_off": 95,
+  "steps_all": 93
+ },
+ {
+  "seed": 5000177,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000178,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000179,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000180,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000181,
+  "same": true,
+  "qual_points": 7
+ },
+ {
+  "seed": 5000182,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000183,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000184,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000185,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000186,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000187,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000188,
+  "same": false,
+  "first_div_step": 32,
+  "qual_points": 15,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p1",
+  "turn_player": "p2",
+  "battle": true,
+  "msg": "「Mr.9」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p2",
+  "winner_all": "p2",
+  "steps_off": 178,
+  "steps_all": 179
+ },
+ {
+  "seed": 5000189,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000190,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000191,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000192,
+  "same": false,
+  "first_div_step": 114,
+  "qual_points": 3,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「イゾウ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p1",
+  "steps_off": 161,
+  "steps_all": 156
+ },
+ {
+  "seed": 5000193,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000194,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000195,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000196,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000197,
+  "same": false,
+  "first_div_step": 146,
+  "qual_points": 13,
+  "qualifies": true,
+  "action": "CONFIRM_OPTIONAL",
+  "decider": "p2",
+  "turn_player": "p1",
+  "battle": true,
+  "msg": "「マーシャル・D・ティーチ」の効果を使用しますか？（コストを払う）",
+  "off_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": false,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "all_move": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": []
+   }
+  },
+  "winner_off": "p1",
+  "winner_all": "p1",
+  "steps_off": 184,
+  "steps_all": 183
+ },
+ {
+  "seed": 5000198,
+  "same": true,
+  "qual_points": 0
+ },
+ {
+  "seed": 5000199,
+  "same": true,
+  "qual_points": 0
+ }
+]

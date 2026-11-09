@@ -429,6 +429,10 @@ pub fn decide_on_state(
     if let Some(d) = &out.defense_proof {
         body["defense_proof"] = d.clone();
     }
+    // 温度サンプル（§7.73）は引いた決定だけに欄を足す（温度なしでは鍵ごと出ない）。
+    if let Some((stage, explored)) = out.temp_pick {
+        body["temp_pick"] = serde_json::json!({"stage": stage, "explored": explored});
+    }
     let rollout = quiesce::take_rollout_stats();
     // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
     if out.lethal.is_some() || out.lethal_reply.is_some() {
@@ -509,6 +513,17 @@ pub fn decide_opts_and_carry(
             if r.as_str().and_then(decide::DefenseView::from_name).is_none() {
                 return Err(EngineError::BadPayload(format!(
                     "decide: defense_proof_view は \"mine\"／\"opp\" のどれか（{r}）"
+                )));
+            }
+        }
+    }
+    // `defense_dialog_tree`（§7.85）: "off"／"life1"／"all" のほかは黙って既定へ落とさない。
+    match ov.get("defense_dialog_tree") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(decide::DefenseDialogTree::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: defense_dialog_tree は \"off\"／\"life1\"／\"all\" のどれか（{r}）"
                 )));
             }
         }
@@ -596,6 +611,17 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_i64)
             .map(|n| n as i32)
             .unwrap_or(d.temp_turns),
+        temp_late: v.get("temp_late").and_then(Value::as_f64).unwrap_or(d.temp_late),
+        temp_late_pow: v
+            .get("temp_late_pow")
+            .and_then(Value::as_f64)
+            .unwrap_or(d.temp_late_pow),
+        prior_pick: match v.get("prior_pick").and_then(Value::as_str) {
+            Some("argmax") => 1,
+            Some("sample") => 2,
+            Some("sample_all") => 3,
+            _ => d.prior_pick,
+        },
         box_commit: flag("box_commit", d.box_commit),
         box_battle: flag("box_battle", d.box_battle),
         box_dialog: flag("box_dialog", d.box_dialog),
@@ -697,6 +723,13 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_str)
             .and_then(decide::DefenseView::from_name)
             .unwrap_or(d.defense_proof_view),
+        // 相手の手番の戦闘中の効果の対話を短い木で読む（§7.85・WP `rs-defense-dialog-tree`・既定 all〔§7.87〕・off は旧い形）。
+        defense_dialog_tree: v
+            .get("defense_dialog_tree")
+            .and_then(Value::as_str)
+            .and_then(decide::DefenseDialogTree::from_name)
+            .unwrap_or(d.defense_dialog_tree),
+        defense_dialog_fold: flag("defense_dialog_fold", d.defense_dialog_fold),
     }
 }
 

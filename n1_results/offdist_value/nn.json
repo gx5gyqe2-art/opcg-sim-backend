@@ -1,0 +1,44 @@
+{
+ "ref_rows": 200000,
+ "groups": {
+  "fold_after_window（窓を閉じた直後）": {
+   "n": 2000,
+   "median": 6.433,
+   "mean": 6.539,
+   "p90": 8.425,
+   "my_turn_share": 0.0,
+   "my_don_active_mean": 0.569,
+   "my_don_rested_mean": 4.984
+  },
+  "main（自分の手番の判断点・別の波）": {
+   "n": 2000,
+   "median": 6.294,
+   "mean": 6.337,
+   "p90": 8.134,
+   "my_turn_share": 0.983,
+   "my_don_active_mean": 3.326,
+   "my_don_rested_mean": 2.572
+  },
+  "window_opp（相手の手番の窓の判断点・別の波）": {
+   "n": 2000,
+   "median": 6.46,
+   "mean": 6.576,
+   "p90": 8.43,
+   "my_turn_share": 0.0,
+   "my_don_active_mean": 0.534,
+   "my_don_rested_mean": 5.018
+  },
+  "window_own（自分の手番の窓の判断点・別の波）": {
+   "n": 2000,
+   "median": 6.392,
+   "mean": 6.475,
+   "p90": 8.244,
+   "my_turn_share": 1.0,
+   "my_don_active_mean": 2.068,
+   "my_don_rested_mean": 4.422
+  }
+ },
+ "wave60_rows": 2652064,
+ "wave60_opp_turn_share": 0.3256,
+ "fold_opp_turn_share": 1.0
+}

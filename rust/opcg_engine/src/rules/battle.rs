@@ -11,7 +11,10 @@
 use crate::effects::continuous::{self, ExpireEvent};
 use crate::effects::triggers;
 use crate::journal::{CardBoolField, CardZone, Session, TriggerQueue};
-use crate::model::{ActiveBattle, CardIdx, CardType, MasterTable, Phase, Position, Seat, Zone};
+use crate::model::{
+    ActiveBattle, BattleDamage, CardIdx, CardType, DamageReplaceContinuation, MasterTable, Phase,
+    Position, Seat, Zone,
+};
 use crate::ops;
 use crate::state::EngineError;
 
@@ -305,7 +308,7 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
         c.get_power(masters.get(c.master), is_target_turn)
     } + counter_buff;
 
-    let mut life_lost = 0;
+    let life_lost = 0;
     if s.state().player(target_owner).leader == Some(target) {
         if attacker_pwr >= target_pwr {
             let damage = if has_keyword(s.state(), attacker, KW_DOUBLE_ATTACK) {
@@ -314,54 +317,15 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                 1
             };
             let banish = has_keyword(s.state(), attacker, KW_BANISH);
-            for _ in 0..damage {
-                if s.state().player(target_owner).life.is_empty() {
-                    s.edit().set_winner(Some(attacker_owner));
-                    break;
-                }
-                // Python は `life.pop(0)` してから move_card する（＝move_card 側から
-                // ライフ離脱には見えない。ON_LIFE_DECREASE は下でまとめて積む）。
-                let life_card = s
-                    .edit()
-                    .card_zone_remove_at(target_owner, CardZone::Life, 0);
-                // 【トリガー】能力は **move_card の前**に見る（Python と同順。バニッシュなら見ない）。
-                let trigger_ability = if banish {
-                    None
-                } else {
-                    trigger_ability_index(s, masters, life_card)?
-                };
-                let dest = if banish { Zone::Trash } else { Zone::Hand };
-                // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）。
-                let dest = if dest == Zone::Hand
-                    && s.state().card(life_card).is_face_up
-                    && crate::effects::actions::rules::has_face_up_life_to_deck_rule(
-                        s,
-                        masters,
-                        target_owner,
-                    )?
-                {
-                    Zone::Deck
-                } else {
-                    dest
-                };
-                crate::effects::actions::move_card(
-                    s,
-                    masters,
-                    life_card,
-                    dest,
-                    target_owner,
-                    Position::Bottom,
-                )?;
-                life_lost += 1;
-                // 【トリガー】は任意＝確認付きで待ち行列へ（複数枚でも消失しない）。
-                if let Some(index) = trigger_ability {
-                    triggers::enqueue_trigger(s, target_owner, life_card, index, true);
-                }
-            }
-            if life_lost > 0 {
-                triggers::enqueue_damage_dealt_listeners(s, masters, attacker, attacker_owner, life_lost)?;
-                triggers::enqueue_damaged_listeners(s, masters, target_owner, life_lost)?;
-            }
+            let st = DamageReplaceContinuation {
+                damaged: target_owner,
+                dealer: attacker_owner,
+                remaining: damage,
+                life_lost: 0,
+                battle: Some(BattleDamage { attacker, target, banish }),
+            };
+            // 任意のダメージ置換の確認で中断した＝resume（`interact.rs`）が残りと後処理を続ける。
+            return continue_damage(s, masters, st, false);
         }
     } else if attacker_pwr >= target_pwr {
         // Python: 保護 →（無ければ）置換 →（無ければ）本来の KO。保護判定は **1 回だけ**
@@ -420,6 +384,113 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
 }
 
 /// ライフから公開されたカードの【トリガー】能力のカード内 index（無ければ `None`）。
+/// ダメージを 1 点ずつ与える（バトル・効果の共通）。戻り値は「任意のダメージ置換の確認で中断した」か。
+///
+/// 1 点ごとに、ダメージを受ける側の「自分がダメージを受ける場合、代わりに〜」（status `DAMAGE` の
+/// 置換・EB05-052）を探す。任意なら持ち主へ確認して中断し（[`DamageReplaceContinuation`]）、
+/// 任意でなければその場で実行して 1 点を消す。置換が無ければライフの上から 1 枚を失う
+/// （ライフが無いのにダメージを受けたら与えた側の勝ち）。**置換はライフが 0 枚でも使える**
+/// （ダメージを受けなければ敗北の条件は成り立たない）。`skip_ask` は「確認を断った直後の 1 点」。
+pub fn run_damage(
+    s: &mut Session,
+    masters: &MasterTable,
+    st: &mut DamageReplaceContinuation,
+    mut skip_ask: bool,
+) -> Result<bool, EngineError> {
+    while st.remaining > 0 {
+        if !skip_ask {
+            if let Some(leader) = s.state().player(st.damaged).leader {
+                if let Some(repl) =
+                    crate::effects::actions::find_replacement(s, masters, leader, &["DAMAGE"])?
+                {
+                    if repl.sub_is_optional {
+                        crate::effects::interact::suspend_for_damage_replacement(
+                            s, masters, repl.protector, *st,
+                        );
+                        return Ok(true);
+                    }
+                    crate::effects::actions::rules::active_replacement_with(
+                        s, masters, leader, &["DAMAGE"], false,
+                    )?;
+                    st.remaining -= 1;
+                    continue;
+                }
+            }
+        }
+        skip_ask = false;
+        if s.state().player(st.damaged).life.is_empty() {
+            s.edit().set_winner(Some(st.dealer));
+            st.remaining = 0;
+            break;
+        }
+        let damaged = st.damaged;
+        // Python は `life.pop(0)` してから move_card する（＝move_card 側から
+        // ライフ離脱には見えない。ON_LIFE_DECREASE は後でまとめて積む）。
+        let life_card = s.edit().card_zone_remove_at(damaged, CardZone::Life, 0);
+        let banish = st.battle.is_some_and(|b| b.banish);
+        // 【トリガー】能力は **move_card の前**に見る（Python と同順。バニッシュなら見ない）。
+        let trigger_ability = if banish {
+            None
+        } else {
+            trigger_ability_index(s, masters, life_card)?
+        };
+        let dest = if banish { Zone::Trash } else { Zone::Hand };
+        // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）。バトルのダメージだけ
+        // （効果のダメージは従来どおり手札へ）。
+        let dest = if st.battle.is_some()
+            && dest == Zone::Hand
+            && s.state().card(life_card).is_face_up
+            && crate::effects::actions::rules::has_face_up_life_to_deck_rule(s, masters, damaged)?
+        {
+            Zone::Deck
+        } else {
+            dest
+        };
+        crate::effects::actions::move_card(s, masters, life_card, dest, damaged, Position::Bottom)?;
+        st.life_lost += 1;
+        st.remaining -= 1;
+        // 【トリガー】は任意＝確認付きで待ち行列へ（複数枚でも消失しない）。
+        if let Some(index) = trigger_ability {
+            triggers::enqueue_trigger(s, damaged, life_card, index, true);
+        }
+    }
+    Ok(false)
+}
+
+/// [`run_damage`] を回し、中断しなければダメージの後処理（バトル: 与えた／受けた誘発と
+/// `finish_attack`・効果: ライフ減少の誘発と待ち行列の消化）まで進める。
+pub fn continue_damage(
+    s: &mut Session,
+    masters: &MasterTable,
+    mut st: DamageReplaceContinuation,
+    skip_ask: bool,
+) -> Result<(), EngineError> {
+    if run_damage(s, masters, &mut st, skip_ask)? {
+        return Ok(());
+    }
+    let life_lost = st.life_lost;
+    match st.battle {
+        Some(b) => {
+            if life_lost > 0 {
+                triggers::enqueue_damage_dealt_listeners(s, masters, b.attacker, st.dealer, life_lost)?;
+                triggers::enqueue_damaged_listeners(s, masters, st.damaged, life_lost)?;
+            }
+            finish_attack(s, masters, b.target, life_lost)
+        }
+        None => {
+            // ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
+            if life_lost > 0 {
+                crate::ops::record_life_left(s, st.damaged, life_lost);
+            }
+            if life_lost > 0 && s.state().winner.is_none() {
+                triggers::enqueue_life_decrease(s, masters, st.damaged, life_lost, true)?;
+                triggers::enqueue_damaged_listeners(s, masters, st.damaged, life_lost)?;
+            }
+            triggers::advance_pending_triggers(s, masters)
+        }
+    }
+}
+
 fn trigger_ability_index(
     s: &Session,
     masters: &MasterTable,

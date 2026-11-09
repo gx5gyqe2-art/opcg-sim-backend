@@ -113,7 +113,10 @@ def default_cache_dir():
 
 def shard_files(d):
     return sorted(f for f in glob.glob(os.path.join(d, "n_record_*.npz"))
-                  if not (f.endswith(".plan.npz") or f.endswith(".time.npz")))
+                  if not (f.endswith(".plan.npz") or f.endswith(".time.npz")
+                          or f.endswith(".res.npz")      # .res＝WP value-teach の案 A の sidecar
+                          or f.endswith(".roll.npz")      # .roll＝WP rollout-teach の打ち続けの平均の sidecar
+                          or f.endswith(".theory.npz")))  # .theory＝WP theory-input の理論の列の sidecar（pack には入れない）
 
 
 def plan_sidecar(f):
@@ -328,10 +331,13 @@ class _Waves:
             out[:] = self.parts[0][idx] if self.cols is None else self.parts[0][idx][:, c]
             return out
         which = np.searchsorted(self.offsets, idx, side="right") - 1
-        for p in np.unique(which):
-            m = which == p
-            got = self.parts[p][idx[m] - self.offsets[p]]
-            out[m] = got if self.cols is None else got[:, c]
+        # 波（part）ごとにまとめて読む。並べ替えで束ねる＝part 数 × 行数のマスクを作らない
+        # （訓練のバッチは何百もの part をまたぐ）。書き戻す位置は元の順なので値は同じ。
+        order = np.argsort(which, kind="stable")
+        for g in np.split(order, np.flatnonzero(np.diff(which[order])) + 1):
+            p = int(which[g[0]])
+            got = self.parts[p][idx[g] - self.offsets[p]]
+            out[g] = got if self.cols is None else got[:, c]
         return out
 
 

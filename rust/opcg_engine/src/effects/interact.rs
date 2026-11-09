@@ -321,6 +321,38 @@ pub fn suspend_for_battle_ko_replacement(
     });
 }
 
+/// 任意のダメージ置換（「自分がダメージを受ける場合、代わりに〜できる」EB05-052）の確認。
+/// 受け入れれば置換を実行してその 1 点を消し・断ればその 1 点を受ける（[`crate::rules::battle::run_damage`]）。
+pub fn suspend_for_damage_replacement(
+    s: &mut Session,
+    masters: &MasterTable,
+    protector: CardIdx,
+    st: crate::model::DamageReplaceContinuation,
+) {
+    let name = card_name(s, masters, Some(protector));
+    let cont = Box::new(Continuation {
+        source_card: Some(protector),
+        damage_replace: Some(st),
+        ..Default::default()
+    });
+    s.edit().set_interaction(Interaction {
+        kind: InteractionKind::ConfirmOptional,
+        player: st.damaged,
+        message: format!("ダメージを受けます。「{name}」の代わりの効果を使用しますか？"),
+        candidates: Vec::new(),
+        selectable: None,
+        constraints: None,
+        can_skip: true,
+        source_card: Some(protector),
+        owner: st.damaged,
+        options: Vec::new(),
+        allow_position: false,
+        allow_reorder: false,
+        continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
+    });
+}
+
 /// 任意の効果除去置換の確認（バトル KO 版の `suspend_for_battle_ko_replacement` の効果除去版）。
 /// 受け入れれば置換を実行して除去をスキップ・断れば本来の除去を続行する。
 #[allow(clippy::too_many_arguments)]
@@ -691,7 +723,25 @@ pub fn resolve_interaction(
                 crate::rules::battle::finish_attack(s, masters, target, bk.life_lost)?;
                 return Ok(());
             }
-            if let Some(rr) = cont.removal_replace.clone() {
+            if let Some(mut dr) = cont.damage_replace {
+                s.edit().pop_interaction();
+                let mut skip_ask = true;
+                if accepted {
+                    if let Some(leader) = s.state().player(dr.damaged).leader {
+                        if super::actions::rules::active_replacement_with(
+                            s, masters, leader, &["DAMAGE"], false,
+                        )? {
+                            dr.remaining -= 1;
+                            skip_ask = false;
+                        }
+                    }
+                }
+                let battle = dr.battle.is_some();
+                crate::rules::battle::continue_damage(s, masters, dr, skip_ask)?;
+                if battle {
+                    return Ok(());
+                }
+            } else if let Some(rr) = cont.removal_replace.clone() {
                 s.edit().pop_interaction();
                 let target = source_card;
                 {

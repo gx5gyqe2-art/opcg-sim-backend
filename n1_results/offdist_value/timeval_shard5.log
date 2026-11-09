@@ -1,0 +1,4 @@
+TIMEVAL shard=5/8 todo 3 (done 1) k=16 roll=16 -> n1_results/offdist_value/timeval_shard5.jsonl
+[1/3] pid=47 ok=True roll=-0.0625 sec=802.1 (826s)
+[2/3] pid=5 ok=True roll=-0.125 sec=1021.8 (1046s)
+[3/3] pid=13 ok=True roll=0.125 sec=1187.6 (1211s)

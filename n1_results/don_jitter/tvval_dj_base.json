@@ -1,0 +1,72 @@
+{
+ "points": 24,
+ "truth": 0.338,
+ "nets": {
+  "nrel_r28x4.npz": {
+   "a_head": {
+    "mean": 0.1363,
+    "ratio": 0.403,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.0782,
+    "ratio": 0.231,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.0901,
+    "ratio": 0.267,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1394,
+    "ratio": 0.413,
+    "n": 24
+   }
+  },
+  "nrel_r27.npz": {
+   "a_head": {
+    "mean": 0.1636,
+    "ratio": 0.484,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1152,
+    "ratio": 0.341,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1284,
+    "ratio": 0.38,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.1927,
+    "ratio": 0.57,
+    "n": 24
+   }
+  },
+  "nrel_r29f4.npz": {
+   "a_head": {
+    "mean": 0.2005,
+    "ratio": 0.593,
+    "n": 24
+   },
+   "b_close": {
+    "mean": 0.1134,
+    "ratio": 0.335,
+    "n": 24
+   },
+   "c_oppend": {
+    "mean": 0.1225,
+    "ratio": 0.362,
+    "n": 24
+   },
+   "d_next": {
+    "mean": 0.2142,
+    "ratio": 0.634,
+    "n": 24
+   }
+  }
+ }
+}

@@ -95,6 +95,9 @@ def build_parser():
     ap.add_argument("--confirm-trigger-legacy", action="store_true",
                     help="基準席を、トリガーの発動確認を「発動する」の 1 手だけで打つ旧い形で打たせる"
                          "（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。候補席は --cand-confirm-trigger-legacy")
+    ap.add_argument("--defense-dialog-tree", default=None, choices=("off", "life1", "all"),
+                    help="基準席の、相手の手番の戦闘中の効果の対話を短い木で読む範囲（§7.85・off＝旧い形・省略＝既定 all〔§7.87〕）。"
+                         "候補席は --cand-defense-dialog-tree")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
@@ -127,6 +130,7 @@ def _best_kw(args):
                             ("window_worlds_legacy", True if args.window_worlds_legacy else None),
                             ("window_tree_legacy", True if args.window_tree_legacy else None),
                             ("confirm_trigger_legacy", True if args.confirm_trigger_legacy else None),
+                            ("defense_dialog_tree", args.defense_dialog_tree),
                             ("worlds", args.worlds if args.worlds and args.worlds > 1 else None)) if v is not None}
     return kw or None
 

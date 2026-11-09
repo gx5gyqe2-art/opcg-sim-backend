@@ -1469,3 +1469,11 @@ fn an_optional_rest_replacement_can_be_declined_and_needs_a_restable_substitute(
         );
     }
 }
+
+/// EB05-061・OP15-098「相手によって場を離れる場合」も相手専用（自分の効果の除去には置換しない）。
+#[test]
+fn opponent_by_clause_is_opponent_only() {
+    assert!(opp_only_removal("自分の元々のパワー6000以下のキャラが相手によって場を離れる場合、代わりに自分のライフの上から1枚を手札に加えることができる。"));
+    assert!(opp_only_removal("このキャラが相手の効果で場を離れる場合、代わりに〜"));
+    assert!(!opp_only_removal("このキャラがKOされる場合、代わりに相手のキャラ1枚をレストにできる"));
+}

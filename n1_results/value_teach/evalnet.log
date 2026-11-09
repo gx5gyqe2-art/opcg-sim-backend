@@ -1,0 +1,5 @@
+opcg_sim/data/learned/nrel_r27.npz points 24 chose_decline 6 | article_decline 18 chose_decline 0 | article_use 6 chose_decline 6 | early chose_decline 0 of 7
+n1_results/value_teach/nrel_ctrl.npz points 24 chose_decline 15 | article_decline 18 chose_decline 10 | article_use 6 chose_decline 5 | early chose_decline 5 of 7
+n1_results/value_teach/nrel_A.npz points 24 chose_decline 17 | article_decline 18 chose_decline 12 | article_use 6 chose_decline 5 | early chose_decline 5 of 7
+n1_results/value_teach/nrel_B.npz points 24 chose_decline 16 | article_decline 18 chose_decline 11 | article_use 6 chose_decline 5 | early chose_decline 4 of 7
+n1_results/value_teach/nrel_AB.npz points 24 chose_decline 17 | article_decline 18 chose_decline 12 | article_use 6 chose_decline 5 | early chose_decline 4 of 7

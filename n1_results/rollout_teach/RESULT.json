@@ -1,0 +1,586 @@
+{
+ "job": "rollout-teach",
+ "section": "§7.80",
+ "ledger": "cpu_theory_gap.md 2+518",
+ "status": "done",
+ "branch": "claude/rollout-teach",
+ "report": "docs/reports/2026-11-05_rollout_teach.md",
+ "results_dir": "n1_results/rollout_teach",
+ "verdict": "no effect: 16-sim 16-game play-out means as the value teacher on 100k positions (0.9% of value rows) leave the DON ratio at window close at 0.33/0.32 (control r29f4 0.34/0.32) and the 82j group gap at 0.304/0.305 (control 0.301/0.306); holdout error not worse (74c 0.4749/0.4741 vs 0.4749/0.4750). The net does not even approach the teacher on the teacher rows (train-side mse vs mean 0.1210/0.1181 vs control 0.1222/0.1192, below run-to-run spread 0.0017) => too thin; cannot tell whether teacher noise is the main cause; add-on fit pair (teacher rows only): mean arm and outcome arm raise the DON ratio equally => teacher noise is not the main cause of the shrink",
+ "teacher": {
+  "positions": 100000,
+  "games": 25000,
+  "holdout_positions": 14132,
+  "waves": [
+   "70f",
+   "71f",
+   "72f",
+   "73f"
+  ],
+  "player": "r28x4 16 sims 1 world both seats",
+  "k": 16,
+  "offset": 19000,
+  "fail": 0,
+  "positions_lt16_games": 106,
+  "min_games": 9,
+  "core_hours": 222.3,
+  "sec_per_position": 8.0,
+  "shards": 30,
+  "shard_minutes": [
+   70,
+   161
+  ],
+  "corr_mean_z": 0.702
+ },
+ "train": {
+  "from": "r28x4",
+  "args": "train_r29f4.json common args + --z-mode rollout",
+  "rows_replaced": 100000,
+  "rows_value": 10712760,
+  "best_ep": 0,
+  "note": "run 1 killed by OOM (concurrent bench) in epoch 2; full 2-epoch rerun is the arm; training not bit-reproducible across runs"
+ },
+ "nets": {
+  "r28x4": {
+   "tvval": {
+    "a_head": [
+     0.1363,
+     0.403
+    ],
+    "b_close": [
+     0.0782,
+     0.231
+    ],
+    "c_oppend": [
+     0.0901,
+     0.267
+    ],
+    "d_next": [
+     0.1394,
+     0.413
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.2818,
+    0.3058
+   ],
+   "band74c": [
+    0.4739,
+    0.8299
+   ],
+   "band70f": [
+    0.4734,
+    0.8287
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1243,
+    "holdout_vs_mean": 0.1239,
+    "holdout_vs_z": 0.5357,
+    "slope_holdout": 0.7849
+   }
+  },
+  "r29f4_ep0": {
+   "rocks": [
+    4,
+    -0.0955,
+    0.099
+   ],
+   "tvval": {
+    "a_head": [
+     0.2005,
+     0.593
+    ],
+    "b_close": [
+     0.1134,
+     0.335
+    ],
+    "c_oppend": [
+     0.1225,
+     0.362
+    ],
+    "d_next": [
+     0.2142,
+     0.634
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3009,
+    0.3227
+   ],
+   "band74c": [
+    0.4749,
+    0.8297
+   ],
+   "band70f": [
+    0.4734,
+    0.83
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1222,
+    "holdout_vs_mean": 0.122,
+    "holdout_vs_z": 0.5247,
+    "slope_holdout": 0.7765
+   }
+  },
+  "r29f4_ep1": {
+   "tvval": {
+    "a_head": [
+     0.1897,
+     0.561
+    ],
+    "b_close": [
+     0.1066,
+     0.315
+    ],
+    "c_oppend": [
+     0.1201,
+     0.355
+    ],
+    "d_next": [
+     0.1999,
+     0.591
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3056,
+    0.3269
+   ],
+   "band74c": [
+    0.475,
+    0.8295
+   ],
+   "band70f": [
+    0.4748,
+    0.8291
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1192,
+    "holdout_vs_mean": 0.1195,
+    "holdout_vs_z": 0.5273,
+    "slope_holdout": 0.7859
+   }
+  },
+  "rt_ep0": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_b_e0.npz",
+   "rocks": [
+    6,
+    -0.1159,
+    0.094
+   ],
+   "tvval": {
+    "a_head": [
+     0.1887,
+     0.558
+    ],
+    "b_close": [
+     0.1125,
+     0.333
+    ],
+    "c_oppend": [
+     0.1209,
+     0.358
+    ],
+    "d_next": [
+     0.2113,
+     0.625
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.304,
+    0.322
+   ],
+   "band74c": [
+    0.4749,
+    0.8299
+   ],
+   "band70f": [
+    0.4734,
+    0.8297
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.121,
+    "holdout_vs_mean": 0.1207,
+    "holdout_vs_z": 0.5246,
+    "slope_holdout": 0.7775
+   }
+  },
+  "rt_ep1": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_b_e1.npz",
+   "tvval": {
+    "a_head": [
+     0.1964,
+     0.581
+    ],
+    "b_close": [
+     0.1081,
+     0.32
+    ],
+    "c_oppend": [
+     0.1181,
+     0.349
+    ],
+    "d_next": [
+     0.2228,
+     0.659
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3046,
+    0.3243
+   ],
+   "band74c": [
+    0.4741,
+    0.8295
+   ],
+   "band70f": [
+    0.4735,
+    0.8299
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1181,
+    "holdout_vs_mean": 0.1182,
+    "holdout_vs_z": 0.526,
+    "slope_holdout": 0.7927
+   }
+  },
+  "rt_run1_ep0": {
+   "file": "n1_results/rollout_teach/nets/nrel_rt_a_e0.npz",
+   "note": "first run (killed in epoch 2 by OOM); run-to-run spread",
+   "tvval": {
+    "a_head": [
+     0.2186,
+     0.647
+    ],
+    "b_close": [
+     0.1127,
+     0.333
+    ],
+    "c_oppend": [
+     0.1227,
+     0.363
+    ],
+    "d_next": [
+     0.2355,
+     0.697
+    ]
+   },
+   "jitter_t3_6_and_holdout": [
+    0.3039,
+    0.3225
+   ],
+   "band74c": [
+    0.4764,
+    0.8292
+   ],
+   "band70f": [
+    0.4752,
+    0.8292
+   ],
+   "teacher_rows": {
+    "train_vs_mean": 0.1227,
+    "holdout_vs_mean": 0.1223,
+    "holdout_vs_z": 0.5252,
+    "slope_holdout": 0.7772
+   }
+  }
+ },
+ "invariants": {
+  "default_bit_identical": "tests/test_rollout_teach.py",
+  "light_rollout_same_world": {
+   "rows": 12,
+   "games": 192,
+   "same": 192
+  },
+  "controls_match_prior_reports": true
+ },
+ "gates": {
+  "make_test": "green with OPENBLAS_CORETYPE=Haswell (one torch grad-vs-numpy test fails on this CPU's AVX-512 kernel by a hair, with and without this change)",
+  "audit_cross": "not needed (engine untouched)"
+ },
+ "fit_pair": {
+  "about": "coordinator add-on: value-only fit from r28x4 on the 85,868 train-side teacher rows only, 2e-4, bs 256, 4 epochs; (i) target=play-out mean, (ii) target=outcome z on the same rows (tests/scripts/rollout_teach.py fit; no aux head)",
+  "verdict": "noise is not the main cause: DON ratio at window close rises equally in both arms (0.31->0.38 vs 0.31->0.37; per-epoch gap 0.000..+0.005 < 0.05) and the 82j gap does not favour the mean arm (0.405 vs 0.416 at ep4); the mean arm fits the teacher better (holdout 0.0995 vs 0.1193) and shrinks less (slope 0.84 vs 0.79) and overfits less (74c 0.500 vs 0.549), but both arms wreck general prediction (74c 0.4739 -> 0.49..0.55)",
+  "nets": {
+   "nrel_fit_mean.ep0.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_mean.ep0.npz",
+    "tvval": {
+     "a_head": [
+      0.2171,
+      0.642
+     ],
+     "b_close": [
+      0.1055,
+      0.312
+     ],
+     "c_oppend": [
+      0.1175,
+      0.348
+     ],
+     "d_next": [
+      0.2495,
+      0.738
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.357,
+     0.3796
+    ],
+    "band74c": [
+     0.4913,
+     0.8235
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.1022,
+     "holdout_vs_mean": 0.1036,
+     "holdout_vs_z": 0.5299,
+     "slope_holdout": 0.8416
+    }
+   },
+   "nrel_fit_mean.ep1.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_mean.ep1.npz",
+    "tvval": {
+     "a_head": [
+      0.2256,
+      0.667
+     ],
+     "b_close": [
+      0.1165,
+      0.345
+     ],
+     "c_oppend": [
+      0.1286,
+      0.38
+     ],
+     "d_next": [
+      0.2478,
+      0.733
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.3742,
+     0.3968
+    ],
+    "band74c": [
+     0.4922,
+     0.8223
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.098,
+     "holdout_vs_mean": 0.1009,
+     "holdout_vs_z": 0.5301,
+     "slope_holdout": 0.8425
+    }
+   },
+   "nrel_fit_mean.ep2.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_mean.ep2.npz",
+    "tvval": {
+     "a_head": [
+      0.2346,
+      0.694
+     ],
+     "b_close": [
+      0.122,
+      0.361
+     ],
+     "c_oppend": [
+      0.1373,
+      0.406
+     ],
+     "d_next": [
+      0.2596,
+      0.768
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.38,
+     0.4063
+    ],
+    "band74c": [
+     0.4953,
+     0.8207
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.0967,
+     "holdout_vs_mean": 0.1004,
+     "holdout_vs_z": 0.5297,
+     "slope_holdout": 0.8459
+    }
+   },
+   "nrel_fit_mean.ep3.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_mean.ep3.npz",
+    "tvval": {
+     "a_head": [
+      0.2313,
+      0.684
+     ],
+     "b_close": [
+      0.1299,
+      0.384
+     ],
+     "c_oppend": [
+      0.1406,
+      0.416
+     ],
+     "d_next": [
+      0.2472,
+      0.731
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.4048,
+     0.4335
+    ],
+    "band74c": [
+     0.4996,
+     0.8194
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.0938,
+     "holdout_vs_mean": 0.0995,
+     "holdout_vs_z": 0.5293,
+     "slope_holdout": 0.844
+    }
+   },
+   "nrel_fit_z.ep0.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_z.ep0.npz",
+    "tvval": {
+     "a_head": [
+      0.2041,
+      0.604
+     ],
+     "b_close": [
+      0.1046,
+      0.31
+     ],
+     "c_oppend": [
+      0.1147,
+      0.339
+     ],
+     "d_next": [
+      0.2149,
+      0.636
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.3531,
+     0.356
+    ],
+    "band74c": [
+     0.5068,
+     0.8153
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.1273,
+     "holdout_vs_mean": 0.1262,
+     "holdout_vs_z": 0.5192,
+     "slope_holdout": 0.7952
+    }
+   },
+   "nrel_fit_z.ep1.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_z.ep1.npz",
+    "tvval": {
+     "a_head": [
+      0.227,
+      0.672
+     ],
+     "b_close": [
+      0.114,
+      0.337
+     ],
+     "c_oppend": [
+      0.125,
+      0.37
+     ],
+     "d_next": [
+      0.2276,
+      0.673
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.3989,
+     0.4037
+    ],
+    "band74c": [
+     0.5161,
+     0.8128
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.1203,
+     "holdout_vs_mean": 0.1225,
+     "holdout_vs_z": 0.5179,
+     "slope_holdout": 0.7896
+    }
+   },
+   "nrel_fit_z.ep2.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_z.ep2.npz",
+    "tvval": {
+     "a_head": [
+      0.2249,
+      0.665
+     ],
+     "b_close": [
+      0.1198,
+      0.354
+     ],
+     "c_oppend": [
+      0.1361,
+      0.403
+     ],
+     "d_next": [
+      0.2476,
+      0.733
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.4128,
+     0.3892
+    ],
+    "band74c": [
+     0.5524,
+     0.8004
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.1252,
+     "holdout_vs_mean": 0.1264,
+     "holdout_vs_z": 0.5166,
+     "slope_holdout": 0.7933
+    }
+   },
+   "nrel_fit_z.ep3.npz": {
+    "file": "n1_results/rollout_teach/nets/nrel_fit_z.ep3.npz",
+    "tvval": {
+     "a_head": [
+      0.219,
+      0.648
+     ],
+     "b_close": [
+      0.1252,
+      0.37
+     ],
+     "c_oppend": [
+      0.1389,
+      0.411
+     ],
+     "d_next": [
+      0.2222,
+      0.657
+     ]
+    },
+    "jitter_t3_6_and_holdout": [
+     0.416,
+     0.4158
+    ],
+    "band74c": [
+     0.5494,
+     0.8013
+    ],
+    "teacher_rows": {
+     "train_vs_mean": 0.1178,
+     "holdout_vs_mean": 0.1193,
+     "holdout_vs_z": 0.5127,
+     "slope_holdout": 0.7939
+    }
+   }
+  }
+ }
+}
