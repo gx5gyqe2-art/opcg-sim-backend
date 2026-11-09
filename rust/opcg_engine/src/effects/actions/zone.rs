@@ -43,8 +43,8 @@ use crate::journal::{CardBoolField, CardZone, Session};
 use crate::model::{CardIdx, MasterTable, Position, Seat, Zone};
 use crate::state::EngineError;
 
-use super::super::ast::{ActionType, GameAction, PlayerRef, TriggerType, ZoneRef};
-use super::super::{ability, triggers, NodeRef};
+use super::super::ast::{ActionType, GameAction, PlayerRef, ZoneRef};
+use super::super::NodeRef;
 
 /// プレイヤーレベル・ハンドラ。担当外なら `None`。
 #[allow(clippy::too_many_arguments)]
@@ -143,49 +143,16 @@ fn deal_damage(
     }
     // Python: `n = value if value and value > 0 else 1`
     let n = if value > 0 { value } else { 1 };
-    let mut life_lost = 0;
-    for _ in 0..n {
-        if s.state().player(damaged).life.is_empty() {
-            // ライフが無いのにダメージ＝効果の実行者の勝利。
-            s.edit().set_winner(Some(actor));
-            break;
-        }
-        let life_card = s.edit().card_zone_remove_at(damaged, CardZone::Life, 0);
-        // 【トリガー】は「移す前」に引く（Python も move_card の前に `next(...)` する）。
-        let trigger_index = first_trigger_index(masters, s, life_card)?;
-        super::move_card(s, masters, life_card, Zone::Hand, damaged, Position::Bottom)?;
-        life_lost += 1;
-        // 【トリガー】は任意。確認付きで待ち行列へ積む（即時解決しない）。
-        if let Some(index) = trigger_index {
-            triggers::enqueue_trigger(s, damaged, life_card, index, true);
-        }
-    }
-    // ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
-    if life_lost > 0 {
-        crate::ops::record_life_left(s, damaged, life_lost);
-    }
-    if life_lost > 0 && s.state().winner.is_none() {
-        triggers::enqueue_life_decrease(s, masters, damaged, life_lost, true)?;
-        triggers::enqueue_damaged_listeners(s, masters, damaged, life_lost)?;
-    }
-    triggers::advance_pending_triggers(s, masters)?;
+    // 1 点ずつ（ダメージ置換 EB05-052 の確認で中断しうる＝resume が残りと後処理を続ける）。
+    let st = crate::model::DamageReplaceContinuation {
+        damaged,
+        dealer: actor,
+        remaining: n,
+        life_lost: 0,
+        battle: None,
+    };
+    crate::rules::battle::continue_damage(s, masters, st, false)?;
     Ok(true)
-}
-
-/// カード内の最初の【トリガー】能力の index（Python の
-/// `next((a for a in master.abilities if a.trigger == TriggerType.TRIGGER), None)`）。
-fn first_trigger_index(
-    masters: &MasterTable,
-    s: &Session,
-    card: CardIdx,
-) -> Result<Option<usize>, EngineError> {
-    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
-    for (index, id) in ids.iter().enumerate() {
-        if ability(masters, *id)?.trigger == TriggerType::Trigger {
-            return Ok(Some(index));
-        }
-    }
-    Ok(None)
 }
 
 /// Python `player_level.shuffle`（`random.shuffle(target.deck)`）。
