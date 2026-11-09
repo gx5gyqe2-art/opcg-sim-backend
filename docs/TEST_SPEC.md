@@ -750,7 +750,7 @@ push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs
 | `tests/test_rs_golden_replay.py` | **golden**: `opcg_engine.replay` の sha1 列が `tests/fixtures/rs_goldens/replay/`（random 150 局＋**a1 50 局**）と一致 |
 | `cargo test --no-default-features` | Rust の単体テスト 381 本（`make test` が先に回す） |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
-| `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
+| `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証）。**ベースラインの登録は旧ベースラインか Rust の監査 golden のどちらかで足りる**（2026-11-09・EB05 追加から新カードは監査 golden に載る＝旧ベースラインは凍結した Python エンジンでしか作れない） |
 | `tests/test_parser_cost_effect_gate.py` | 「コスト：〜の場合、効果」の条件は効果側（Branch）に残り能力全体へ持ち上げない（OP05-082／OP10-118／OP09-060／OP15-074・ユーザ決定 2026-10-01）。コストなし・「：」前・見出し条件は従来どおり。`test_verified_buckets.py` の `H_COST_GATE_LIFT=0` ラチェットと対 |
 | `cargo test`（`rules/tests_cost_gate.rs`） | 実カード（`tests/fixtures/cost_gate_cards.json`）で、条件偽でも起動メインが合法手に出てコストだけ払い効果が不発／真なら効果が出る |
 | `cargo test`（`rules/tests_unpayable_activate.rs`） | 払えないコスト（「コストN以上のこのキャラ」・付与中のドン!!・デッキの枚数・付与するドン!!のプール・コストの「A か B」）の起動メインは合法手に出ない・DB 全体の掃き出しで合法な起動は打てば盤面が変わる（§7.46） |

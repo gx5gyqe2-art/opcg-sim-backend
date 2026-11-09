@@ -24,6 +24,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "opcg_sim", "data", "opcg_cards.json")
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "fixtures", "full_card_baseline.json")
+AUDIT_GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "fixtures", "rs_goldens", "audit.json")
 
 # §8.2 台帳で「✓（一巡済み）」とした弾の接頭辞。これらは弾×色で検証済み。
 VERIFIED_SET_RE = re.compile(r'^(OP\d{2}|EB\d{2}|PRB\d{2}|ST\d{2}|P)-')
@@ -34,11 +36,15 @@ def _verified_card_ids(db):
 
 
 def test_verified_buckets_have_behavior_baseline():
-    """検証済み弾の全カード・全トリガーがベースライン指紋に登録されている。"""
+    """検証済み弾の全カード・全トリガーがベースライン指紋（旧ベースラインか監査 golden）に登録されている。"""
     db = CardLoader(DATA)
     db.load()
     with open(BASELINE, encoding="utf-8") as f:
         base = set(json.load(f).keys())
+    # 旧ベースライン（凍結した Python エンジンの指紋）は今のコードでは作り直せない＝**監査 golden が置き換えた**
+    # （CLAUDE.md）。2026-11-09 の EB05 追加から、新しいカードは Rust の監査 golden（`make golden-audit`）に載る。
+    with open(AUDIT_GOLDEN, encoding="utf-8") as f:
+        base |= {f"{e['card_id']}|{e['trigger']}" for e in json.load(f)["entries"]}
 
     missing = []
     for cid in _verified_card_ids(db):
