@@ -1,0 +1,4 @@
+{"seed": 7202000, "score": 1.0, "leaders": ["OP09-042", "OP08-058"], "games": [1.0, 0.0], "cand_leaders": ["OP09-022", "OP12-040"], "turns": [9, 11], "cand_opts": {"sims": 12800, "worlds": 8, "budget": 0, "lethal_proof": "root"}}
+{"seed": 7202001, "score": 1.0, "leaders": ["EB04-001", "P-086"], "games": [1.0, 0.0], "cand_leaders": ["OP11-001", "OP06-022"], "turns": [15, 11], "cand_opts": {"sims": 12800, "worlds": 8, "budget": 0, "lethal_proof": "root"}}
+{"seed": 7202003, "score": 2.0, "leaders": ["OP07-059", "ST05-001"], "games": [1.0, 1.0], "cand_leaders": ["OP14-040", "OP01-060"], "turns": [13, 12], "cand_opts": {"sims": 12800, "worlds": 8, "budget": 0, "lethal_proof": "root"}}
+{"seed": 7202002, "score": 1.0, "leaders": ["OP10-001", "ST13-003"], "games": [1.0, 0.0], "cand_leaders": ["OP17-001", "OP16-080"], "turns": [13, 17], "cand_opts": {"sims": 12800, "worlds": 8, "budget": 0, "lethal_proof": "root"}}
