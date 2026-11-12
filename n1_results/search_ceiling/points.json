@@ -1,0 +1,2080 @@
+[
+ {
+  "gi": 11,
+  "seed": 4461012,
+  "step": 3,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 4,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "3a9ead65-a3ac-4dae-ad40-70d0b7b77942"
+   }
+  },
+  "pid": 0,
+  "stage0": false
+ },
+ {
+  "gi": 17,
+  "seed": 4461016,
+  "step": 5,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 4,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "f1d96151-dd23-4732-a3b6-3fec8583a3c4"
+   }
+  },
+  "pid": 1,
+  "stage0": false
+ },
+ {
+  "gi": 29,
+  "seed": 4461030,
+  "step": 6,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "727816c0-e1ed-4e4f-be02-3f885ab44cb8"
+   }
+  },
+  "pid": 2,
+  "stage0": true
+ },
+ {
+  "gi": 32,
+  "seed": 4461033,
+  "step": 3,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 3,
+  "stage0": false
+ },
+ {
+  "gi": 35,
+  "seed": 4461037,
+  "step": 5,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "3dff62a2-36c1-4675-b4a9-9b7e7d0bc887"
+   }
+  },
+  "pid": 4,
+  "stage0": false
+ },
+ {
+  "gi": 47,
+  "seed": 4461042,
+  "step": 3,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "dc858e16-3b20-4f28-8564-2dc69533a310"
+   }
+  },
+  "pid": 5,
+  "stage0": false
+ },
+ {
+  "gi": 55,
+  "seed": 4461057,
+  "step": 6,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 6,
+  "stage0": false
+ },
+ {
+  "gi": 65,
+  "seed": 4461065,
+  "step": 3,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "630d1b66-93e3-465b-b8a3-4c05922bcc75"
+   }
+  },
+  "pid": 7,
+  "stage0": true
+ },
+ {
+  "gi": 77,
+  "seed": 4461078,
+  "step": 8,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 8,
+  "stage0": false
+ },
+ {
+  "gi": 94,
+  "seed": 4461093,
+  "step": 3,
+  "turn": 2,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:play",
+  "want_turn": 2,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "0f2edfc9-ae81-40a2-9779-48a5b462214f"
+   }
+  },
+  "pid": 9,
+  "stage0": false
+ },
+ {
+  "gi": 15,
+  "seed": 4461015,
+  "step": 9,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 8,
+  "dtype": "main:activate_main",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "979d64aa-613f-4df9-83c4-82e952aa6d3d"
+   }
+  },
+  "pid": 10,
+  "stage0": false
+ },
+ {
+  "gi": 18,
+  "seed": 4461018,
+  "step": 8,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 7,
+  "dtype": "main:attack",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "0ec33682-1d5a-4c28-858a-60819751e936",
+    "target_ids": [
+     "627cc6cb-183b-4638-8d45-14ef6416f338"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 11,
+  "stage0": false
+ },
+ {
+  "gi": 21,
+  "seed": 4461023,
+  "step": 10,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "02fae474-75d3-4761-8740-9d9ec69dbc12",
+    "target_ids": [
+     "a79c58bb-ba94-4ff7-871b-a1ae9a1aedc6"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 12,
+  "stage0": true
+ },
+ {
+  "gi": 34,
+  "seed": 4461032,
+  "step": 7,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 8,
+  "dtype": "main:play",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "92a6aa67-9036-4961-a241-9c4254497fe1"
+   }
+  },
+  "pid": 13,
+  "stage0": false
+ },
+ {
+  "gi": 48,
+  "seed": 4461046,
+  "step": 19,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 5,
+  "dtype": "main:play",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "f607c888-41d4-428e-a389-de2c0a6f0b68"
+   }
+  },
+  "pid": 14,
+  "stage0": false
+ },
+ {
+  "gi": 56,
+  "seed": 4461055,
+  "step": 17,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 5,
+  "dtype": "main:attack",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "f95133c6-f53e-46ad-b5e0-e71a33a962fe",
+    "target_ids": [
+     "87b31db4-0c11-47fd-a7dd-353fce0336ee"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 15,
+  "stage0": false
+ },
+ {
+  "gi": 66,
+  "seed": 4461069,
+  "step": 5,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 9,
+  "dtype": "main:play",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "e4c80637-834f-4d0c-8e17-82b7b1efae41"
+   }
+  },
+  "pid": 16,
+  "stage0": false
+ },
+ {
+  "gi": 85,
+  "seed": 4461086,
+  "step": 14,
+  "turn": 3,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:play",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "af00eb86-3f95-4081-af23-ba756617ec32"
+   }
+  },
+  "pid": 17,
+  "stage0": true
+ },
+ {
+  "gi": 4,
+  "seed": 4461005,
+  "step": 17,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "80bb7bbf-9770-49a4-94e5-3ea81014a6d6",
+    "target_ids": [
+     "173f3c93-fa3f-4a84-a59f-f7500e17e34a"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 18,
+  "stage0": false
+ },
+ {
+  "gi": 14,
+  "seed": 4461014,
+  "step": 21,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 9,
+  "dtype": "main:attach",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "a86f2f94-f2d4-4935-bec3-2806f9b360df",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 19,
+  "stage0": false
+ },
+ {
+  "gi": 20,
+  "seed": 4461022,
+  "step": 16,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 6,
+  "dtype": "main:attack",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "e4748c48-650e-4655-b940-c4d2aaa80950",
+    "target_ids": [
+     "b240df91-f58a-4cc2-8ad0-af6a83dc1fc7"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 20,
+  "stage0": false
+ },
+ {
+  "gi": 31,
+  "seed": 4461034,
+  "step": 12,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "cebc8eca-80e3-4b3d-b6be-da2b75d98780",
+    "target_ids": [
+     "3f17e117-d868-41f0-9ef7-069c57f73d39"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 21,
+  "stage0": false
+ },
+ {
+  "gi": 42,
+  "seed": 4461040,
+  "step": 18,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 10,
+  "dtype": "main:play",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "07f3cc6e-2e0d-4503-9740-0f325669eb19"
+   }
+  },
+  "pid": 22,
+  "stage0": true
+ },
+ {
+  "gi": 50,
+  "seed": 4461049,
+  "step": 13,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 10,
+  "dtype": "main:play",
+  "want_turn": 3,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "fa4a72cc-7de6-43a1-ab8d-12026e9c8e4b"
+   }
+  },
+  "pid": 23,
+  "stage0": false
+ },
+ {
+  "gi": 83,
+  "seed": 4461082,
+  "step": 22,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 24,
+  "stage0": false
+ },
+ {
+  "gi": 88,
+  "seed": 4461091,
+  "step": 24,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:activate_main",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "e7c2a297-4270-46d9-b2d5-3b6d0730f20e"
+   }
+  },
+  "pid": 25,
+  "stage0": false
+ },
+ {
+  "gi": 97,
+  "seed": 4461099,
+  "step": 10,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 8,
+  "dtype": "main:activate_main",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "a017a2e5-db35-4136-b885-7938a325d1d2"
+   }
+  },
+  "pid": 26,
+  "stage0": false
+ },
+ {
+  "gi": 99,
+  "seed": 4461092,
+  "step": 14,
+  "turn": 4,
+  "seat": "p2",
+  "n_cand": 9,
+  "dtype": "main:attack",
+  "want_turn": 4,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "e8af98ff-cdf7-4a63-8936-4bc8bc9cb562",
+    "target_ids": [
+     "adba6aae-903c-4d5f-8d4b-17a36850085d"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 27,
+  "stage0": true
+ },
+ {
+  "gi": 19,
+  "seed": 4461020,
+  "step": 23,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 4,
+  "dtype": "main:attack",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "7ebbfc3a-3526-4f8e-977d-8ba14a4ce903",
+    "target_ids": [
+     "19e2ee7d-5c8a-497d-ac80-f78b7e1f3e42"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 28,
+  "stage0": false
+ },
+ {
+  "gi": 23,
+  "seed": 4461025,
+  "step": 28,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 16,
+  "dtype": "main:play",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "c29aba74-40e1-4426-ad9e-ce663dd1e18e"
+   }
+  },
+  "pid": 29,
+  "stage0": false
+ },
+ {
+  "gi": 27,
+  "seed": 4461028,
+  "step": 29,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 8,
+  "dtype": "main:attack",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "4b7918f5-e542-464d-b826-acc7ca76b757",
+    "target_ids": [
+     "684ff187-582c-4cdd-8a80-747096c25b22"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 30,
+  "stage0": false
+ },
+ {
+  "gi": 28,
+  "seed": 4461021,
+  "step": 26,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "cea91ace-a5d2-47a4-93f7-d37a59028b75",
+    "target_ids": [
+     "babbd584-4ea5-45df-8177-edb4bab55091"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 31,
+  "stage0": false
+ },
+ {
+  "gi": 36,
+  "seed": 4461035,
+  "step": 19,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ef96f6fc-eb34-4cfc-b9df-c969ce4fd4c1",
+    "target_ids": [
+     "afd3996f-506a-46ef-8db0-9c65c207fd29"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 32,
+  "stage0": true
+ },
+ {
+  "gi": 37,
+  "seed": 4461036,
+  "step": 20,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 11,
+  "dtype": "main:play",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "a20e0df1-d039-4bcd-ae1b-13c7fe706338"
+   }
+  },
+  "pid": 33,
+  "stage0": false
+ },
+ {
+  "gi": 45,
+  "seed": 4461047,
+  "step": 22,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 12,
+  "dtype": "main:play",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "4483b99b-1723-49d9-90d8-fcf1798835e7"
+   }
+  },
+  "pid": 34,
+  "stage0": false
+ },
+ {
+  "gi": 57,
+  "seed": 4461058,
+  "step": 25,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 9,
+  "dtype": "main:play",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "842d7eba-5dd1-44f3-9a65-7984e15ecb71"
+   }
+  },
+  "pid": 35,
+  "stage0": false
+ },
+ {
+  "gi": 79,
+  "seed": 4461075,
+  "step": 19,
+  "turn": 5,
+  "seat": "p1",
+  "n_cand": 9,
+  "dtype": "main:play",
+  "want_turn": 5,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "84935ffb-f0bb-4053-aafb-9be33aadae93"
+   }
+  },
+  "pid": 36,
+  "stage0": false
+ },
+ {
+  "gi": 6,
+  "seed": 4461006,
+  "step": 30,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 9,
+  "dtype": "main:activate_main",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "176dd0a6-78ad-45c6-bcdb-471691b41b60"
+   }
+  },
+  "pid": 37,
+  "stage0": true
+ },
+ {
+  "gi": 8,
+  "seed": 4461011,
+  "step": 31,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 17,
+  "dtype": "main:attack",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "3b28bcff-52f7-4018-b8d4-ee3cfc42e973",
+    "target_ids": [
+     "0783aa2b-15ad-45e8-9429-6bd598286739"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 38,
+  "stage0": false
+ },
+ {
+  "gi": 10,
+  "seed": 4461009,
+  "step": 40,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 9,
+  "dtype": "main:attack",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "f4e6da2f-3ce8-4eef-8a38-43701c89b3f1",
+    "target_ids": [
+     "18644773-636c-4249-b601-247f767f0e2b"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 39,
+  "stage0": false
+ },
+ {
+  "gi": 38,
+  "seed": 4461039,
+  "step": 28,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 10,
+  "dtype": "main:activate_main",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "c2a0e929-6d83-4963-97d1-7ae913d6f2a4"
+   }
+  },
+  "pid": 40,
+  "stage0": false
+ },
+ {
+  "gi": 54,
+  "seed": 4461051,
+  "step": 63,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 5,
+  "dtype": "main:attack",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "b3c3100c-cde6-41f1-a8ac-f72e22af5e59",
+    "target_ids": [
+     "2fb5d619-6980-4643-9428-efe977ceb62e"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 41,
+  "stage0": false
+ },
+ {
+  "gi": 59,
+  "seed": 4461056,
+  "step": 40,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 42,
+  "stage0": true
+ },
+ {
+  "gi": 61,
+  "seed": 4461061,
+  "step": 40,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 12,
+  "dtype": "main:attach",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "74122a3a-6360-452b-8f7e-b3bb56f7839f",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 43,
+  "stage0": false
+ },
+ {
+  "gi": 71,
+  "seed": 4461066,
+  "step": 27,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 9,
+  "dtype": "main:attach",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "c29f0eb2-0a8d-4bbd-89d8-8c739a85c4e9",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 44,
+  "stage0": false
+ },
+ {
+  "gi": 81,
+  "seed": 4461083,
+  "step": 49,
+  "turn": 6,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 6,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "9a88bbf1-5d43-43c9-b8b9-239f7d26003a",
+    "target_ids": [
+     "61a21827-2774-47b5-bb2c-37c68e3288dd"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 45,
+  "stage0": false
+ },
+ {
+  "gi": 0,
+  "seed": 4461003,
+  "step": 55,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "af6b2381-9c04-4ef8-9e56-7ee486d6a1da",
+    "target_ids": [
+     "b65368aa-6bbc-424f-b9f8-cd869055cdd4"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 46,
+  "stage0": false
+ },
+ {
+  "gi": 2,
+  "seed": 4461004,
+  "step": 51,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 11,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "b249c2b4-02b7-427a-b952-bf581d0bb629",
+    "target_ids": [
+     "fbf5ed3a-4ddf-4c87-b0ff-1636f50f5dcd"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 47,
+  "stage0": true
+ },
+ {
+  "gi": 43,
+  "seed": 4461044,
+  "step": 51,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 5,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ac2d5616-c34b-4c44-880d-d09d9e440e6f",
+    "target_ids": [
+     "904985ab-3eab-47b4-a9a2-13d70f2f9a48"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 48,
+  "stage0": false
+ },
+ {
+  "gi": 68,
+  "seed": 4461067,
+  "step": 43,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 10,
+  "dtype": "main:play",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "cd1cfc11-c263-43b1-9044-e1ceceee50ad"
+   }
+  },
+  "pid": 49,
+  "stage0": false
+ },
+ {
+  "gi": 70,
+  "seed": 4461072,
+  "step": 39,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "feafbf97-f665-42fe-bbb8-a5fd8df5d9f1",
+    "target_ids": [
+     "d9a6e199-5d91-4c0d-b2b4-e4a6e8f8e09d"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 50,
+  "stage0": false
+ },
+ {
+  "gi": 80,
+  "seed": 4461081,
+  "step": 49,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "23d5a97b-2d02-48a1-ad8d-245ecf2c759b",
+    "target_ids": [
+     "6fc43a24-a7c0-4fea-98c0-6edb0fb96d4e"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 51,
+  "stage0": false
+ },
+ {
+  "gi": 84,
+  "seed": 4461085,
+  "step": 34,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 15,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ce44b40f-e1a5-4bee-82a5-304881c412f1",
+    "target_ids": [
+     "d2fa0969-4343-4746-b8d3-a74e08f75423"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 52,
+  "stage0": true
+ },
+ {
+  "gi": 92,
+  "seed": 4461095,
+  "step": 45,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 12,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "1110503e-417a-4733-9ca0-ab2a6c935469",
+    "target_ids": [
+     "fd4fda41-7999-41cc-af75-667c927bdacb"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 53,
+  "stage0": false
+ },
+ {
+  "gi": 96,
+  "seed": 4461097,
+  "step": 49,
+  "turn": 7,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 7,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "209a17d9-1055-4d6f-89f7-79115374ad46",
+    "target_ids": [
+     "d9163a33-773e-494c-8456-fe315ed1ba25"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 54,
+  "stage0": false
+ },
+ {
+  "gi": 5,
+  "seed": 4461001,
+  "step": 62,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ad1f680e-f1b0-4aa2-9679-67192b21bb50",
+    "target_ids": [
+     "dc2ca2e9-c2bd-474b-8cf9-04210c7a48c1"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 55,
+  "stage0": false
+ },
+ {
+  "gi": 16,
+  "seed": 4461019,
+  "step": 49,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:attack",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "f5590104-6f4f-44b6-a687-c16ae2267ad7",
+    "target_ids": [
+     "004bb086-0a62-4384-91c6-d4e93a6f27c0"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 56,
+  "stage0": false
+ },
+ {
+  "gi": 46,
+  "seed": 4461048,
+  "step": 49,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 24,
+  "dtype": "main:play",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "e834a900-552e-4f46-bc44-1734aefa6d03"
+   }
+  },
+  "pid": 57,
+  "stage0": true
+ },
+ {
+  "gi": 62,
+  "seed": 4461059,
+  "step": 51,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 16,
+  "dtype": "main:activate_main",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "c901aa9b-3e36-4662-baf6-311eb0bd6aea"
+   }
+  },
+  "pid": 58,
+  "stage0": false
+ },
+ {
+  "gi": 64,
+  "seed": 4461064,
+  "step": 52,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 16,
+  "dtype": "main:play",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "fdf45f90-274b-4690-a145-065097ee00c9"
+   }
+  },
+  "pid": 59,
+  "stage0": false
+ },
+ {
+  "gi": 82,
+  "seed": 4461077,
+  "step": 71,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:activate_main",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "ec606eee-0c6c-4934-941d-6376ce247029"
+   }
+  },
+  "pid": 60,
+  "stage0": false
+ },
+ {
+  "gi": 86,
+  "seed": 4461084,
+  "step": 59,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 4,
+  "dtype": "main:attack",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "a23ceb03-2007-4b89-935e-541537c79e8d",
+    "target_ids": [
+     "fe13c3d8-fa75-48f2-9412-e194494accc0"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 61,
+  "stage0": false
+ },
+ {
+  "gi": 89,
+  "seed": 4461087,
+  "step": 52,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "a3a1deac-9c0a-4f0c-b782-8b539193e394",
+    "target_ids": [
+     "68be9607-cd93-43aa-9e4d-63fd931113e4"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 62,
+  "stage0": true
+ },
+ {
+  "gi": 95,
+  "seed": 4461096,
+  "step": 55,
+  "turn": 8,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 8,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 63,
+  "stage0": false
+ },
+ {
+  "gi": 12,
+  "seed": 4461010,
+  "step": 73,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 20,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "6719e283-6b3d-4caa-bccf-19678ed0b8d9",
+    "target_ids": [
+     "ae4aa1ef-baa2-4570-9a2a-b2700a12b595"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 64,
+  "stage0": false
+ },
+ {
+  "gi": 24,
+  "seed": 4461024,
+  "step": 77,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 13,
+  "dtype": "main:attach",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "3a96d224-6ab4-463e-96f7-8e03a0755cf2",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 65,
+  "stage0": false
+ },
+ {
+  "gi": 26,
+  "seed": 4461027,
+  "step": 68,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 6,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "99366482-167e-4057-a192-e1ac5af13af0",
+    "target_ids": [
+     "c0dd7824-d013-46d8-8390-1e5a8c58c65d"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 66,
+  "stage0": false
+ },
+ {
+  "gi": 30,
+  "seed": 4461029,
+  "step": 91,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 12,
+  "dtype": "main:play",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "a5ad04ec-fc9e-4b43-a539-254a74e91768"
+   }
+  },
+  "pid": 67,
+  "stage0": true
+ },
+ {
+  "gi": 33,
+  "seed": 4461031,
+  "step": 85,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 10,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "190eb8ea-5765-485e-b6fc-ed53c21f7dd5",
+    "target_ids": [
+     "3cb20775-c02b-45fb-82bf-9e0c4e534607"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 68,
+  "stage0": false
+ },
+ {
+  "gi": 67,
+  "seed": 4461068,
+  "step": 64,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 15,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "cbba2884-db3c-4921-9fa0-8359c2d1a72a",
+    "target_ids": [
+     "52cd7acb-5fc1-4833-b775-71c54165cf6d"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 69,
+  "stage0": false
+ },
+ {
+  "gi": 69,
+  "seed": 4461070,
+  "step": 77,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 12,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "f36caccb-533b-492f-a6f7-afc37421e082",
+    "target_ids": [
+     "2d25add8-e302-4b11-bbb5-9ad86fb4d9e3"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 70,
+  "stage0": false
+ },
+ {
+  "gi": 75,
+  "seed": 4461076,
+  "step": 62,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 20,
+  "dtype": "main:attack",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "06352a58-f94c-4d63-b9ce-88b3938fa655",
+    "target_ids": [
+     "ebe7f0b4-0309-48f2-898e-6dae2f81f9a5"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 71,
+  "stage0": false
+ },
+ {
+  "gi": 90,
+  "seed": 4461089,
+  "step": 120,
+  "turn": 9,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 9,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 72,
+  "stage0": true
+ },
+ {
+  "gi": 1,
+  "seed": 4461000,
+  "step": 77,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 41,
+  "dtype": "main:play",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "073bf6cf-9e71-40d9-9871-d8f5621c846d"
+   }
+  },
+  "pid": 73,
+  "stage0": false
+ },
+ {
+  "gi": 7,
+  "seed": 4461008,
+  "step": 65,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 13,
+  "dtype": "main:play",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "8ad2304f-e69c-49e8-92b3-659051cfa473"
+   }
+  },
+  "pid": 74,
+  "stage0": false
+ },
+ {
+  "gi": 22,
+  "seed": 4461017,
+  "step": 105,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 18,
+  "dtype": "main:play",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "c666fec0-375c-4f96-858b-68308d84cafc"
+   }
+  },
+  "pid": 75,
+  "stage0": false
+ },
+ {
+  "gi": 39,
+  "seed": 4461038,
+  "step": 121,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 5,
+  "dtype": "main:turn_end",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 76,
+  "stage0": false
+ },
+ {
+  "gi": 41,
+  "seed": 4461043,
+  "step": 107,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "e5c6a187-8cac-4447-9913-914f1666103f",
+    "target_ids": [
+     "1154de4b-4edf-440e-bdc7-74c4b2f3a863"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 77,
+  "stage0": true
+ },
+ {
+  "gi": 49,
+  "seed": 4461050,
+  "step": 84,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 78,
+  "stage0": false
+ },
+ {
+  "gi": 76,
+  "seed": 4461079,
+  "step": 75,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 25,
+  "dtype": "main:attack",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "fc207064-8bea-4b8a-b850-364057f79c86",
+    "target_ids": [
+     "5c773225-f5b3-4d88-aac4-14f7ccabeb85"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 79,
+  "stage0": false
+ },
+ {
+  "gi": 87,
+  "seed": 4461088,
+  "step": 106,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 12,
+  "dtype": "main:attach",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ba46d43b-87ef-451c-a6b5-48f95fee3c5a",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 80,
+  "stage0": false
+ },
+ {
+  "gi": 91,
+  "seed": 4461090,
+  "step": 74,
+  "turn": 10,
+  "seat": "p2",
+  "n_cand": 15,
+  "dtype": "main:attack",
+  "want_turn": 10,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "a7861af4-195b-4bb8-9f80-1d7b353910c5",
+    "target_ids": [
+     "339a3169-11ee-469a-9184-70218f20b5c2"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 81,
+  "stage0": false
+ },
+ {
+  "gi": 3,
+  "seed": 4461002,
+  "step": 148,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 11,
+  "dtype": "main:activate_main",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "7a74e0b2-5753-4d18-995c-f1610177e121"
+   }
+  },
+  "pid": 82,
+  "stage0": true
+ },
+ {
+  "gi": 9,
+  "seed": 4461007,
+  "step": 117,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 6,
+  "dtype": "main:attack",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "6de39852-202f-48c6-ba5f-23d1772c1cc6",
+    "target_ids": [
+     "9705bab7-d7ba-498e-bd27-228bcc85912c"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 83,
+  "stage0": false
+ },
+ {
+  "gi": 13,
+  "seed": 4461013,
+  "step": 135,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 13,
+  "dtype": "main:attack",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "fef2cc8f-5c39-4efa-91dc-867204bb9abe",
+    "target_ids": [
+     "7d98d83b-4d96-4303-8dbd-0c9bcdc615f7"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 84,
+  "stage0": false
+ },
+ {
+  "gi": 25,
+  "seed": 4461026,
+  "step": 100,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 13,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "07bce6c4-96d7-43c7-8740-78a57173068c",
+    "target_ids": [
+     "bec833c4-6bd3-4187-89f1-0a258967b54c"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 85,
+  "stage0": false
+ },
+ {
+  "gi": 40,
+  "seed": 4461041,
+  "step": 92,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 12,
+  "dtype": "main:attack",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "a71c23f4-8b47-4709-a560-2af519659e48",
+    "target_ids": [
+     "7a65eae8-8c99-4cbb-8396-ec7226d71aaf"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 86,
+  "stage0": false
+ },
+ {
+  "gi": 51,
+  "seed": 4461053,
+  "step": 101,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 13,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "de2df312-67de-4a40-9c16-124dbaf716ac",
+    "target_ids": [
+     "46fb2d56-73ae-48a1-882f-fbbbdcc2dcd0"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 87,
+  "stage0": true
+ },
+ {
+  "gi": 52,
+  "seed": 4461054,
+  "step": 150,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 3,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "8cf1c548-987f-4273-b9a0-2f581028be42",
+    "target_ids": [
+     "cf5ea476-e120-40eb-a7b5-91b2e48868aa"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 88,
+  "stage0": false
+ },
+ {
+  "gi": 53,
+  "seed": 4461052,
+  "step": 113,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 15,
+  "dtype": "main:activate_main",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "ACTIVATE_MAIN",
+   "payload": {
+    "uuid": "8cdb07db-4885-48d3-a3b9-17c8da859965"
+   }
+  },
+  "pid": 89,
+  "stage0": false
+ },
+ {
+  "gi": 58,
+  "seed": 4461060,
+  "step": 112,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 4,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "92601b68-0aaa-428c-8b01-e2c30595f55d",
+    "target_ids": [
+     "ea3f5dcc-d76f-449a-972e-5bfc70fe8bab"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 90,
+  "stage0": false
+ },
+ {
+  "gi": 72,
+  "seed": 4461073,
+  "step": 106,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 9,
+  "dtype": "main:attack",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "62a96c43-e43b-4ab7-a275-6add44c38117",
+    "target_ids": [
+     "7a5d63e0-78ec-45b8-90c4-016b4a6cdee0"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 91,
+  "stage0": false
+ },
+ {
+  "gi": 73,
+  "seed": 4461074,
+  "step": 101,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 9,
+  "dtype": "main:play",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "b919f803-df0f-4f62-9166-fb0a4d8a5bf8"
+   }
+  },
+  "pid": 92,
+  "stage0": true
+ },
+ {
+  "gi": 93,
+  "seed": 4461094,
+  "step": 101,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 3,
+  "dtype": "main:turn_end",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 93,
+  "stage0": false
+ },
+ {
+  "gi": 98,
+  "seed": 4461098,
+  "step": 76,
+  "turn": 11,
+  "seat": "p1",
+  "n_cand": 2,
+  "dtype": "main:turn_end",
+  "want_turn": 11,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "TURN_END",
+   "payload": {}
+  },
+  "pid": 94,
+  "stage0": false
+ },
+ {
+  "gi": 44,
+  "seed": 4461045,
+  "step": 145,
+  "turn": 12,
+  "seat": "p2",
+  "n_cand": 19,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "d6a3befd-2991-46d2-858b-69496cb497f6",
+    "target_ids": [
+     "b22c9cc3-c2bc-4bfa-9830-fada5cb0eead"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 95,
+  "stage0": false
+ },
+ {
+  "gi": 60,
+  "seed": 4461062,
+  "step": 153,
+  "turn": 12,
+  "seat": "p2",
+  "n_cand": 7,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "19c6aa6e-227b-4420-a17c-3d675ab4bd62",
+    "target_ids": [
+     "bd38ab6d-02ff-44da-84fc-9e0d07eff8f0"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 96,
+  "stage0": false
+ },
+ {
+  "gi": 63,
+  "seed": 4461063,
+  "step": 116,
+  "turn": 12,
+  "seat": "p2",
+  "n_cand": 7,
+  "dtype": "main:play",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "PLAY",
+   "payload": {
+    "uuid": "89937237-d107-4579-a687-de275ea032af"
+   }
+  },
+  "pid": 97,
+  "stage0": true
+ },
+ {
+  "gi": 74,
+  "seed": 4461071,
+  "step": 118,
+  "turn": 12,
+  "seat": "p2",
+  "n_cand": 8,
+  "dtype": "main:attack",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "734b2f39-5028-4baa-8009-b95c1531670b",
+    "target_ids": [
+     "ea00a1b0-17c5-400c-a9bc-96b062f4009a"
+    ],
+    "don_k": 0
+   }
+  },
+  "pid": 98,
+  "stage0": false
+ },
+ {
+  "gi": 78,
+  "seed": 4461080,
+  "step": 87,
+  "turn": 12,
+  "seat": "p2",
+  "n_cand": 8,
+  "dtype": "main:attach",
+  "want_turn": 12,
+  "rec_move": {
+   "kind": "game",
+   "action_type": "DON_BOX",
+   "payload": {
+    "uuid": "ecba04eb-0fb7-475b-976c-f6c610962648",
+    "target_ids": [],
+    "don_k": 1
+   }
+  },
+  "pid": 99,
+  "stage0": false
+ }
+]

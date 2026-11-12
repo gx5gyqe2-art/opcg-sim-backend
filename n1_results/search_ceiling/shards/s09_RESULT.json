@@ -1,0 +1,9 @@
+{
+ "job": "search-ceiling",
+ "shard": "09",
+ "rows": 32,
+ "ok": 32,
+ "fail": [],
+ "cpu_h": 5.98,
+ "note": "jsonl has 34 lines: 2 stale exit -9 (OOM) rows for pid 48/73 x1000, superseded by later ok rows after rerun; 1x same as record 7/8"
+}

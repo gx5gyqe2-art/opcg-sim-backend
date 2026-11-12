@@ -1,0 +1,10 @@
+{
+ "job": "search-ceiling",
+ "shard": "10",
+ "rows": 38,
+ "ok": 32,
+ "unique_ok": 32,
+ "fail": [],
+ "note": "all 32 (pid,mult) done. x1000 OOM exit -9 rows for pids 24,49,61,86 are superseded by later ok rows (final retry of 24 and 61 with --workers 2)",
+ "cpu_h": 10.94
+}
