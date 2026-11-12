@@ -1,0 +1,5 @@
+jobs 2 (done 30)
+[1/2 4962s] pid 24 x1000 w8  sec 4959.25 cpu 4914.73 rss 5632.3 nodes 10239794 pv 49/4 max 60/5
+[2/2 4962s] pid 61 x1000 w8  sec 3368.36 cpu 3340.22 rss 5380.4 nodes 10239992 pv 36/3 max 72/5
+RUN_DONE
+ALL_DONE
