@@ -1,0 +1,9 @@
+jobs 6 (done 26)
+[1/6 7247s] pid 5 x1000 w8  sec 7244.92 cpu 7184.85 rss 4974.7 nodes 10240002 pv 86/9 max 86/9
+[2/6 7247s] pid 18 x1000 w8  sec 3853.92 cpu 3819.52 rss 5138.5 nodes 10217239 pv 62/5 max 71/7
+[3/6 10289s] pid 30 x1000 w8  sec 6430.18 cpu 6382.11 rss 4834.7 nodes 10240008 pv 44/6 max 95/8
+[4/6 11703s] pid 43 x1000 w8  sec 4453.23 cpu 4421.29 rss 6069.7 nodes 10238898 pv 57/3 max 68/4
+[5/6 19913s] pid 55 x1000 w8  sec 9621.64 cpu 9531.04 rss 5210.1 nodes 9299788 pv 39/2 max 81/6
+[6/6 19913s] pid 93 x1000 w8  sec 3283.04 cpu 3248.58 rss 5810.2 nodes 10049721 pv 24/1 max 45/4
+RUN_DONE
+ALL_DONE
