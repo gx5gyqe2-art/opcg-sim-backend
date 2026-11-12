@@ -1,0 +1,9 @@
+jobs 0 (done 28)
+RUN_DONE
+jobs 4 (done 28)
+[1/4 1137s] pid 24 x1000 w8 exit -9 sec 1137.3 cpu None rss None nodes None pv None/None max None/None
+[2/4 6831s] pid 49 x1000 w8  sec 6829.09 cpu 6734.59 rss 5160.2 nodes 10234686 pv 43/3 max 59/4
+[3/4 6831s] pid 61 x1000 w8 exit -9 sec 1137.3 cpu None rss None nodes None pv None/None max None/None
+[4/4 6831s] pid 86 x1000 w8  sec 4576.18 cpu 4532.88 rss 5740.4 nodes 10219077 pv 46/3 max 77/6
+RUN_DONE
+ALL_DONE
