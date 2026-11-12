@@ -455,6 +455,16 @@ def choice_table(rows: List[Dict[str, Any]], worlds: int, judge: List[Dict[str, 
                                 "abs_root_v_shift": _mean_ci([abs(b["root_v"] - a["root_v"]) for a, b in both]),
                                 "top_share": _mean_ci([b["n_share"] for _, b in both if b.get("n_share") is not None])}
         # 審判: 替わった点の差（高い倍率の手 − 1 倍の手）。全体＝替わらなかった点を 0 として全点で平均。
+        # 高い倍率の読みの中での値の差（新しい手 − 1 倍の手・勝率の単位＝q の差の半分）。1 倍の手が上位に無い点は数えない。
+        # 選んだ手の値は選ばれたぶん上に偏る（勝者の呪い）＝上限の目安として読む。
+        qd = []
+        for a_, b_ in ch:
+            qa = [t["q"] for t in b_["top"] if t.get("key") == a_["key"]]
+            qb = [t["q"] for t in b_["top"] if t.get("key") == b_["key"]]
+            if qa and qb:
+                qd.append((qb[0] - qa[0]) / 2)
+        cell["inner_gain_changed"] = _mean_ci(qd)
+        cell["inner_gain_all"] = _mean_ci(qd + [0.0] * (len(both) - len(ch))) if len(qd) == len(ch) else None
         diffs = [jd[(b["pid"], b["key"])]["diff"] for _, b in ch if (b["pid"], b["key"]) in jd]
         cell["judged"] = len(diffs)
         cell["gain_changed"] = _mean_ci(diffs)
