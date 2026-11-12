@@ -1,7 +1,7 @@
 {
  "job": "arena-sc10-w19",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r29f4.npz + sims 12800",
   "baseline": "nrel_r29f4.npz + sims 1280 (current shipping)",
