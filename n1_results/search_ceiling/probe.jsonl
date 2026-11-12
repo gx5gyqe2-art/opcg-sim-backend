@@ -1,0 +1,1 @@
+{"pid": 2, "mult": 10000, "worlds": 1, "fail": "exit -6", "sec": 2362.3, "err": "memory allocation of 12672 bytes failed\nstack backtrace:\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n"}
