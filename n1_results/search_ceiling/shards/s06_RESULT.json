@@ -1,0 +1,31 @@
+{
+ "job": "search-ceiling",
+ "shard": "06",
+ "rows": 32,
+ "ok": 28,
+ "raw_lines": 42,
+ "note": "jsonl is append-only: 1000x retries (workers 2 after OOM kills at 3) and pid 56 failures duplicated; take the last row per (pid,mult). pid 56 fails deterministically at all mults: AssertionError seat p1 vs p2 (search_ceiling.py:178).",
+ "fail": [
+  [
+   56,
+   1,
+   "exit 1"
+  ],
+  [
+   56,
+   10,
+   "exit 1"
+  ],
+  [
+   56,
+   100,
+   "exit 1"
+  ],
+  [
+   56,
+   1000,
+   "exit 1"
+  ]
+ ],
+ "cpu_h": 11.8
+}
