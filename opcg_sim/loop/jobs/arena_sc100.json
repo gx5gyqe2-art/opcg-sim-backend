@@ -1,0 +1,73 @@
+{
+ "kind": "arena",
+ "section": "§7.90",
+ "ledger_grep": "WP `search-ceiling` の対戦 100 倍",
+ "about": "探索の天井（§7.90 段 2）: 候補 読み 128,000 回（100 倍）vs 基準 1,280 回（今の出荷）・両席 r29f4・世界 8 本・枝予算なし・詰みの証明 root・公平・random×real。1 シャード 4 ペア",
+ "job": "arena-sc100-w{KK}",
+ "branch": "claude/arena-sc100-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 12,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r29f4.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r29f4.npz"
+ },
+ "out_dir": "arena_sc100",
+ "pairs": 4,
+ "chunk_pairs": 1,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "8",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "128000",
+  "--cand-worlds",
+  "8",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "43200"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "7241000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "sc100_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r29f4.npz + sims 128000",
+  "baseline": "nrel_r29f4.npz + sims 1280 (current shipping)",
+  "both": "worlds 8 x budget 0 x lethal root (fair)",
+  "pairs": 4
+ },
+ "commit_message": "arena sc100 shard {KK}",
+ "require": [
+  {
+   "file": "rust/opcg_engine/src/search/decide.rs",
+   "grep": "defense_dialog_tree: DefenseDialogTree::All,"
+  }
+ ]
+}
