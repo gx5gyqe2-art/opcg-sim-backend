@@ -22,7 +22,27 @@
    "result": "out of memory at 13 GB after 2362 s",
    "need_gb_est": 35
   },
-  "x3000_w1": "running at report time; appended below when done",
+  "x3000_w1": {
+   "points": 20,
+   "fail": 0,
+   "cpu_sec_mean": 1443.3,
+   "cpu_sec_max": 4480.7,
+   "rss_mb_mean": 6313,
+   "rss_mb_max": 10215,
+   "nodes_mean": 3442292,
+   "pv_turn_boundaries_mean": 3.95,
+   "max_depth_turn_boundaries_mean": 5.25,
+   "max_depth_turn_boundaries_max": 9,
+   "mean_depth_turn_boundaries": 2.88,
+   "changed_vs_x1": "8/20",
+   "same_as_x1000": "19/20",
+   "inner_gain_all_vs_x1": [
+    0.0044,
+    0.0002,
+    0.0085
+   ],
+   "note": "world 1, 20 stage-0 points; x1000 on the same points: pv 3.55, max 4.80, mean 2.60, changed vs x1 7/20. Referee not run on the one new changed pair. 9 points ended below 3.83M nodes (cause not examined)."
+  },
   "table": {
    "w1_x1": {
     "n": 20,
