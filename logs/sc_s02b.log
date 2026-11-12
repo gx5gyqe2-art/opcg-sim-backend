@@ -1,0 +1,7 @@
+jobs 4 (done 28)
+[1/4 3687s] pid 14 x1000 w8  sec 3684.49 cpu 3648.72 rss 4968.6 nodes 10240008 pv 42/4 max 61/6
+[2/4 3691s] pid 26 x1000 w8  sec 3688.37 cpu 3652.62 rss 4848.4 nodes 10240008 pv 53/5 max 69/8
+[3/4 9655s] pid 39 x1000 w8  sec 5965.61 cpu 5908.14 rss 5692.9 nodes 10237873 pv 39/2 max 51/3
+[4/4 9655s] pid 64 x1000 w8  sec 3403.74 cpu 3368.62 rss 7128.8 nodes 8967816 pv 14/0 max 61/3
+RUN_DONE
+ALL_DONE

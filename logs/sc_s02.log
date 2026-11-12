@@ -1,0 +1,37 @@
+jobs 24 (done 0)
+[1/24 7s] pid 1 x1 w8  sec 2.45 cpu 2.33 rss 243.6 nodes 10248 pv 20/3 max 27/3
+[2/24 7s] pid 14 x1 w8  sec 2.88 cpu 2.75 rss 246.2 nodes 10248 pv 15/1 max 25/3
+[3/24 7s] pid 26 x1 w8  sec 1.88 cpu 1.79 rss 273.0 nodes 10248 pv 19/2 max 35/4
+[4/24 8s] pid 39 x1 w8  sec 3.12 cpu 2.93 rss 259.4 nodes 10248 pv 31/1 max 36/2
+[5/24 13s] pid 51 x1 w8  sec 4.01 cpu 3.91 rss 340.4 nodes 10248 pv 21/2 max 32/2
+[6/24 13s] pid 64 x1 w8  sec 2.22 cpu 2.13 rss 260.1 nodes 10248 pv 16/1 max 18/1
+[7/24 13s] pid 76 x1 w8  sec 2.87 cpu 2.81 rss 289.2 nodes 10180 pv 14/1 max 14/2
+[8/24 19s] pid 89 x1 w8  sec 9.51 cpu 9.22 rss 383.1 nodes 10248 pv 24/1 max 28/1
+[9/24 39s] pid 1 x10 w8  sec 24.88 cpu 24.55 rss 426.4 nodes 102408 pv 24/3 max 33/4
+[10/24 42s] pid 14 x10 w8  sec 27.03 cpu 26.73 rss 436.4 nodes 102408 pv 25/2 max 36/4
+[11/24 42s] pid 26 x10 w8  sec 18.95 cpu 18.75 rss 442.2 nodes 102408 pv 28/3 max 49/6
+[12/24 61s] pid 39 x10 w8  sec 39.24 cpu 38.6 rss 456.6 nodes 102408 pv 25/2 max 42/3
+[13/24 77s] pid 51 x10 w8  sec 40.95 cpu 40.48 rss 439.4 nodes 102408 pv 24/2 max 38/3
+[14/24 77s] pid 64 x10 w8  sec 18.69 cpu 18.4 rss 410.1 nodes 92760 pv 14/0 max 26/1
+[15/24 77s] pid 76 x10 w8  sec 28.38 cpu 27.96 rss 448.1 nodes 99916 pv 15/1 max 25/3
+[16/24 131s] pid 89 x10 w8  sec 69.7 cpu 68.75 rss 447.8 nodes 102408 pv 25/1 max 30/2
+[17/24 360s] pid 1 x100 w8  sec 297.31 cpu 294.38 rss 764.4 nodes 1024008 pv 31/4 max 49/6
+[18/24 360s] pid 14 x100 w8  sec 283.68 cpu 280.83 rss 828.4 nodes 1024008 pv 26/2 max 42/5
+[19/24 360s] pid 26 x100 w8  sec 280.69 cpu 277.99 rss 847.8 nodes 1024008 pv 39/4 max 64/7
+[20/24 634s] pid 39 x100 w8  sec 500.66 cpu 496.33 rss 942.5 nodes 1023837 pv 33/2 max 42/3
+[21/24 998s] pid 51 x100 w8  sec 637.39 cpu 630.6 rss 816.8 nodes 1023884 pv 40/3 max 60/4
+[22/24 998s] pid 64 x100 w8  sec 220.58 cpu 218.45 rss 1033.0 nodes 900177 pv 14/0 max 41/2
+[23/24 998s] pid 76 x100 w8  sec 295.39 cpu 292.58 rss 777.3 nodes 941092 pv 17/1 max 36/4
+[24/24 1228s] pid 89 x100 w8  sec 642.85 cpu 637.79 rss 913.8 nodes 1023482 pv 40/1 max 52/2
+RUN_DONE
+jobs 8 (done 24)
+[1/8 4200s] pid 1 x1000 w8  sec 4198.16 cpu 4010.62 rss 4287.3 nodes 10240008 pv 50/5 max 64/7
+[2/8 4200s] pid 14 x1000 w8 exit -9 sec 1611.4 cpu None rss None nodes None pv None/None max None/None
+[3/8 4200s] pid 26 x1000 w8 exit -9 sec 3129.9 cpu None rss None nodes None pv None/None max None/None
+[4/8 4689s] pid 39 x1000 w8 exit -9 sec 3077.1 cpu None rss None nodes None pv None/None max None/None
+[5/8 12804s] pid 51 x1000 w8  sec 9671.91 cpu 9533.72 rss 4690.4 nodes 10239286 pv 60/5 max 88/6
+[6/8 12804s] pid 64 x1000 w8 exit -9 sec 1200.6 cpu None rss None nodes None pv None/None max None/None
+[7/8 12804s] pid 76 x1000 w8  sec 3112.89 cpu 3033.08 rss 3427.7 nodes 7994772 pv 27/2 max 43/4
+[8/8 12804s] pid 89 x1000 w8  sec 6223.81 cpu 6174.96 rss 5462.2 nodes 10221996 pv 57/2 max 73/3
+RUN_DONE
+ALL_DONE
