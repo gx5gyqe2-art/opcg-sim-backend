@@ -1,0 +1,891 @@
+{
+ "wp": "search-ceiling",
+ "spec": "docs/search_efficiency_plan.md §7.90",
+ "report": "docs/reports/2026-11-12_search_ceiling.md",
+ "base": "d8eb6f2",
+ "net": "nrel_r29f4",
+ "points": 99,
+ "excluded": {
+  "pid": 56,
+  "why": "replay does not reach the recorded position on the current engine"
+ },
+ "gate": {
+  "cargo": "645 passed",
+  "pytest": "937 passed, 17 skipped",
+  "audit_cross_void": 0,
+  "goldens": "unchanged"
+ },
+ "stage0": {
+  "points": 20,
+  "x10000": {
+   "worlds": 1,
+   "result": "out of memory at 13 GB after 2362 s",
+   "need_gb_est": 35
+  },
+  "x3000_w1": "running at report time; appended below when done",
+  "table": {
+   "w1_x1": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 0.329,
+     "med": 0.245,
+     "min": 0.1,
+     "max": 1.49
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 219.645,
+     "med": 215.75,
+     "min": 215.4,
+     "max": 256.9
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 1277.3,
+     "med": 1281.0,
+     "min": 1208,
+     "max": 1281
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 1.85,
+     "med": 2.0,
+     "min": 0.0,
+     "max": 4.0
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 2.4,
+     "med": 2.0,
+     "min": 1,
+     "max": 4
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.197,
+     "med": 1.136,
+     "min": 0.112,
+     "max": 2.695
+    }
+   },
+   "w1_x10": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 3.674,
+     "med": 2.655,
+     "min": 1.53,
+     "max": 15.86
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 281.96,
+     "med": 294.15,
+     "min": 216.9,
+     "max": 303.9
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 12590.8,
+     "med": 12801.0,
+     "min": 9902,
+     "max": 12801
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 2.5,
+     "med": 2.5,
+     "min": 0.0,
+     "max": 5.0
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 3.2,
+     "med": 3.0,
+     "min": 1,
+     "max": 6
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.667,
+     "med": 1.548,
+     "min": 0.409,
+     "max": 3.473
+    }
+   },
+   "w1_x100": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 39.477,
+     "med": 32.435,
+     "min": 13.64,
+     "max": 155.81
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 474.09,
+     "med": 475.0,
+     "min": 376.4,
+     "max": 543.5
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 120687.45,
+     "med": 128001.0,
+     "min": 68826,
+     "max": 128001
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 2.65,
+     "med": 2.0,
+     "min": 0.0,
+     "max": 5.0
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 4.15,
+     "med": 4.0,
+     "min": 1,
+     "max": 7
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 2.139,
+     "med": 2.014,
+     "min": 0.486,
+     "max": 4.096
+    }
+   },
+   "w1_x1000": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 465.108,
+     "med": 341.755,
+     "min": 136.2,
+     "max": 1743.98
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 2294.265,
+     "med": 2329.95,
+     "min": 999.2,
+     "max": 3490.1
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 1171237.5,
+     "med": 1279360.5,
+     "min": 444077,
+     "max": 1280001
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 3.55,
+     "med": 3.0,
+     "min": 1.0,
+     "max": 7.0
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 4.8,
+     "med": 5.0,
+     "min": 2,
+     "max": 8
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 2.598,
+     "med": 2.441,
+     "min": 0.961,
+     "max": 5.137
+    }
+   },
+   "w8_x1": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 2.294,
+     "med": 1.765,
+     "min": 0.85,
+     "max": 8.76
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 274.99,
+     "med": 264.0,
+     "min": 236.7,
+     "max": 360.5
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 9912.9,
+     "med": 10248.0,
+     "min": 4308,
+     "max": 10248
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 1.675,
+     "med": 1.812,
+     "min": 0.375,
+     "max": 3.25
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 2.75,
+     "med": 3.0,
+     "min": 1,
+     "max": 4
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.139,
+     "med": 1.188,
+     "min": 0.062,
+     "max": 2.294
+    }
+   },
+   "w8_x10": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 26.476,
+     "med": 20.805,
+     "min": 10.48,
+     "max": 97.26
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 427.22,
+     "med": 441.1,
+     "min": 299.8,
+     "max": 461.2
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 97704.0,
+     "med": 102408.0,
+     "min": 36582,
+     "max": 102408
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 2.362,
+     "med": 2.75,
+     "min": 0.125,
+     "max": 4.125
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 3.95,
+     "med": 4.0,
+     "min": 1,
+     "max": 7
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.595,
+     "med": 1.666,
+     "min": 0.23,
+     "max": 3.319
+    }
+   },
+   "w8_x100": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 318.514,
+     "med": 267.0,
+     "min": 69.64,
+     "max": 1038.7
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 814.105,
+     "med": 820.85,
+     "min": 584.1,
+     "max": 950.1
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 951681.85,
+     "med": 1023950.0,
+     "min": 177262,
+     "max": 1024008
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 3.119,
+     "med": 3.25,
+     "min": 0.375,
+     "max": 4.875
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 5.1,
+     "med": 5.0,
+     "min": 2,
+     "max": 8
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 2.167,
+     "med": 2.118,
+     "min": 0.36,
+     "max": 4.017
+    }
+   },
+   "w8_x1000": {
+    "n": 20,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 3979.959,
+     "med": 3264.47,
+     "min": 668.94,
+     "max": 12017.85
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 4597.675,
+     "med": 4757.2,
+     "min": 1654.3,
+     "max": 6151.9
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 9289098.25,
+     "med": 10221963.5,
+     "min": 1128522,
+     "max": 10240008
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 3.781,
+     "med": 3.625,
+     "min": 0.375,
+     "max": 6.375
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 6.1,
+     "med": 6.5,
+     "min": 2,
+     "max": 9
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 2.704,
+     "med": 2.53,
+     "min": 0.374,
+     "max": 4.838
+    }
+   }
+  }
+ },
+ "stage1": {
+  "table": {
+   "w8_x1": {
+    "n": 99,
+    "cpu_sec": {
+     "n": 99,
+     "mean": 2.659,
+     "med": 2.13,
+     "min": 0.09,
+     "max": 12.03
+    },
+    "rss_mb": {
+     "n": 99,
+     "mean": 281.906,
+     "med": 267.6,
+     "min": 220.1,
+     "max": 411.2
+    },
+    "nodes": {
+     "n": 99,
+     "mean": 9513.273,
+     "med": 10248,
+     "min": 210,
+     "max": 10248
+    },
+    "pv_turns_mean": {
+     "n": 99,
+     "mean": 1.58,
+     "med": 1.5,
+     "min": 0.0,
+     "max": 4.25
+    },
+    "pv10_turns_mean": {
+     "n": 99,
+     "mean": 1.242,
+     "med": 1.125,
+     "min": 0.0,
+     "max": 3.5
+    },
+    "max_turns_max": {
+     "n": 99,
+     "mean": 2.586,
+     "med": 2,
+     "min": 0,
+     "max": 5
+    },
+    "mean_turns": {
+     "n": 99,
+     "mean": 1.037,
+     "med": 1.047,
+     "min": 0.0,
+     "max": 2.867
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.7331,
+     0.2335,
+     0.0606,
+     0.009,
+     0.0003
+    ]
+   },
+   "w8_x10": {
+    "n": 99,
+    "cpu_sec": {
+     "n": 99,
+     "mean": 28.682,
+     "med": 22.53,
+     "min": 0.81,
+     "max": 146.25
+    },
+    "rss_mb": {
+     "n": 99,
+     "mean": 416.092,
+     "med": 440.1,
+     "min": 222.3,
+     "max": 481.2
+    },
+    "nodes": {
+     "n": 99,
+     "mean": 92600.586,
+     "med": 102408,
+     "min": 331,
+     "max": 102408
+    },
+    "pv_turns_mean": {
+     "n": 99,
+     "mean": 2.159,
+     "med": 2.125,
+     "min": 0.0,
+     "max": 5.25
+    },
+    "pv10_turns_mean": {
+     "n": 99,
+     "mean": 1.761,
+     "med": 1.75,
+     "min": 0.0,
+     "max": 4.75
+    },
+    "max_turns_max": {
+     "n": 99,
+     "mean": 3.566,
+     "med": 3,
+     "min": 1,
+     "max": 7
+    },
+    "mean_turns": {
+     "n": 99,
+     "mean": 1.455,
+     "med": 1.361,
+     "min": 0.0,
+     "max": 3.776
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.8177,
+     0.4056,
+     0.1658,
+     0.0532,
+     0.0114,
+     0.0012,
+     0.0
+    ]
+   },
+   "w8_x100": {
+    "n": 99,
+    "cpu_sec": {
+     "n": 99,
+     "mean": 330.125,
+     "med": 280.83,
+     "min": 7.85,
+     "max": 1333.41
+    },
+    "rss_mb": {
+     "n": 99,
+     "mean": 796.295,
+     "med": 827.9,
+     "min": 224.4,
+     "max": 1293.6
+    },
+    "nodes": {
+     "n": 99,
+     "mean": 903414.303,
+     "med": 1023837,
+     "min": 628,
+     "max": 1024008
+    },
+    "pv_turns_mean": {
+     "n": 99,
+     "mean": 2.758,
+     "med": 2.75,
+     "min": 0.0,
+     "max": 6.875
+    },
+    "pv10_turns_mean": {
+     "n": 99,
+     "mean": 2.082,
+     "med": 2.0,
+     "min": 0.0,
+     "max": 5.5
+    },
+    "max_turns_max": {
+     "n": 99,
+     "mean": 4.646,
+     "med": 4,
+     "min": 1,
+     "max": 10
+    },
+    "mean_turns": {
+     "n": 99,
+     "mean": 1.905,
+     "med": 1.783,
+     "min": 0.0,
+     "max": 4.984
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.8645,
+     0.5562,
+     0.2926,
+     0.129,
+     0.0472,
+     0.0133,
+     0.0019,
+     0.0002,
+     0.0,
+     0.0
+    ]
+   },
+   "w8_x1000": {
+    "n": 99,
+    "cpu_sec": {
+     "n": 99,
+     "mean": 3825.363,
+     "med": 3376.13,
+     "min": 71.48,
+     "max": 14259.11
+    },
+    "rss_mb": {
+     "n": 99,
+     "mean": 4444.588,
+     "med": 4718.1,
+     "min": 228.9,
+     "max": 8747.1
+    },
+    "nodes": {
+     "n": 99,
+     "mean": 8837332.646,
+     "med": 10221956,
+     "min": 1364,
+     "max": 10240008
+    },
+    "pv_turns_mean": {
+     "n": 99,
+     "mean": 3.268,
+     "med": 3.375,
+     "min": 0.0,
+     "max": 7.75
+    },
+    "pv10_turns_mean": {
+     "n": 99,
+     "mean": 2.364,
+     "med": 2.125,
+     "min": 0.0,
+     "max": 6.0
+    },
+    "max_turns_max": {
+     "n": 99,
+     "mean": 5.596,
+     "med": 6,
+     "min": 1,
+     "max": 11
+    },
+    "mean_turns": {
+     "n": 99,
+     "mean": 2.346,
+     "med": 2.309,
+     "min": 0.0,
+     "max": 5.956
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.8814,
+     0.6543,
+     0.4181,
+     0.2266,
+     0.1071,
+     0.0406,
+     0.0141,
+     0.0032,
+     0.0007,
+     0.0001,
+     0.0
+    ]
+   }
+  },
+  "choice": {
+   "worlds": 8,
+   "mults": [
+    1,
+    10,
+    100,
+    1000
+   ],
+   "points": 99,
+   "x10_vs_x1": {
+    "n": 99,
+    "changed": 23,
+    "changed_rate": 0.2323,
+    "changed_ci": [
+     0.1601,
+     0.3246
+    ],
+    "root_v_shift": {
+     "n": 99,
+     "mean": 0.0034,
+     "ci": [
+      -0.0076,
+      0.0143
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 99,
+     "mean": 0.0381,
+     "ci": [
+      0.0302,
+      0.0461
+     ]
+    },
+    "top_share": {
+     "n": 99,
+     "mean": 0.6222,
+     "ci": [
+      0.5785,
+      0.6658
+     ]
+    },
+    "inner_gain_changed": {
+     "n": 23,
+     "mean": 0.0185,
+     "ci": [
+      0.0127,
+      0.0243
+     ]
+    },
+    "inner_gain_all": {
+     "n": 99,
+     "mean": 0.0043,
+     "ci": [
+      0.0023,
+      0.0063
+     ]
+    },
+    "judged": 23,
+    "gain_changed": {
+     "n": 23,
+     "mean": 0.0183,
+     "ci": [
+      -0.0039,
+      0.0406
+     ]
+    },
+    "gain_all": {
+     "n": 99,
+     "mean": 0.0043,
+     "ci": [
+      -0.001,
+      0.0096
+     ]
+    },
+    "points_better": 1,
+    "points_worse": 1
+   },
+   "x100_vs_x1": {
+    "n": 99,
+    "changed": 29,
+    "changed_rate": 0.2929,
+    "changed_ci": [
+     0.2124,
+     0.389
+    ],
+    "root_v_shift": {
+     "n": 99,
+     "mean": 0.0027,
+     "ci": [
+      -0.0155,
+      0.0209
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 99,
+     "mean": 0.0659,
+     "ci": [
+      0.0533,
+      0.0786
+     ]
+    },
+    "top_share": {
+     "n": 99,
+     "mean": 0.6333,
+     "ci": [
+      0.5904,
+      0.6762
+     ]
+    },
+    "inner_gain_changed": {
+     "n": 29,
+     "mean": 0.0207,
+     "ci": [
+      0.0111,
+      0.0303
+     ]
+    },
+    "inner_gain_all": {
+     "n": 99,
+     "mean": 0.0061,
+     "ci": [
+      0.0027,
+      0.0094
+     ]
+    },
+    "judged": 29,
+    "gain_changed": {
+     "n": 29,
+     "mean": 0.0119,
+     "ci": [
+      -0.0092,
+      0.0329
+     ]
+    },
+    "gain_all": {
+     "n": 99,
+     "mean": 0.0035,
+     "ci": [
+      -0.0027,
+      0.0097
+     ]
+    },
+    "points_better": 1,
+    "points_worse": 2
+   },
+   "x1000_vs_x1": {
+    "n": 99,
+    "changed": 31,
+    "changed_rate": 0.3131,
+    "changed_ci": [
+     0.2302,
+     0.41
+    ],
+    "root_v_shift": {
+     "n": 99,
+     "mean": 0.0028,
+     "ci": [
+      -0.0206,
+      0.0261
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 99,
+     "mean": 0.0854,
+     "ci": [
+      0.0693,
+      0.1015
+     ]
+    },
+    "top_share": {
+     "n": 99,
+     "mean": 0.6407,
+     "ci": [
+      0.598,
+      0.6834
+     ]
+    },
+    "inner_gain_changed": {
+     "n": 29,
+     "mean": 0.014,
+     "ci": [
+      -0.0046,
+      0.0327
+     ]
+    },
+    "inner_gain_all": null,
+    "judged": 31,
+    "gain_changed": {
+     "n": 31,
+     "mean": -0.0015,
+     "ci": [
+      -0.0278,
+      0.0248
+     ]
+    },
+    "gain_all": {
+     "n": 99,
+     "mean": -0.0005,
+     "ci": [
+      -0.0086,
+      0.0077
+     ]
+    },
+    "points_better": 1,
+    "points_worse": 2
+   },
+   "x1_same_x10": {
+    "n": 99,
+    "same": 76,
+    "rate": 0.7677,
+    "ci": [
+     0.6754,
+     0.8399
+    ]
+   },
+   "x10_same_x100": {
+    "n": 99,
+    "same": 84,
+    "rate": 0.8485,
+    "ci": [
+     0.765,
+     0.906
+    ]
+   },
+   "x100_same_x1000": {
+    "n": 99,
+    "same": 85,
+    "rate": 0.8586,
+    "ci": [
+     0.7765,
+     0.9139
+    ]
+   }
+  }
+ },
+ "judge": {
+  "referee": "nrel_r29f4, 160 sims, 1 world, both seats to the end",
+  "k": 64,
+  "pairs_w8": 42,
+  "pairs_w1_stage0": 9
+ },
+ "arena_from_coordinator": {
+  "x10": "+29.9 [+15.1, +44.8] (512 pairs, final)",
+  "x100": "+108.7 [+42.7, +183.4] (33 of 128 pairs, interim)"
+ },
+ "main_points_per_seat_per_game": 32.9
+}
