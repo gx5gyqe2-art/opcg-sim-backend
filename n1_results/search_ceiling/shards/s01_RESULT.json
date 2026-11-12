@@ -1,0 +1,8 @@
+{
+ "job": "search-ceiling",
+ "shard": "01",
+ "rows": 32,
+ "ok": 32,
+ "fail": [],
+ "cpu_h": 8.97
+}
