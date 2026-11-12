@@ -50,6 +50,13 @@ pub struct DecideOptions {
     /// §7.73 段 5（度合い）: 後半の温度で引くときの分布の指数。訪問の割合を `pow` 乗して正規化する
     /// （1.0＝訪問に比例＝今までと 1 ビットも同じ・0.5＝平らに・0＝一様）。序盤の温度には効かない。
     pub temp_late_pow: f64,
+    /// §7.90 WP `search-ceiling`（**測定専用**・既定 false＝戻り値も打つ手も 1 ビットも同じ）: 木を回した決定の
+    /// 戻り値に深さの読み出し（`depth`・[`super::mcts::depth_readout`]）を足す。木を読むだけで探索は変えない。
+    pub depth_readout: bool,
+    /// §7.90（**測定専用**・既定 false・`depth_readout` と一緒のときだけ効く）: 世界を 1 本回し終えるたびに
+    /// 深さを読み出して木を捨てる（`world_threads=1` と合わせるとメモリの山が世界 1 本ぶんになる）。
+    /// 打つ手・根の統計は変わらない。戻り値の `pv` は空になり、読み出しの主な読み筋は世界ごとの訪問最多の手から辿る。
+    pub depth_lean: bool,
     /// §7.79 WP `light-rollout`（**測定専用**・既定 0＝無効＝1 ビットも同じ）: メインの判断点の木の手を、
     /// 根の事前分布（ネットの打ち方の割合）から選び直す。1＝割合が最大の手・2＝割合に比例して引く（温度 1）。
     /// 探索の回数（`sims`）は別に決める（0 にすれば木は回らず、根を広げた 1 回の評価だけ）。
@@ -343,6 +350,8 @@ impl Default for DecideOptions {
             temp_turns: 0,
             temp_late: 0.0,
             temp_late_pow: 1.0,
+            depth_readout: false,
+            depth_lean: false,
             prior_pick: 0,
             box_commit: true,
             box_battle: true,
@@ -492,6 +501,8 @@ pub struct DecideOut {
     /// 温度サンプルの印（§7.73・サンプルを引いたときだけ）: (1＝序盤の温度／2＝後半の低確率の温度,
     /// 引いた手が貪欲に選ぶ手と違ったか)。
     pub temp_pick: Option<(u8, bool)>,
+    /// 測定専用の深さの読み出し（§7.90・`depth_readout` で木を回した決定だけ・[`super::mcts::depth_readout`]）。
+    pub depth: Option<Value>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -1815,6 +1826,8 @@ struct WorldRun {
     world: GameState,
     /// `root_reply` の木の中の証明の実績（§7.21・使ったときだけ）
     reply: Option<super::lethal::ReplyProof>,
+    /// 深さの読み出し（§7.90 の `depth_lean`＝世界を回し終えた所で読み出して木を捨てたときだけ）
+    depth: Option<Value>,
 }
 
 /// 1 本の木を回す（つまみは全世界で同じ）。
@@ -1828,7 +1841,7 @@ fn run_one_world(
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
     reply: bool,
-) -> Result<(RunOut, Vec<Node>, Option<super::lethal::ReplyProof>), EngineError> {
+) -> Result<(RunOut, Vec<Node>, Option<super::lethal::ReplyProof>, Option<Value>), EngineError> {
     let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
     tree.select_rule = opts.select_rule;
     tree.q_min_frac = opts.q_min_frac;
@@ -1849,7 +1862,15 @@ fn run_one_world(
     }
     let run = tree.run_in_world(world, rng, st)?;
     let reply = tree.lethal_reply.take();
-    Ok((run, tree.into_nodes(), reply))
+    let mut nodes = tree.into_nodes();
+    // §7.90 `depth_lean`（測定専用）: 世界を回し終えた所で深さを読み出し、木を捨てる（世界を順に回せば
+    // メモリの山は 1 本ぶん）。主な読み筋はその世界の訪問最多の手から辿る。戻り値の `pv` は空になる。
+    let depth = (opts.depth_readout && opts.depth_lean).then(|| {
+        let d = super::mcts::depth_readout(&nodes, None);
+        nodes = Vec::new();
+        d
+    });
+    Ok((run, nodes, reply, depth))
 }
 
 /// K 本の世界を引いて木を回す（§20.7.1）。
@@ -1872,8 +1893,8 @@ fn run_worlds(
     let seed0 = opts.search_seed.unwrap_or(0);
     let world0 = sample_world(state, name, opts.world_view(), rng)?;
     if k <= 1 {
-        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
-        return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0, reply: rp }]);
+        let (run, nodes, rp, dz) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+        return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0, reply: rp, depth: dz }]);
     }
     // 世界 i>=1 を 1 本回す（呼んだスレッドの thread_local を使う＝必ず新しいスレッドから呼ぶ）。
     let world_job = |i: usize| -> Result<(WorldRun, i64, u64), EngineError> {
@@ -1892,8 +1913,8 @@ fn run_worlds(
             budget: BoxBudget::new(opts.budget),
         };
         let world = sample_world(state, name, opts.world_view(), &mut r)?;
-        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst, reply)?;
-        Ok((WorldRun { seed, run, nodes, world, reply: rp }, wst.budget.used, wst.budget.exhausted))
+        let (run, nodes, rp, dz) = run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst, reply)?;
+        Ok((WorldRun { seed, run, nodes, world, reply: rp, depth: dz }, wst.budget.used, wst.budget.exhausted))
     };
     let world_job = &world_job;
     let lost = || EngineError::BadPayload("decide: 世界の探索スレッドが panic した".into());
@@ -1911,8 +1932,8 @@ fn run_worlds(
         std::thread::scope(|scope| -> Result<(), EngineError> {
             let handles: Vec<_> = (1..k).map(|i| scope.spawn(move || world_job(i))).collect();
             // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
-            let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
-            runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp });
+            let (run, nodes, rp, dz) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+            runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp, depth: dz });
             for h in handles {
                 rest.push(h.join().map_err(|_| lost())?);
             }
@@ -1942,8 +1963,8 @@ fn run_worlds(
             }
             Ok(w0)
         })?;
-        let (run, nodes, rp) = w0?;
-        runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp });
+        let (run, nodes, rp, dz) = w0?;
+        runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp, depth: dz });
         for slot in slots {
             rest.push(slot.into_inner().unwrap_or_else(|e| e.into_inner()).ok_or_else(lost)?);
         }
@@ -2108,6 +2129,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         window_read: None,
         defense_proof: None,
         temp_pick: None,
+        depth: None,
     }
 }
 
@@ -2239,6 +2261,7 @@ fn decide_after_lethal(
                 window_read: pick.read,
                 defense_proof: pick.defense,
                 temp_pick: None,
+                depth: None,
             });
         }
     }
@@ -2365,6 +2388,22 @@ fn decide_after_lethal(
         None
     };
     let pv = principal_variation_of(&runs[pv_world].nodes, pv_first, 8);
+    // 測定専用の深さの読み出し（§7.90・既定 off＝ここへ入らない）。世界ごとに出す（主な読み筋は、選んだ手を
+    // その世界の添字へ写して辿る・写せない世界は訪問最多の手から）。
+    let depth = opts.depth_readout.then(|| {
+        let per: Vec<Value> = runs
+            .iter()
+            .enumerate()
+            .map(|(w, r)| {
+                if let Some(d) = &r.depth {
+                    return d.clone();
+                }
+                let first = if worlds > 1 { chosen_idx.and_then(|i| back[w][i]) } else { chosen_idx };
+                super::mcts::depth_readout(&r.nodes, first)
+            })
+            .collect();
+        serde_json::json!({"pv_world": pv_world, "per_world": per})
+    });
     // 棋譜ダンプの鍵はここで採る（Python `_decide_inner` の `record` と同じ位置＝残ドン掘り／
     // 残り起動の差し替えと先頭原始手化の**前**＝訪問分布の候補と突き合わせられる箱レベル）。
     let rec_sig = mv.as_ref().map(move_sig);
@@ -2485,6 +2524,7 @@ fn decide_after_lethal(
         window_read: None,
         defense_proof: None,
         temp_pick,
+        depth,
     })
 }
 
@@ -3184,6 +3224,7 @@ pub(super) mod tests {
             nodes: Vec::new(),
             world: crate::testkit::sample_state(),
             reply: None,
+            depth: None,
         };
         let runs = vec![
             mk(0, vec![6.0, 2.0], vec![1.0, -1.0]),

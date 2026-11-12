@@ -433,6 +433,10 @@ pub fn decide_on_state(
     if let Some((stage, explored)) = out.temp_pick {
         body["temp_pick"] = serde_json::json!({"stage": stage, "explored": explored});
     }
+    // 深さの読み出し（§7.90・測定専用）は旗を立てて木を回した決定だけに欄を足す（既定では鍵ごと出ない）。
+    if let Some(d) = &out.depth {
+        body["depth"] = d.clone();
+    }
     let rollout = quiesce::take_rollout_stats();
     // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
     if out.lethal.is_some() || out.lethal_reply.is_some() {
@@ -711,6 +715,9 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .map(|n| n as usize)
             .filter(|n| *n > 0)
             .unwrap_or(d.window_tree_worlds),
+        // 深さの読み出し（§7.90・測定専用・既定 false）。
+        depth_readout: flag("depth_readout", d.depth_readout),
+        depth_lean: flag("depth_lean", d.depth_lean),
         // 守りの窓の相手から見た詰みの証明（§7.51・WP `rs-defense-proof`・測定用・既定 false）。
         defense_proof: flag("defense_proof", d.defense_proof),
         defense_proof_life: v.get("defense_proof_life").and_then(Value::as_i64).unwrap_or(d.defense_proof_life),

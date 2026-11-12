@@ -1,0 +1,773 @@
+{
+ "stage0": {
+  "points": [
+   2,
+   7,
+   12,
+   17,
+   22,
+   27,
+   32,
+   37,
+   42,
+   47,
+   52,
+   57,
+   62,
+   67,
+   72,
+   77,
+   82,
+   87,
+   92,
+   97
+  ],
+  "table": {
+   "w1_x1": {
+    "n": 20,
+    "fail": 0,
+    "fail_why": null,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 0.329,
+     "med": 0.245,
+     "min": 0.1,
+     "max": 1.49
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 219.645,
+     "med": 215.75,
+     "min": 215.4,
+     "max": 256.9
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 1277.3,
+     "med": 1281.0,
+     "min": 1208,
+     "max": 1281
+    },
+    "visits_per_plan": {
+     "n": 20,
+     "mean": 1.0,
+     "med": 1.0,
+     "min": 1.0,
+     "max": 1.0
+    },
+    "pv_len": {
+     "n": 20,
+     "mean": 17.3,
+     "med": 17.0,
+     "min": 6,
+     "max": 27
+    },
+    "pv_turns": {
+     "n": 20,
+     "mean": 1.85,
+     "med": 2.0,
+     "min": 0,
+     "max": 4
+    },
+    "pv10_len": {
+     "n": 20,
+     "mean": 12.75,
+     "med": 13.0,
+     "min": 5,
+     "max": 21
+    },
+    "pv10_turns": {
+     "n": 20,
+     "mean": 1.45,
+     "med": 1.0,
+     "min": 0,
+     "max": 3
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 1.85,
+     "med": 2.0,
+     "min": 0.0,
+     "max": 4.0
+    },
+    "pv10_turns_mean": {
+     "n": 20,
+     "mean": 1.45,
+     "med": 1.0,
+     "min": 0.0,
+     "max": 3.0
+    },
+    "max_depth_max": {
+     "n": 20,
+     "mean": 20.4,
+     "med": 20.0,
+     "min": 12,
+     "max": 27
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 2.4,
+     "med": 2.0,
+     "min": 1,
+     "max": 4
+    },
+    "max_turns_mean": {
+     "n": 20,
+     "mean": 2.4,
+     "med": 2.0,
+     "min": 1.0,
+     "max": 4.0
+    },
+    "mean_depth": {
+     "n": 20,
+     "mean": 10.233,
+     "med": 10.422,
+     "min": 5.269,
+     "max": 15.737
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.197,
+     "med": 1.136,
+     "min": 0.112,
+     "max": 2.695
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.8029,
+     0.3068,
+     0.0772,
+     0.0099
+    ]
+   },
+   "w8_x1": {
+    "n": 20,
+    "fail": 0,
+    "fail_why": null,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 2.294,
+     "med": 1.765,
+     "min": 0.85,
+     "max": 8.76
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 274.99,
+     "med": 264.0,
+     "min": 236.7,
+     "max": 360.5
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 9912.9,
+     "med": 10248.0,
+     "min": 4308,
+     "max": 10248
+    },
+    "visits_per_plan": {
+     "n": 20,
+     "mean": 1.0,
+     "med": 1.0,
+     "min": 1.0,
+     "max": 1.0
+    },
+    "pv_len": {
+     "n": 20,
+     "mean": 17.15,
+     "med": 16.0,
+     "min": 6,
+     "max": 33
+    },
+    "pv_turns": {
+     "n": 20,
+     "mean": 1.55,
+     "med": 1.0,
+     "min": 0,
+     "max": 3
+    },
+    "pv10_len": {
+     "n": 20,
+     "mean": 13.2,
+     "med": 13.0,
+     "min": 5,
+     "max": 25
+    },
+    "pv10_turns": {
+     "n": 20,
+     "mean": 1.25,
+     "med": 1.0,
+     "min": 0,
+     "max": 3
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 1.675,
+     "med": 1.812,
+     "min": 0.375,
+     "max": 3.25
+    },
+    "pv10_turns_mean": {
+     "n": 20,
+     "mean": 1.325,
+     "med": 1.312,
+     "min": 0.0,
+     "max": 3.0
+    },
+    "max_depth_max": {
+     "n": 20,
+     "mean": 25.25,
+     "med": 26.0,
+     "min": 16,
+     "max": 33
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 2.75,
+     "med": 3.0,
+     "min": 1,
+     "max": 4
+    },
+    "max_turns_mean": {
+     "n": 20,
+     "mean": 2.344,
+     "med": 2.25,
+     "min": 0.875,
+     "max": 3.75
+    },
+    "mean_depth": {
+     "n": 20,
+     "mean": 10.365,
+     "med": 10.473,
+     "min": 5.471,
+     "max": 14.225
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.139,
+     "med": 1.188,
+     "min": 0.062,
+     "max": 2.294
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.7987,
+     0.2722,
+     0.0568,
+     0.0116
+    ]
+   },
+   "w8_x10": {
+    "n": 8,
+    "fail": 0,
+    "fail_why": null,
+    "cpu_sec": {
+     "n": 8,
+     "mean": 24.924,
+     "med": 25.725,
+     "min": 11.93,
+     "max": 36.56
+    },
+    "rss_mb": {
+     "n": 8,
+     "mean": 430.538,
+     "med": 439.5,
+     "min": 370.7,
+     "max": 448.9
+    },
+    "nodes": {
+     "n": 8,
+     "mean": 102408.0,
+     "med": 102408.0,
+     "min": 102408,
+     "max": 102408
+    },
+    "visits_per_plan": {
+     "n": 8,
+     "mean": 1.0,
+     "med": 1.0,
+     "min": 1.0,
+     "max": 1.0
+    },
+    "pv_len": {
+     "n": 8,
+     "mean": 32.0,
+     "med": 31.5,
+     "min": 21,
+     "max": 45
+    },
+    "pv_turns": {
+     "n": 8,
+     "mean": 3.5,
+     "med": 3.0,
+     "min": 3,
+     "max": 5
+    },
+    "pv10_len": {
+     "n": 8,
+     "mean": 26.25,
+     "med": 25.5,
+     "min": 15,
+     "max": 37
+    },
+    "pv10_turns": {
+     "n": 8,
+     "mean": 3.0,
+     "med": 3.0,
+     "min": 2,
+     "max": 4
+    },
+    "pv_turns_mean": {
+     "n": 8,
+     "mean": 3.297,
+     "med": 3.188,
+     "min": 2.625,
+     "max": 4.125
+    },
+    "pv10_turns_mean": {
+     "n": 8,
+     "mean": 2.844,
+     "med": 2.812,
+     "min": 2.125,
+     "max": 3.75
+    },
+    "max_depth_max": {
+     "n": 8,
+     "mean": 44.25,
+     "med": 45.0,
+     "min": 30,
+     "max": 56
+    },
+    "max_turns_max": {
+     "n": 8,
+     "mean": 5.25,
+     "med": 5.0,
+     "min": 4,
+     "max": 7
+    },
+    "max_turns_mean": {
+     "n": 8,
+     "mean": 4.203,
+     "med": 4.062,
+     "min": 3.25,
+     "max": 5.25
+    },
+    "mean_depth": {
+     "n": 8,
+     "mean": 17.835,
+     "med": 17.706,
+     "min": 14.321,
+     "max": 20.668
+    },
+    "mean_turns": {
+     "n": 8,
+     "mean": 2.23,
+     "med": 2.119,
+     "min": 1.689,
+     "max": 3.319
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.994,
+     0.7767,
+     0.3308,
+     0.1177,
+     0.0101,
+     0.0009,
+     0.0
+    ]
+   }
+  },
+  "choice_w8": {
+   "worlds": 8,
+   "mults": [
+    1,
+    10
+   ],
+   "points": 20,
+   "x10_vs_x1": {
+    "n": 8,
+    "changed": 0,
+    "changed_rate": 0.0,
+    "changed_ci": [
+     0.0,
+     0.3244
+    ],
+    "root_v_shift": {
+     "n": 8,
+     "mean": 0.0016,
+     "ci": [
+      -0.0198,
+      0.023
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 8,
+     "mean": 0.0253,
+     "ci": [
+      0.0149,
+      0.0357
+     ]
+    },
+    "top_share": {
+     "n": 8,
+     "mean": 0.6413,
+     "ci": [
+      0.4688,
+      0.8138
+     ]
+    },
+    "judged": 0,
+    "gain_changed": {
+     "n": 0,
+     "mean": null,
+     "ci": [
+      null,
+      null
+     ]
+    },
+    "gain_all": {
+     "n": 8,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "points_better": 0,
+    "points_worse": 0
+   },
+   "x1_same_x10": {
+    "n": 8,
+    "same": 8,
+    "rate": 1.0,
+    "ci": [
+     0.6756,
+     1.0
+    ]
+   }
+  },
+  "choice_w1": {
+   "worlds": 1,
+   "mults": [
+    1
+   ],
+   "points": 20
+  }
+ },
+ "stage1": {
+  "table": {
+   "w8_x1": {
+    "n": 20,
+    "fail": 0,
+    "fail_why": null,
+    "cpu_sec": {
+     "n": 20,
+     "mean": 2.294,
+     "med": 1.765,
+     "min": 0.85,
+     "max": 8.76
+    },
+    "rss_mb": {
+     "n": 20,
+     "mean": 274.99,
+     "med": 264.0,
+     "min": 236.7,
+     "max": 360.5
+    },
+    "nodes": {
+     "n": 20,
+     "mean": 9912.9,
+     "med": 10248.0,
+     "min": 4308,
+     "max": 10248
+    },
+    "visits_per_plan": {
+     "n": 20,
+     "mean": 1.0,
+     "med": 1.0,
+     "min": 1.0,
+     "max": 1.0
+    },
+    "pv_len": {
+     "n": 20,
+     "mean": 17.15,
+     "med": 16.0,
+     "min": 6,
+     "max": 33
+    },
+    "pv_turns": {
+     "n": 20,
+     "mean": 1.55,
+     "med": 1.0,
+     "min": 0,
+     "max": 3
+    },
+    "pv10_len": {
+     "n": 20,
+     "mean": 13.2,
+     "med": 13.0,
+     "min": 5,
+     "max": 25
+    },
+    "pv10_turns": {
+     "n": 20,
+     "mean": 1.25,
+     "med": 1.0,
+     "min": 0,
+     "max": 3
+    },
+    "pv_turns_mean": {
+     "n": 20,
+     "mean": 1.675,
+     "med": 1.812,
+     "min": 0.375,
+     "max": 3.25
+    },
+    "pv10_turns_mean": {
+     "n": 20,
+     "mean": 1.325,
+     "med": 1.312,
+     "min": 0.0,
+     "max": 3.0
+    },
+    "max_depth_max": {
+     "n": 20,
+     "mean": 25.25,
+     "med": 26.0,
+     "min": 16,
+     "max": 33
+    },
+    "max_turns_max": {
+     "n": 20,
+     "mean": 2.75,
+     "med": 3.0,
+     "min": 1,
+     "max": 4
+    },
+    "max_turns_mean": {
+     "n": 20,
+     "mean": 2.344,
+     "med": 2.25,
+     "min": 0.875,
+     "max": 3.75
+    },
+    "mean_depth": {
+     "n": 20,
+     "mean": 10.365,
+     "med": 10.473,
+     "min": 5.471,
+     "max": 14.225
+    },
+    "mean_turns": {
+     "n": 20,
+     "mean": 1.139,
+     "med": 1.188,
+     "min": 0.062,
+     "max": 2.294
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.7987,
+     0.2722,
+     0.0568,
+     0.0116
+    ]
+   },
+   "w8_x10": {
+    "n": 8,
+    "fail": 0,
+    "fail_why": null,
+    "cpu_sec": {
+     "n": 8,
+     "mean": 24.924,
+     "med": 25.725,
+     "min": 11.93,
+     "max": 36.56
+    },
+    "rss_mb": {
+     "n": 8,
+     "mean": 430.538,
+     "med": 439.5,
+     "min": 370.7,
+     "max": 448.9
+    },
+    "nodes": {
+     "n": 8,
+     "mean": 102408.0,
+     "med": 102408.0,
+     "min": 102408,
+     "max": 102408
+    },
+    "visits_per_plan": {
+     "n": 8,
+     "mean": 1.0,
+     "med": 1.0,
+     "min": 1.0,
+     "max": 1.0
+    },
+    "pv_len": {
+     "n": 8,
+     "mean": 32.0,
+     "med": 31.5,
+     "min": 21,
+     "max": 45
+    },
+    "pv_turns": {
+     "n": 8,
+     "mean": 3.5,
+     "med": 3.0,
+     "min": 3,
+     "max": 5
+    },
+    "pv10_len": {
+     "n": 8,
+     "mean": 26.25,
+     "med": 25.5,
+     "min": 15,
+     "max": 37
+    },
+    "pv10_turns": {
+     "n": 8,
+     "mean": 3.0,
+     "med": 3.0,
+     "min": 2,
+     "max": 4
+    },
+    "pv_turns_mean": {
+     "n": 8,
+     "mean": 3.297,
+     "med": 3.188,
+     "min": 2.625,
+     "max": 4.125
+    },
+    "pv10_turns_mean": {
+     "n": 8,
+     "mean": 2.844,
+     "med": 2.812,
+     "min": 2.125,
+     "max": 3.75
+    },
+    "max_depth_max": {
+     "n": 8,
+     "mean": 44.25,
+     "med": 45.0,
+     "min": 30,
+     "max": 56
+    },
+    "max_turns_max": {
+     "n": 8,
+     "mean": 5.25,
+     "med": 5.0,
+     "min": 4,
+     "max": 7
+    },
+    "max_turns_mean": {
+     "n": 8,
+     "mean": 4.203,
+     "med": 4.062,
+     "min": 3.25,
+     "max": 5.25
+    },
+    "mean_depth": {
+     "n": 8,
+     "mean": 17.835,
+     "med": 17.706,
+     "min": 14.321,
+     "max": 20.668
+    },
+    "mean_turns": {
+     "n": 8,
+     "mean": 2.23,
+     "med": 2.119,
+     "min": 1.689,
+     "max": 3.319
+    },
+    "reach_turns_frac": [
+     1.0,
+     0.994,
+     0.7767,
+     0.3308,
+     0.1177,
+     0.0101,
+     0.0009,
+     0.0
+    ]
+   }
+  },
+  "choice_w8": {
+   "worlds": 8,
+   "mults": [
+    1,
+    10
+   ],
+   "points": 20,
+   "x10_vs_x1": {
+    "n": 8,
+    "changed": 0,
+    "changed_rate": 0.0,
+    "changed_ci": [
+     0.0,
+     0.3244
+    ],
+    "root_v_shift": {
+     "n": 8,
+     "mean": 0.0016,
+     "ci": [
+      -0.0198,
+      0.023
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 8,
+     "mean": 0.0253,
+     "ci": [
+      0.0149,
+      0.0357
+     ]
+    },
+    "top_share": {
+     "n": 8,
+     "mean": 0.6413,
+     "ci": [
+      0.4688,
+      0.8138
+     ]
+    },
+    "judged": 0,
+    "gain_changed": {
+     "n": 0,
+     "mean": null,
+     "ci": [
+      null,
+      null
+     ]
+    },
+    "gain_all": {
+     "n": 8,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "points_better": 0,
+    "points_worse": 0
+   },
+   "x1_same_x10": {
+    "n": 8,
+    "same": 8,
+    "rate": 1.0,
+    "ci": [
+     0.6756,
+     1.0
+    ]
+   }
+  }
+ },
+ "judge": {
+  "pairs": 0,
+  "k": null,
+  "void": 0
+ }
+}

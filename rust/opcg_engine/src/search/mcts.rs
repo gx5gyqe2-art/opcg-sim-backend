@@ -137,6 +137,9 @@ pub struct Node {
     pub expanded: bool,
     pub terminal: bool,
     pub term_val: f64,
+    /// この節点の盤面の `turn_count`（測定専用の深さの読み出し [`depth_readout`] が手番の境目を数えるのに使う。
+    /// 0＝盤面を見ずに作った節点〔例外手・証明済みの子〕＝親と同じ手番として数える。探索はこの欄を読まない）。
+    pub turn: i32,
 }
 
 /// PV（主変化）の 1 手（`docs/rust_engine_plan.md` §20.4 の思考ログ・[`TreeMcts::principal_variation`]）。
@@ -193,6 +196,106 @@ pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usi
         }
     }
     out
+}
+
+/// 測定専用の深さの読み出し（`search_efficiency_plan.md` §7.90・`DecideOptions::depth_readout`）。
+///
+/// 1 本の木（1 つの世界）を根から全部たどり、次を JSON で返す。**木を読むだけ**で探索には触れない。
+///
+/// - `nodes`＝節点の総数／`expanded`＝展開済み（終局を含む）の数／`root_visits`＝根の訪問の合計
+/// - `max_depth`＝根からの手数の最大／`max_turns`＝根から越えた**手番の境目**（`turn_count` が変わった回数）の最大
+/// - `by_depth[d]`＝深さ d の節点の数／`by_turns[t]`＝境目を t 回越えた先に在る節点の数
+/// - `reach_depth[d]`＝深さ d 以上まで降りた読みの回数（深さ d の節点へ入る辺の訪問の和・`[0]` は根の訪問）
+/// - `reach_turns[t]`＝境目を t 回以上越えた読みの回数（`[0]` は根の訪問）
+/// - `pv`＝主な読み筋（`first` の手から訪問最多の子を葉まで・**切らない**）の各手の `[訪問, 越えた境目の累計]`
+/// - `pv_len`・`pv_turns`＝その長さと越えた境目の数
+///
+/// 手番の境目は節点の `turn`（盤面の `turn_count`）の変化で数える。`turn == 0` の節点（盤面を見ずに作った
+/// 例外手・証明済みの子）は親と同じ手番として数える。
+pub fn depth_readout(nodes: &[Node], first: Option<usize>) -> serde_json::Value {
+    let mut by_depth: Vec<u64> = Vec::new();
+    let mut by_turns: Vec<u64> = Vec::new();
+    let mut reach_depth: Vec<f64> = Vec::new();
+    let mut reach_turns: Vec<f64> = Vec::new();
+    let mut expanded = 0u64;
+    let bump = |v: &mut Vec<u64>, i: usize| {
+        if v.len() <= i {
+            v.resize(i + 1, 0);
+        }
+        v[i] += 1;
+    };
+    let add = |v: &mut Vec<f64>, i: usize, x: f64| {
+        if v.len() <= i {
+            v.resize(i + 1, 0.0);
+        }
+        v[i] += x;
+    };
+    let turn_of = |i: usize, parent_turn: i32| if nodes[i].turn == 0 { parent_turn } else { nodes[i].turn };
+    let root_visits: f64 = nodes.first().map(|n| n.n.iter().sum()).unwrap_or(0.0);
+    // (節点, 深さ, 越えた境目, この節点の手番〔0 は親から継ぐ〕)
+    let mut stack: Vec<(usize, usize, usize, i32)> = Vec::new();
+    if !nodes.is_empty() {
+        stack.push((0, 0, 0, nodes[0].turn));
+        add(&mut reach_depth, 0, root_visits);
+        add(&mut reach_turns, 0, root_visits);
+    }
+    while let Some((i, d, t, turn)) = stack.pop() {
+        let n = &nodes[i];
+        bump(&mut by_depth, d);
+        bump(&mut by_turns, t);
+        if n.expanded {
+            expanded += 1;
+        }
+        for (a, c) in n.children.iter().enumerate() {
+            let Some(c) = *c else { continue };
+            let ct = turn_of(c, turn);
+            let crossed = ct != turn;
+            let visits = n.n.get(a).copied().unwrap_or(0.0);
+            add(&mut reach_depth, d + 1, visits);
+            if crossed {
+                add(&mut reach_turns, t + 1, visits);
+            }
+            stack.push((c, d + 1, t + usize::from(crossed), ct));
+        }
+    }
+    // 主な読み筋（切らない）
+    let mut pv: Vec<(f64, usize)> = Vec::new();
+    let mut node = 0usize;
+    let mut forced = first;
+    let mut turn = nodes.first().map(|n| n.turn).unwrap_or(0);
+    let mut crossed = 0usize;
+    while node < nodes.len() {
+        let n = &nodes[node];
+        if !n.expanded || n.terminal || n.legal.is_empty() {
+            break;
+        }
+        let a = match forced.take().filter(|i| *i < n.legal.len()) {
+            Some(i) => i,
+            None => argmax_f64(&n.n),
+        };
+        let Some(c) = n.children.get(a).copied().flatten() else { break };
+        let ct = turn_of(c, turn);
+        if ct != turn {
+            crossed += 1;
+        }
+        turn = ct;
+        pv.push((n.n[a], crossed));
+        node = c;
+    }
+    serde_json::json!({
+        "nodes": nodes.len(),
+        "expanded": expanded,
+        "root_visits": root_visits,
+        "max_depth": by_depth.len().saturating_sub(1),
+        "max_turns": by_turns.len().saturating_sub(1),
+        "by_depth": by_depth,
+        "by_turns": by_turns,
+        "reach_depth": reach_depth,
+        "reach_turns": reach_turns,
+        "pv_len": pv.len(),
+        "pv_turns": crossed,
+        "pv": pv.iter().map(|(n, t)| serde_json::json!([n, t])).collect::<Vec<_>>(),
+    })
 }
 
 /// 木の中の相手に「こちらの手札」を見せない（`search_efficiency_plan.md` §7.14・**測定専用**）。
@@ -362,6 +465,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         st: &mut SearchState,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
+        self.nodes[node].turn = s.state().turn_count;
         if ctx.is_terminal(s) {
             let tm = ctx.current_player(s);
             let w = s.state().winner;
@@ -611,6 +715,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         let term = ctx.is_terminal(s);
         let tm = ctx.current_player(s);
         let child = self.new_node();
+        self.nodes[child].turn = s.state().turn_count;
         if term {
             let w = s.state().winner;
             let parent_to_move = self.nodes[parent].to_move;
