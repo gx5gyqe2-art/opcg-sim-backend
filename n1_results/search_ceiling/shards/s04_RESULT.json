@@ -1,0 +1,25 @@
+{
+ "job": "search-ceiling",
+ "shard": "04",
+ "rows": 33,
+ "ok": 30,
+ "fail": [
+  [
+   4,
+   1000,
+   "exit -9"
+  ],
+  [
+   4,
+   1000,
+   "exit -9"
+  ],
+  [
+   41,
+   1000,
+   "exit -9"
+  ]
+ ],
+ "cpu_h": 5.94,
+ "note": "fails are 1000x OOM kills (exit -9) at 3 workers; retried once, failed again"
+}
