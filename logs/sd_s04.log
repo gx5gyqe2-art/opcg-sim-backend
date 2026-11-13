@@ -1,0 +1,65 @@
+jobs 32 (done 0)
+[1/32 189s] pid 4 t4  cpu 184.44 rss 1096.8 nodes 1022731 pv 57.625/7.0 max 83/10
+[2/32 236s] pid 16 t4  cpu 231.69 rss 804.6 nodes 1022061 pv 47.375/5.0 max 69/6
+[3/32 266s] pid 29 t4  cpu 261.57 rss 815.0 nodes 1024008 pv 72.625/4.875 max 99/7
+[4/32 678s] pid 41 t4  cpu 670.65 rss 891.4 nodes 1023967 pv 61.0/3.875 max 89/5
+[5/32 678s] pid 54 t4  cpu 275.59 rss 742.9 nodes 1021554 pv 42.625/4.0 max 67/7
+[6/32 678s] pid 68 t4  cpu 379.04 rss 784.3 nodes 990085 pv 38.625/2.0 max 64/4
+[7/32 678s] pid 80 t4  cpu 189.27 rss 852.6 nodes 1012887 pv 43.875/3.0 max 75/5
+[8/32 681s] pid 93 t4  cpu 218.39 rss 926.1 nodes 912620 pv 34.0/2.0 max 40/2
+[9/32 690s] pid 4 k2  cpu 217.73 rss 681.0 nodes 1023755 pv 66.0/8.125 max 92/10
+[10/32 932s] pid 16 k2  cpu 307.14 rss 705.9 nodes 1023984 pv 52.0/5.75 max 67/6
+[11/32 986s] pid 29 k2  cpu 303.17 rss 683.8 nodes 1023788 pv 94.375/6.0 max 111/8
+[12/32 1503s] pid 41 k2  cpu 813.76 rss 789.9 nodes 1023887 pv 79.0/4.625 max 100/6
+[13/32 1503s] pid 54 k2  cpu 354.97 rss 696.8 nodes 1015380 pv 55.0/5.0 max 73/8
+[14/32 1503s] pid 68 k2  cpu 375.82 rss 626.0 nodes 661984 pv 47.875/2.375 max 65/4
+[15/32 1503s] pid 80 k2  cpu 167.98 rss 676.4 nodes 720775 pv 43.375/2.625 max 62/5
+[16/32 1503s] pid 93 k2  cpu 120.64 rss 543.8 nodes 805937 pv 31.75/2.0 max 40/3
+[17/32 1503s] pid 4 k2c4  cpu 252.11 rss 695.1 nodes 1015533 pv 86.5/9.875 max 126/15
+[18/32 1503s] pid 16 k2c4  cpu 299.31 rss 649.5 nodes 996142 pv 61.125/5.875 max 82/7
+[19/32 1640s] pid 29 k2c4  cpu 323.64 rss 705.8 nodes 1022965 pv 112.875/7.0 max 141/9
+[20/32 2262s] pid 41 k2c4  cpu 839.95 rss 784.4 nodes 1023587 pv 105.375/5.5 max 138/7
+[21/32 2262s] pid 54 k2c4  cpu 364.61 rss 677.3 nodes 985320 pv 63.5/5.375 max 86/8
+[22/32 2262s] pid 68 k2c4  cpu 264.6 rss 599.0 nodes 534636 pv 49.5/2.5 max 101/6
+[23/32 2262s] pid 80 k2c4  cpu 150.92 rss 652.6 nodes 675333 pv 58.875/4.125 max 80/6
+[24/32 2262s] pid 93 k2c4  cpu 105.75 rss 464.5 nodes 648810 pv 34.5/2.0 max 40/2
+[25/32 2262s] pid 4 ok1  cpu 275.09 rss 591.7 nodes 687456 pv 84.125/9.5 max 124/14
+[26/32 2262s] pid 16 ok1  cpu 301.8 rss 704.1 nodes 774785 pv 62.625/6.25 max 85/8
+[27/32 2267s] pid 29 ok1  cpu 380.97 rss 735.0 nodes 885614 pv 102.0/6.625 max 146/10
+[28/32 2724s] pid 41 ok1  cpu 643.76 rss 587.3 nodes 246307 pv 113.25/5.875 max 171/9
+[29/32 2724s] pid 54 ok1  cpu 320.01 rss 687.7 nodes 980878 pv 64.375/6.0 max 105/10
+[30/32 2724s] pid 68 ok1  cpu 154.26 rss 438.2 nodes 106502 pv 37.75/2.0 max 81/6
+[31/32 2724s] pid 80 ok1  cpu 142.24 rss 520.8 nodes 278861 pv 39.5/2.75 max 73/6
+[32/32 2724s] pid 93 ok1  cpu 84.63 rss 414.0 nodes 155104 pv 27.625/2.0 max 45/3
+RUN_DONE
+jobs 16 (done 32)
+[1/16 299s] pid 4 w2k2f2c4  cpu 294.56 rss 1527.7 nodes 1006776 pv 92.0/9.5 max 97/11
+[2/16 299s] pid 16 w2k2f2c4  cpu 274.88 rss 1388.1 nodes 835348 pv 57.5/5.5 max 71/6
+[3/16 642s] pid 29 w2k2f2c4  cpu 358.07 rss 1650.1 nodes 1021610 pv 130.5/8.0 max 149/8
+[4/16 1127s] pid 41 w2k2f2c4  cpu 819.93 rss 1865.6 nodes 1023966 pv 96.5/5.5 max 134/7
+[5/16 1127s] pid 54 w2k2f2c4  cpu 369.43 rss 1463.7 nodes 958073 pv 60.5/5.5 max 73/8
+[6/16 1254s] pid 68 w2k2f2c4  cpu 234.45 rss 978.5 nodes 592584 pv 55.0/3.0 max 67/4
+[7/16 1274s] pid 80 w2k2f2c4  cpu 144.07 rss 938.6 nodes 558816 pv 55.5/3.5 max 74/6
+[8/16 1368s] pid 93 w2k2f2c4  cpu 111.42 rss 836.0 nodes 595133 pv 33.5/2.0 max 40/2
+[9/16 1453s] pid 4 w1c4  cpu 175.27 rss 2332.1 nodes 1023845 pv 59.0/8.0 max 67/8
+[10/16 1582s] pid 16 w1c4  cpu 209.85 rss 1962.3 nodes 1024001 pv 55.0/5.0 max 56/6
+[11/16 1682s] pid 29 w1c4  cpu 226.01 rss 1792.4 nodes 1024001 pv 53.0/4.0 max 103/7
+[12/16 2359s] pid 41 w1c4  cpu 768.81 rss 2452.5 nodes 1024001 pv 77.0/4.0 max 84/7
+[13/16 2359s] pid 54 w1c4  cpu 343.34 rss 1816.0 nodes 1024001 pv 54.0/5.0 max 55/6
+[14/16 2383s] pid 68 w1c4  cpu 348.72 rss 1975.1 nodes 1010758 pv 46.0/2.0 max 46/2
+[15/16 2480s] pid 80 w1c4  cpu 118.61 rss 2320.3 nodes 1009244 pv 47.0/3.0 max 47/4
+[16/16 2561s] pid 93 w1c4  cpu 175.04 rss 2527.8 nodes 1019145 pv 21.0/2.0 max 34/2
+RUN_DONE
+JUDGE todo 10 (done 0) k=64
+JUDGE pid=4 shapes=['k2', 'k2c4'] diff=0.0156 [-0.0533, 0.0845] sec=144.7 (1/10 146s)
+JUDGE pid=16 shapes=['w1c4'] diff=-0.0156 [-0.1269, 0.0956] sec=208.0 (2/10 210s)
+JUDGE pid=16 shapes=['k2', 'k2c4', 'ok1', 't4', 'w2k2f2c4'] diff=-0.1094 [-0.2258, 0.0071] sec=213.5 (3/10 215s)
+JUDGE pid=54 shapes=['w1c4'] diff=-0.0156 [-0.0462, 0.015] sec=227.1 (4/10 373s)
+JUDGE pid=68 shapes=['k2', 'k2c4', 'w1c4', 'w2k2f2c4'] diff=0.0 [0.0, 0.0] sec=165.1 (5/10 375s)
+JUDGE pid=68 shapes=['ok1'] diff=0.0469 [-0.0548, 0.1486] sec=160.5 (6/10 376s)
+JUDGE pid=80 shapes=['k2', 'k2c4'] diff=0.0312 [-0.044, 0.1065] sec=56.5 (7/10 430s)
+JUDGE pid=80 shapes=['t4', 'w2k2f2c4'] diff=0.0781 [-0.0012, 0.1575] sec=56.2 (8/10 432s)
+JUDGE pid=80 shapes=['ok1', 'w1c4'] diff=0.0312 [-0.03, 0.0925] sec=57.8 (9/10 433s)
+JUDGE pid=41 shapes=['w2k2f2c4'] diff=-0.1094 [-0.2337, 0.015] sec=788.7 (10/10 791s)
+JUDGE_DONE
+ALL_DONE
