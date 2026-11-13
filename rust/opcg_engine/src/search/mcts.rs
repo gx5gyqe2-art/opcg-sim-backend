@@ -122,6 +122,69 @@ pub fn apply_root_prior_temp(p: &mut [f64], temp: f64) -> bool {
     true
 }
 
+/// §7.91 WP `search-deep`（**測定専用**）: 木の中（根以外）の節の読みを狭く・深くする形。
+/// 既定（[`DeepShape::default`]）はどの分岐にも入らない＝探索は 1 bit も変わらない。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeepShape {
+    /// 根以外の節の事前分布を `P^(1/t)` で尖らせる（t<1 で尖る・1.0＝何もしない）。
+    pub prior_temp: f64,
+    /// 根以外の節で、事前分布の上位 k 手だけを残す（0＝絞らない）。残した手の割合は和 1 に直す。
+    pub topk: usize,
+    /// `topk` を掛ける節を「根の手番の相手の番の節」だけにする（false＝根以外の全部）。
+    pub topk_opp_only: bool,
+    /// 根以外の節で、まだ読んでいない手の値を 0 ではなく「その節の今の平均の値 − これ」と置く
+    /// （`None`＝今までどおり 0）。負けている側の節で全部の手を 1 回ずつ読む広がりを止める。
+    pub fpu_red: Option<f64>,
+}
+
+impl Default for DeepShape {
+    fn default() -> Self {
+        DeepShape { prior_temp: 1.0, topk: 0, topk_opp_only: false, fpu_red: None }
+    }
+}
+
+impl DeepShape {
+    /// 既定（何もしない）か。
+    pub fn is_off(&self) -> bool {
+        *self == DeepShape::default()
+    }
+
+    /// 根以外の節の (合法手, 事前分布) を形に合わせて絞り・尖らせる。変えたら true（＝`P` は float64 扱い）。
+    /// `opp_node`＝根の手番の相手の番の節か。上位 k 手は割合の大きい順（同じなら添字が小さい方）で選び、元の並びのまま残す。
+    pub fn shape(&self, legal: &mut Vec<Move>, p: &mut Vec<f64>, opp_node: bool) -> bool {
+        let mut changed = false;
+        let k = if self.topk_opp_only && !opp_node { 0 } else { self.topk };
+        if k > 0 && p.len() > k {
+            let mut idx: Vec<usize> = (0..p.len()).collect();
+            idx.sort_by(|a, b| p[*b].partial_cmp(&p[*a]).unwrap_or(std::cmp::Ordering::Equal).then(a.cmp(b)));
+            let mut keep = vec![false; p.len()];
+            for i in &idx[..k] {
+                keep[*i] = true;
+            }
+            let mut it = keep.iter();
+            legal.retain(|_| *it.next().unwrap());
+            let mut it = keep.iter();
+            p.retain(|_| *it.next().unwrap());
+            let total: f64 = p.iter().sum();
+            if total > 0.0 {
+                for x in p.iter_mut() {
+                    *x /= total;
+                }
+            } else {
+                let n = p.len() as f64;
+                for x in p.iter_mut() {
+                    *x = 1.0 / n;
+                }
+            }
+            changed = true;
+        }
+        if apply_root_prior_temp(p, self.prior_temp) {
+            changed = true;
+        }
+        changed
+    }
+}
+
 /// Python `mcts._Node`。
 #[derive(Debug, Default, Clone)]
 pub struct Node {
@@ -341,6 +404,9 @@ pub struct TreeMcts<'a, 'b> {
     pub q_min_frac: f64,
     /// 根の事前分布の平坦化（§20.5・既定 1.0＝何もしない）。
     pub root_prior_temp: f64,
+    /// §7.91 WP `search-deep`（**測定専用**・既定は全部 off＝1 bit も変えない）: 読みを幅ではなく深さへ振る形。
+    /// どれも**根以外の節**にだけ掛かる（根は今までどおり全部の手を広げる）。
+    pub deep: DeepShape,
     /// 木の中の相手にこちらの手札を見せない（§7.14・既定 `None`＝今までどおり）。
     pub opp_blind: Option<OppBlind>,
     /// 根の直後の相手の応手の節点での詰みの証明（§7.21 `root_reply`・既定 `None`＝今までどおり）。
@@ -361,6 +427,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             select_rule: SelectRule::Visits,
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
+            deep: DeepShape::default(),
             opp_blind: None,
             lethal_reply: None,
             reply_nodes: Vec::new(),
@@ -613,8 +680,19 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             }
         }
 
-        let n = legal.len();
         let (priors, trunk) = ctx.priors_keep(s, &legal)?;
+        // §7.91 `search-deep`（測定専用・既定 off＝この塊に入らない）: 根以外の節の手を絞り・割合を尖らせる。
+        let mut shaped: Option<Vec<f64>> = None;
+        if node != 0 && !self.deep.is_off() {
+            if let Some(p) = priors.as_ref() {
+                let mut p64: Vec<f64> = p.iter().map(|x| *x as f64).collect();
+                let opp_node = self.nodes[0].to_move != Some(to_move_seat);
+                if self.deep.shape(&mut legal, &mut p64, opp_node) {
+                    shaped = Some(p64);
+                }
+            }
+        }
+        let n = legal.len();
         {
             let node = &mut self.nodes[node];
             node.legal = legal;
@@ -622,6 +700,10 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             node.w = vec![0.0; n];
             node.children = vec![None; n];
             match priors {
+                Some(_) if shaped.is_some() => {
+                    node.p = shaped.take().unwrap();
+                    node.p_f32 = false;
+                }
                 Some(p) => {
                     node.p = p.iter().map(|x| *x as f64).collect();
                     node.p_f32 = true;
@@ -847,12 +929,17 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         let n = &self.nodes[node];
         let total: f64 = n.n.iter().sum();
         let sqrt_n = if total > 0.0 { total.sqrt() } else { 1.0 };
+        // §7.91 `search-deep`（測定専用）: 根以外の節のまだ読んでいない手の値（既定は 0＝今までどおり）。
+        let unvisited_q = match self.deep.fpu_red {
+            Some(red) if node != 0 && total > 0.0 => n.w.iter().sum::<f64>() / total - red,
+            _ => 0.0,
+        };
         let u: Vec<f64> = (0..n.legal.len())
             .map(|i| {
                 let q = if n.n[i] > 0.0 {
                     n.w[i] / n.n[i].max(1.0)
                 } else {
-                    0.0
+                    unvisited_q
                 };
                 let bonus = if n.p_f32 {
                     // numpy: float32 配列 × 弱スカラー → float32 のまま
@@ -953,6 +1040,31 @@ mod tests {
         assert_eq!(SelectRule::from_name("greedy"), None);
         assert_eq!(SelectRule::default(), SelectRule::Visits);
         assert_eq!(SelectRule::QMinN.name(), "q_min_n");
+    }
+
+    /// §7.91 `DeepShape`: 既定は何も変えない。上位 k 手は元の並びで残り和は 1・相手の節だけの絞りは自分の節を触らない。
+    #[test]
+    fn deep_shape_default_is_a_no_op_and_topk_keeps_order() {
+        let mv = |_i: usize| Move::from_json(serde_json::json!({}));
+        let legal0: Vec<Move> = (0..4).map(mv).collect();
+        let p0 = vec![0.1, 0.4, 0.2, 0.3];
+        let (mut l, mut p) = (legal0.clone(), p0.clone());
+        assert!(DeepShape::default().is_off());
+        assert!(!DeepShape::default().shape(&mut l, &mut p, true));
+        assert_eq!((l.len(), &p), (4, &p0));
+        let k2 = DeepShape { topk: 2, ..DeepShape::default() };
+        assert!(k2.shape(&mut l, &mut p, false));
+        assert_eq!(l.len(), 2);
+        assert!((p[0] - 0.4 / 0.7).abs() < 1e-12 && (p[1] - 0.3 / 0.7).abs() < 1e-12);
+        let opp = DeepShape { topk: 2, topk_opp_only: true, ..DeepShape::default() };
+        let (mut l, mut p) = (legal0.clone(), p0.clone());
+        assert!(!opp.shape(&mut l, &mut p, false));
+        assert!(opp.shape(&mut l, &mut p, true));
+        assert_eq!(l.len(), 2);
+        let sharp = DeepShape { prior_temp: 0.5, ..DeepShape::default() };
+        let (mut l, mut p) = (legal0, p0);
+        assert!(sharp.shape(&mut l, &mut p, false));
+        assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-12 && p[1] > 0.4);
     }
 
     /// `root_prior_temp`: 和は 1 のまま・順位は保つ・尖りは緩む。t=1 は 1 bit も変えない。

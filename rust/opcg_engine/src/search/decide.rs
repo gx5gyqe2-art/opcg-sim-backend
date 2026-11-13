@@ -57,6 +57,10 @@ pub struct DecideOptions {
     /// 深さを読み出して木を捨てる（`world_threads=1` と合わせるとメモリの山が世界 1 本ぶんになる）。
     /// 打つ手・根の統計は変わらない。戻り値の `pv` は空になり、読み出しの主な読み筋は世界ごとの訪問最多の手から辿る。
     pub depth_lean: bool,
+    /// §7.91 WP `search-deep`（**測定専用**・既定は全部 off＝1 ビットも同じ）: メインの判断点の木の、根以外の節の
+    /// 読みを狭く・深くする形（opts の `tree_prior_temp`／`tree_topk`／`tree_topk_side`／`tree_fpu_red`）。
+    /// 窓の短い木（戦闘の応手・守りの対話）には掛けない。
+    pub deep: super::mcts::DeepShape,
     /// §7.79 WP `light-rollout`（**測定専用**・既定 0＝無効＝1 ビットも同じ）: メインの判断点の木の手を、
     /// 根の事前分布（ネットの打ち方の割合）から選び直す。1＝割合が最大の手・2＝割合に比例して引く（温度 1）。
     /// 探索の回数（`sims`）は別に決める（0 にすれば木は回らず、根を広げた 1 回の評価だけ）。
@@ -352,6 +356,7 @@ impl Default for DecideOptions {
             temp_late_pow: 1.0,
             depth_readout: false,
             depth_lean: false,
+            deep: super::mcts::DeepShape::default(),
             prior_pick: 0,
             box_commit: true,
             box_battle: true,
@@ -1846,6 +1851,7 @@ fn run_one_world(
     tree.select_rule = opts.select_rule;
     tree.q_min_frac = opts.q_min_frac;
     tree.root_prior_temp = opts.root_prior_temp;
+    tree.deep = opts.deep;
     if opts.opp_blind {
         tree.opp_blind = Some(super::mcts::OppBlind::new(name, opp_blind_seed(world_seed)));
     }
