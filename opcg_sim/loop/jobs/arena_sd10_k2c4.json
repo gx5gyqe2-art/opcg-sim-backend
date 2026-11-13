@@ -1,0 +1,81 @@
+{
+ "kind": "arena",
+ "section": "§7.91",
+ "ledger_grep": "WP `search-deep` の対戦 10 倍",
+ "about": "深く読む形（§7.91 段 1 の ii）: 両席 読み 12,800 回（10 倍）・候補だけ 木の根以外の節は打ち方の割合の上位 2 手だけ・探索の広がりの係数 1／4 vs 基準 今の形・両席 r29f4・世界 8 本・枝予算なし・詰みの証明 root・公平・random×real。1 シャード 16 ペア",
+ "job": "arena-sd10-k2c4-w{KK}",
+ "branch": "claude/arena-sd10-k2c4-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 8,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r29f4.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r29f4.npz"
+ },
+ "out_dir": "arena_sd10_k2c4",
+ "pairs": 16,
+ "chunk_pairs": 4,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "12800",
+  "--worlds",
+  "8",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "12800",
+  "--cand-worlds",
+  "8",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root",
+  "--cand-tree-topk",
+  "2",
+  "--cand-c-puct",
+  "0.375"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "21600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "7281000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "sd10_k2c4_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r29f4.npz + sims 12800 + --cand-tree-topk 2 --cand-c-puct 0.375",
+  "baseline": "nrel_r29f4.npz + sims 12800 (current shape)",
+  "both": "worlds 8 x budget 0 x lethal root (fair)",
+  "pairs": 16
+ },
+ "commit_message": "arena sd10 k2c4 shard {KK}",
+ "require": [
+  {
+   "file": "rust/opcg_engine/src/search/decide.rs",
+   "grep": "defense_dialog_tree: DefenseDialogTree::All,"
+  },
+  {
+   "file": "rust/opcg_engine/src/search/mcts.rs",
+   "grep": "pub struct DeepShape"
+  }
+ ]
+}
