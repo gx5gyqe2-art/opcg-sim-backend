@@ -1,0 +1,1 @@
+{"seed": 7268000, "score": 2.0, "leaders": ["OP04-039", "OP14-040"], "games": [1.0, 1.0], "cand_leaders": ["OP02-071", "OP10-001"], "turns": [13, 12], "cand_opts": {"sims": 128000, "worlds": 8, "c_puct": 0.375, "tree_topk": 2, "budget": 0, "lethal_proof": "root"}}
