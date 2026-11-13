@@ -16,7 +16,7 @@
  "metrics": {
   "arena_sd100_k2c4/sd100_k2c4_real_w13.jsonl": 4
  },
- "notes": "",
+ "notes": "完走。1 ペア約 8,155 秒（候補席 128,000 回の深い読み）。作業セッションのコンテナが途中で 1 回再起動し実行役のプロセスが消えたが、手順どおり同じ 2 行で再起動して結果ブランチの partial から続きを取り戻した（取りこぼしなし・4/4 ペア）。void（決着せず）は 0。候補席の勝率は 8 局で 0.500（4 ペアとも 1 勝 1 敗）＝このシャード単独では差が見えない（全体の集計はコーディネータ側）。",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_sd100_k2c4.json",
   "k": 13,
