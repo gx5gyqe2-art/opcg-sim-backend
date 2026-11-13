@@ -1,7 +1,7 @@
 {
  "job": "arena-sd100-k2c4-w13",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r29f4.npz + sims 128000 + --cand-tree-topk 2 --cand-c-puct 0.375",
   "baseline": "nrel_r29f4.npz + sims 1280 (current shipping)",
