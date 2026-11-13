@@ -718,6 +718,13 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         // 深さの読み出し（§7.90・測定専用・既定 false）。
         depth_readout: flag("depth_readout", d.depth_readout),
         depth_lean: flag("depth_lean", d.depth_lean),
+        // 読みを深さへ振る形（§7.91・WP `search-deep`・測定専用・既定は全部 off）。
+        deep: mcts::DeepShape {
+            prior_temp: v.get("tree_prior_temp").and_then(Value::as_f64).filter(|x| *x > 0.0).unwrap_or(d.deep.prior_temp),
+            topk: v.get("tree_topk").and_then(Value::as_u64).map(|n| n as usize).unwrap_or(d.deep.topk),
+            topk_opp_only: v.get("tree_topk_side").and_then(Value::as_str) == Some("opp"),
+            fpu_red: v.get("tree_fpu_red").and_then(Value::as_f64),
+        },
         // 守りの窓の相手から見た詰みの証明（§7.51・WP `rs-defense-proof`・測定用・既定 false）。
         defense_proof: flag("defense_proof", d.defense_proof),
         defense_proof_life: v.get("defense_proof_life").and_then(Value::as_i64).unwrap_or(d.defense_proof_life),

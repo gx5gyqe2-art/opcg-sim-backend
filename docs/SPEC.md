@@ -1405,6 +1405,21 @@ opts の `depth_readout`（既定 false）を立てると、decide の出力に 
 後段（出力の `pv`・詰みの証明の応手の木）は木が無い前提で動く＝**対戦・生成・アリーナでは使わない**。どちらの旗も off なら出力も
 golden も 1 bit も変わらない。
 
+### 2.5.15 読みを深さへ振る形（Rust・opts の `tree_prior_temp`／`tree_topk`／`tree_topk_side`／`tree_fpu_red`・測定専用・2026-11-13〜）
+
+> 正本はコード（`rust/opcg_engine/src/search/mcts.rs` の `DeepShape`・`expand_eval`・`puct_select`）。経緯は
+> `docs/search_efficiency_plan.md` §7.91（WP `search-deep`）・`docs/reports/2026-11-13_search_deep.md`。
+
+メインの判断点の木の**根以外の節**にだけ掛かる 4 つの旗（既定は全部 off＝どの分岐にも入らず、出力も golden も 1 bit も変わらない）。
+根は今までどおり全部の手を広げる。戦闘の応手・守りの対話の短い木には掛からない。
+
+- `tree_prior_temp`（既定 1.0）: 節の打ち方の割合を `P^(1/t)` に直して和 1 に戻す（t < 1 で尖る）。
+- `tree_topk`（既定 0）: 節の打ち方の割合の上位 k 手だけを残す（同じ割合は並びの早い方・残した手は元の並びのまま・和 1 に戻す）。
+  事前分布の無い節（一様）と、箱で 1 手に畳んだ節は触らない。
+- `tree_topk_side`（`"opp"` のときだけ効く）: 上位 k 手の絞りを「根の手番の相手の番の節」だけにする。
+- `tree_fpu_red`（既定なし）: 節でまだ読んでいない手の値を、0 ではなく「その節の今の平均の値 − この数」に置く
+  （既定の 0 のままだと、負けている側の節はどの手も 1 回ずつ読んでから先へ進む）。
+
 ---
 
 ## 3. カード効果システム
