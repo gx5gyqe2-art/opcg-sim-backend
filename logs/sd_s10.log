@@ -1,0 +1,54 @@
+jobs 28 (done 0)
+[1/28 372s] pid 11 t4  cpu 366.47 rss 781.4 nodes 1024008 pv 54.75/5.0 max 84/7
+[2/28 410s] pid 24 t4  cpu 403.96 rss 971.4 nodes 1024008 pv 39.75/3.125 max 54/5
+[3/28 659s] pid 36 t4  cpu 650.9 rss 862.1 nodes 1024008 pv 75.375/4.875 max 95/6
+[4/28 659s] pid 49 t4  cpu 577.87 rss 915.4 nodes 1015556 pv 45.125/2.75 max 59/3
+[5/28 802s] pid 63 t4  cpu 424.57 rss 870.8 nodes 982838 pv 37.875/2.625 max 75/5
+[6/28 1175s] pid 75 t4  cpu 756.82 rss 994.2 nodes 957181 pv 47.375/1.75 max 81/4
+[7/28 1175s] pid 88 t4  cpu 20.62 rss 402.0 nodes 91477 pv 7.625/0.625 max 24/1
+[8/28 1175s] pid 11 k2  cpu 488.06 rss 726.9 nodes 1024008 pv 65.875/5.375 max 87/7
+[9/28 1175s] pid 24 k2  cpu 415.56 rss 771.6 nodes 1024008 pv 49.75/3.875 max 61/6
+[10/28 1531s] pid 36 k2  cpu 721.72 rss 755.2 nodes 1023826 pv 86.375/5.125 max 119/6
+[11/28 1943s] pid 49 k2  cpu 854.64 rss 751.3 nodes 964885 pv 68.125/3.75 max 99/5
+[12/28 1943s] pid 63 k2  cpu 460.79 rss 665.9 nodes 707348 pv 51.625/3.25 max 83/5
+[13/28 1943s] pid 75 k2  cpu 489.94 rss 752.8 nodes 906741 pv 57.75/2.0 max 74/4
+[14/28 1943s] pid 88 k2  cpu 16.56 rss 221.8 nodes 2647 pv 8.5/0.625 max 19/2
+[15/28 2092s] pid 11 k2c4  cpu 536.77 rss 743.3 nodes 1024008 pv 79.75/6.375 max 128/8
+[16/28 2092s] pid 24 k2c4  cpu 429.87 rss 758.2 nodes 1023930 pv 67.75/4.875 max 106/8
+[17/28 2437s] pid 36 k2c4  cpu 757.7 rss 783.1 nodes 1023661 pv 101.25/5.75 max 119/8
+[18/28 2823s] pid 49 k2c4  cpu 871.76 rss 744.6 nodes 931538 pv 80.25/4.125 max 127/7
+[19/28 2823s] pid 63 k2c4  cpu 330.75 rss 559.7 nodes 301170 pv 51.625/3.25 max 92/7
+[20/28 2823s] pid 75 k2c4  cpu 455.92 rss 751.5 nodes 791701 pv 58.0/2.0 max 64/3
+[21/28 2823s] pid 88 k2c4  cpu 16.12 rss 220.8 nodes 2137 pv 8.375/0.625 max 18/1
+[22/28 3160s] pid 11 ok1  cpu 794.59 rss 739.9 nodes 1023891 pv 80.5/6.625 max 110/9
+[23/28 3160s] pid 24 ok1  cpu 437.39 rss 838.4 nodes 710298 pv 74.875/5.0 max 108/8
+[24/28 3220s] pid 36 ok1  cpu 659.92 rss 742.9 nodes 633673 pv 99.5/5.875 max 131/8
+[25/28 3370s] pid 49 ok1  cpu 540.63 rss 707.9 nodes 597908 pv 72.5/3.875 max 122/7
+[26/28 3370s] pid 63 ok1  cpu 483.17 rss 745.9 nodes 735214 pv 66.5/4.375 max 106/7
+[27/28 3461s] pid 75 ok1  cpu 297.4 rss 485.8 nodes 145889 pv 51.125/2.0 max 74/3
+[28/28 3461s] pid 88 ok1  cpu 15.45 rss 217.6 nodes 245 pv 8.625/0.625 max 16/1
+RUN_DONE
+jobs 14 (done 28)
+[1/14 671s] pid 11 w2k2f2c4  cpu 664.73 rss 1627.3 nodes 1024002 pv 93.0/6.5 max 114/8
+[2/14 671s] pid 24 w2k2f2c4  cpu 553.23 rss 1770.0 nodes 1023050 pv 66.5/5.5 max 88/7
+[3/14 1232s] pid 36 w2k2f2c4  cpu 667.04 rss 1747.2 nodes 1007205 pv 130.5/7.0 max 154/8
+[4/14 1720s] pid 49 w2k2f2c4  cpu 1041.43 rss 1750.5 nodes 987030 pv 95.0/5.0 max 101/6
+[5/14 1720s] pid 63 w2k2f2c4  cpu 300.96 rss 728.5 nodes 292350 pv 59.5/4.0 max 84/7
+[6/14 1963s] pid 75 w2k2f2c4  cpu 421.02 rss 1593.5 nodes 833493 pv 62.5/2.0 max 96/5
+[7/14 1963s] pid 88 w2k2f2c4  cpu 25.39 rss 220.4 nodes 867 pv 11.5/1.0 max 19/1
+[8/14 2125s] pid 11 w1c4  cpu 372.43 rss 1925.7 nodes 1024001 pv 87.0/6.0 max 100/7
+[9/14 2433s] pid 24 w1c4  cpu 465.18 rss 2545.2 nodes 1024001 pv 47.0/4.0 max 50/5
+[10/14 2835s] pid 36 w1c4  cpu 702.93 rss 1986.0 nodes 1024001 pv 66.0/4.0 max 66/5
+[11/14 3035s] pid 49 w1c4  cpu 596.24 rss 2625.2 nodes 1024001 pv 43.0/3.0 max 43/3
+[12/14 3225s] pid 63 w1c4  cpu 385.0 rss 1616.1 nodes 689466 pv 50.0/5.0 max 66/6
+[13/14 3811s] pid 75 w1c4  cpu 768.81 rss 2196.0 nodes 984606 pv 82.0/3.0 max 84/5
+[14/14 3811s] pid 88 w1c4  cpu 18.84 rss 283.5 nodes 17612 pv 7.0/1.0 max 25/2
+RUN_DONE
+JUDGE todo 5 (done 0) k=64
+JUDGE pid=63 shapes=['w1c4'] diff=0.0156 [-0.015, 0.0462] sec=254.2 (1/5 256s)
+JUDGE pid=49 shapes=['t4'] diff=0.0 [-0.0756, 0.0756] sec=751.1 (2/5 753s)
+JUDGE pid=75 shapes=['w2k2f2c4'] diff=0.0 [-0.0437, 0.0437] sec=528.7 (3/5 785s)
+JUDGE pid=49 shapes=['ok1'] diff=0.0 [-0.0873, 0.0873] sec=836.2 (4/5 838s)
+JUDGE pid=49 shapes=['w1c4'] diff=0.0 [-0.0873, 0.0873] sec=844.0 (5/5 846s)
+JUDGE_DONE
+ALL_DONE
