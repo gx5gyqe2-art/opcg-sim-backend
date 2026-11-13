@@ -1,0 +1,10 @@
+{
+ "job": "search-deep",
+ "shard": "07",
+ "rows": 48,
+ "ok": 48,
+ "fail": [],
+ "judge_pairs": 6,
+ "judge_errors": 0,
+ "cpu_h": 4.12
+}
