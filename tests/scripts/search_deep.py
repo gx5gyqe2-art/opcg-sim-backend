@@ -186,7 +186,7 @@ def cmd_run(a):
 # ---------------------------------------------------------------------------------------------------------
 def load_rows(out: str, mult: int) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
-    for path in [os.path.join(out, "runs.jsonl")] + sorted(glob.glob(os.path.join(out, "shards", "*.jsonl"))):
+    for path in sorted(glob.glob(os.path.join(out, "runs*.jsonl"))) + sorted(glob.glob(os.path.join(out, "shards", "s*.jsonl"))):
         rows += SC.read_jsonl(path)
     last: Dict[Any, Dict[str, Any]] = {}
     for r in rows:
@@ -230,6 +230,11 @@ def cmd_judge(a):
     games = SC.load_games()
     shapes = a.shapes.split(",")
     pairs = changed_pairs(a.out, a.mult, shapes)
+    s0 = {p["pid"] for p in SC.load_points(PTS_DIR) if p["stage0"]}
+    if a.stage0:
+        pairs = [p for p in pairs if p["pid"] in s0]
+    if a.rest:
+        pairs = [p for p in pairs if p["pid"] not in s0]
     if a.shard:
         k, n = (int(x) for x in a.shard.split("/"))
         pairs = [p for i, p in enumerate(pairs) if i % n == k - 1]
@@ -340,6 +345,8 @@ def main(argv=None):
     p.add_argument("--k", type=int, default=64)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--shard", default=None)
+    p.add_argument("--stage0", action="store_true", help="段 0 の 20 点の組だけ")
+    p.add_argument("--rest", action="store_true", help="段 0 の 20 点を除いた組だけ（シャード用）")
     p.add_argument("--judge-file", default="judge.jsonl")
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")

@@ -1,0 +1,8664 @@
+{
+ "mult": 10,
+ "judge_pairs": 0,
+ "stage0": {
+  "ceiling": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 26.476,
+    "med": 20.805,
+    "min": 10.48,
+    "max": 97.26
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 427.22,
+    "med": 441.1,
+    "min": 299.8,
+    "max": 461.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97704.0,
+    "med": 102408.0,
+    "min": 36582,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.362,
+    "med": 2.75,
+    "min": 0.125,
+    "max": 4.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.956,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 25.806,
+    "med": 27.625,
+    "min": 9.375,
+    "max": 36.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.95,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.212,
+    "med": 3.25,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.4,
+    "med": 38.5,
+    "min": 29,
+    "max": 67
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.558,
+    "med": 16.032,
+    "min": 8.847,
+    "max": 20.668
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.595,
+    "med": 1.666,
+    "min": 0.23,
+    "max": 3.319
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8759,
+    0.4718,
+    0.1913,
+    0.0519,
+    0.0042,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1611
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6034,
+     "ci": [
+      0.5006,
+      0.7061
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 3
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 20,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "base": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 30.417,
+    "med": 23.825,
+    "min": 10.87,
+    "max": 106.14
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 427.705,
+    "med": 441.8,
+    "min": 299.8,
+    "max": 461.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97704.0,
+    "med": 102408.0,
+    "min": 36582,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.362,
+    "med": 2.75,
+    "min": 0.125,
+    "max": 4.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.956,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 25.806,
+    "med": 27.625,
+    "min": 9.375,
+    "max": 36.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.95,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.212,
+    "med": 3.25,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.4,
+    "med": 38.5,
+    "min": 29,
+    "max": 67
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.558,
+    "med": 16.032,
+    "min": 8.847,
+    "max": 20.668
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.595,
+    "med": 1.666,
+    "min": 0.23,
+    "max": 3.319
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8759,
+    0.4718,
+    0.1913,
+    0.0519,
+    0.0042,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1611
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6034,
+     "ci": [
+      0.5006,
+      0.7061
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 3
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 20,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.028,
+    "med": 23.625,
+    "min": 10.96,
+    "max": 106.19
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 425.32,
+    "med": 440.25,
+    "min": 282.8,
+    "max": 466.0
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97873.95,
+    "med": 102401.0,
+    "min": 36278,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.494,
+    "med": 2.562,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.013,
+    "med": 2.062,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 27.194,
+    "med": 29.688,
+    "min": 8.0,
+    "max": 39.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.15,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.4,
+    "med": 3.562,
+    "min": 1.0,
+    "max": 5.125
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 42.9,
+    "med": 42.5,
+    "min": 27,
+    "max": 63
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 16.902,
+    "med": 17.806,
+    "min": 10.429,
+    "max": 23.373
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.69,
+    "med": 1.761,
+    "min": 0.225,
+    "max": 3.643
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8787,
+    0.5008,
+    0.2268,
+    0.0715,
+    0.0107,
+    0.0013,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1611
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.005,
+     "ci": [
+      -0.0102,
+      0.0002
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0096,
+     "ci": [
+      0.0058,
+      0.0133
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6262,
+     "ci": [
+      0.5306,
+      0.7219
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 3
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 20,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.514,
+    "med": 25.16,
+    "min": 10.9,
+    "max": 104.64
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 423.485,
+    "med": 440.7,
+    "min": 284.2,
+    "max": 466.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98037.1,
+    "med": 102405.5,
+    "min": 35139,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.706,
+    "med": 2.812,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.237,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 29.95,
+    "med": 30.375,
+    "min": 9.625,
+    "max": 42.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.669,
+    "med": 3.812,
+    "min": 1.0,
+    "max": 5.875
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 50.3,
+    "med": 50.0,
+    "min": 28,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 18.982,
+    "med": 19.417,
+    "min": 10.274,
+    "max": 26.836
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.852,
+    "med": 1.831,
+    "min": 0.231,
+    "max": 3.845
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8824,
+    0.5518,
+    0.2846,
+    0.1034,
+    0.0261,
+    0.0034,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0083,
+     "ci": [
+      -0.0194,
+      0.0027
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0217,
+     "ci": [
+      0.0152,
+      0.0281
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6287,
+     "ci": [
+      0.5265,
+      0.7308
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c8": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.976,
+    "med": 24.74,
+    "min": 10.3,
+    "max": 113.34
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 418.39,
+    "med": 433.1,
+    "min": 288.0,
+    "max": 466.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97921.75,
+    "med": 102388.5,
+    "min": 33552,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.938,
+    "med": 2.812,
+    "min": 0.125,
+    "max": 5.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.431,
+    "med": 2.375,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 33.212,
+    "med": 33.875,
+    "min": 10.125,
+    "max": 50.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.25,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.881,
+    "med": 3.938,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 58.4,
+    "med": 60.0,
+    "min": 32,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 21.488,
+    "med": 21.255,
+    "min": 10.28,
+    "max": 32.333
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.033,
+    "med": 2.111,
+    "min": 0.247,
+    "max": 4.12
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8853,
+    0.5962,
+    0.3551,
+    0.1423,
+    0.0444,
+    0.0097,
+    0.0002,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 6,
+    "rate": 0.3,
+    "ci": [
+     0.1455,
+     0.519
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0112,
+     "ci": [
+      -0.0313,
+      0.0089
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.038,
+     "ci": [
+      0.0262,
+      0.0497
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6365,
+     "ci": [
+      0.5353,
+      0.7376
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 36.303,
+    "med": 27.14,
+    "min": 13.17,
+    "max": 126.4
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 550.685,
+    "med": 546.55,
+    "min": 496.1,
+    "max": 623.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98186.45,
+    "med": 102402.0,
+    "min": 63552,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.95,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.5,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 33.4,
+    "med": 38.0,
+    "min": 9.5,
+    "max": 46.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.25,
+    "med": 4.0,
+    "min": 1,
+    "max": 6
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.875,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 43.65,
+    "med": 44.0,
+    "min": 28,
+    "max": 64
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.47,
+    "med": 22.362,
+    "min": 12.605,
+    "max": 27.851
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.041,
+    "med": 1.992,
+    "min": 0.423,
+    "max": 3.691
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.945,
+    0.6213,
+    0.3332,
+    0.1228,
+    0.0179,
+    0.0005
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0543,
+     "ci": [
+      -0.1857,
+      0.0771
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1175,
+     "ci": [
+      -0.0052,
+      0.2403
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6692,
+     "ci": [
+      0.5489,
+      0.7894
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 35.794,
+    "med": 29.515,
+    "min": 12.89,
+    "max": 140.42
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 435.625,
+    "med": 440.45,
+    "min": 351.5,
+    "max": 491.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 96914.75,
+    "med": 102401.0,
+    "min": 57881,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.7,
+    "med": 2.0,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.2,
+    "med": 2.0,
+    "min": 0.0,
+    "max": 4.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 32.0,
+    "med": 29.5,
+    "min": 9.0,
+    "max": 61.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.8,
+    "med": 42.5,
+    "min": 28,
+    "max": 64
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 21.44,
+    "med": 21.936,
+    "min": 11.534,
+    "max": 35.67
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.116,
+    "med": 2.046,
+    "min": 0.484,
+    "max": 4.098
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9557,
+    0.6304,
+    0.3391,
+    0.1573,
+    0.0325,
+    0.0013,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0634,
+     "ci": [
+      -0.2064,
+      0.0795
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1551,
+     "ci": [
+      0.0271,
+      0.2831
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.728,
+     "ci": [
+      0.6057,
+      0.8503
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 36.697,
+    "med": 25.79,
+    "min": 13.83,
+    "max": 141.96
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 550.88,
+    "med": 568.6,
+    "min": 389.6,
+    "max": 645.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97624.35,
+    "med": 102397.5,
+    "min": 45559,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.25,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 6.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.725,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 38.725,
+    "med": 38.75,
+    "min": 13.5,
+    "max": 61.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.425,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 6.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 51.85,
+    "med": 52.0,
+    "min": 26,
+    "max": 75
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 24.69,
+    "med": 24.852,
+    "min": 12.546,
+    "max": 35.483
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.315,
+    "med": 2.059,
+    "min": 0.586,
+    "max": 4.73
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9518,
+    0.6738,
+    0.4068,
+    0.1894,
+    0.0775,
+    0.0152,
+    0.0002
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 6,
+    "rate": 0.3,
+    "ci": [
+     0.1455,
+     0.519
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0553,
+     "ci": [
+      -0.1883,
+      0.0776
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1182,
+     "ci": [
+      -0.0062,
+      0.2426
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7027,
+     "ci": [
+      0.5905,
+      0.815
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 9
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 37.907,
+    "med": 28.275,
+    "min": 13.13,
+    "max": 178.61
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 442.75,
+    "med": 450.3,
+    "min": 317.7,
+    "max": 528.5
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95702.7,
+    "med": 102391.0,
+    "min": 25558,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.45,
+    "med": 3.5,
+    "min": 0.0,
+    "max": 7.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.75,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 6.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 40.5,
+    "med": 41.0,
+    "min": 15.0,
+    "max": 62.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.55,
+    "med": 5.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.55,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 50.3,
+    "med": 50.5,
+    "min": 27,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 26.145,
+    "med": 24.258,
+    "min": 13.818,
+    "max": 44.582
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.431,
+    "med": 2.226,
+    "min": 0.664,
+    "max": 4.581
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.967,
+    0.6966,
+    0.4321,
+    0.2372,
+    0.0819,
+    0.0154,
+    0.0007
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.064,
+     "ci": [
+      -0.2119,
+      0.084
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.167,
+     "ci": [
+      0.0363,
+      0.2977
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7899,
+     "ci": [
+      0.6793,
+      0.9006
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 9
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.455,
+    "med": 25.82,
+    "min": 10.21,
+    "max": 114.98
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 423.235,
+    "med": 439.0,
+    "min": 307.0,
+    "max": 462.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97919.2,
+    "med": 102408.0,
+    "min": 32767,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.725,
+    "med": 2.875,
+    "min": 0.0,
+    "max": 5.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.75,
+    "min": 0.0,
+    "max": 4.375
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 30.869,
+    "med": 34.0,
+    "min": 10.5,
+    "max": 43.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.2,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.444,
+    "med": 3.812,
+    "min": 1.0,
+    "max": 5.875
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 46.35,
+    "med": 43.5,
+    "min": 29,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 17.822,
+    "med": 18.812,
+    "min": 9.27,
+    "max": 24.63
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.768,
+    "med": 1.823,
+    "min": 0.253,
+    "max": 3.451
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8797,
+    0.5222,
+    0.2652,
+    0.0837,
+    0.014,
+    0.0025,
+    0.0003
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0011,
+     "ci": [
+      -0.0083,
+      0.0105
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0144,
+     "ci": [
+      0.0076,
+      0.0213
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5777,
+     "ci": [
+      0.4743,
+      0.6811
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.985,
+    "med": 26.47,
+    "min": 9.91,
+    "max": 118.04
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 414.26,
+    "med": 433.35,
+    "min": 317.2,
+    "max": 463.5
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97409.05,
+    "med": 102401.5,
+    "min": 28505,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.219,
+    "med": 3.438,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.819,
+    "med": 3.0,
+    "min": 0.125,
+    "max": 5.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 38.188,
+    "med": 38.562,
+    "min": 15.875,
+    "max": 57.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.85,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.825,
+    "med": 4.125,
+    "min": 0.875,
+    "max": 6.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 58.55,
+    "med": 57.0,
+    "min": 33,
+    "max": 92
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 22.013,
+    "med": 24.502,
+    "min": 10.862,
+    "max": 30.39
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.087,
+    "med": 2.175,
+    "min": 0.303,
+    "max": 3.732
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8944,
+    0.5984,
+    0.3677,
+    0.1653,
+    0.0487,
+    0.01,
+    0.0027,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0021,
+     "ci": [
+      -0.0176,
+      0.0135
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0249,
+     "ci": [
+      0.014,
+      0.0358
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5536,
+     "ci": [
+      0.446,
+      0.6612
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.748,
+    "med": 27.405,
+    "min": 6.58,
+    "max": 171.54
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 389.71,
+    "med": 402.75,
+    "min": 281.6,
+    "max": 445.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94490.8,
+    "med": 102052.0,
+    "min": 14324,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.581,
+    "med": 3.562,
+    "min": 0.375,
+    "max": 6.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.312,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 44.169,
+    "med": 43.375,
+    "min": 16.75,
+    "max": 65.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.95,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.95,
+    "med": 4.188,
+    "min": 0.875,
+    "max": 6.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.9,
+    "med": 62.0,
+    "min": 30,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 28.211,
+    "med": 28.827,
+    "min": 14.837,
+    "max": 40.19
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.502,
+    "med": 2.405,
+    "min": 0.358,
+    "max": 4.228
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9462,
+    0.7445,
+    0.47,
+    0.2382,
+    0.0763,
+    0.0213,
+    0.0055,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0333,
+     "ci": [
+      0.0019,
+      0.0647
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.053,
+     "ci": [
+      0.0277,
+      0.0783
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5552,
+     "ci": [
+      0.4418,
+      0.6686
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.777,
+    "med": 26.27,
+    "min": 10.44,
+    "max": 142.55
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 405.835,
+    "med": 423.7,
+    "min": 291.3,
+    "max": 446.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97839.35,
+    "med": 102408.0,
+    "min": 26914,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.75,
+    "med": 2.812,
+    "min": 0.375,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.344,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 31.481,
+    "med": 33.812,
+    "min": 13.0,
+    "max": 45.75
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.9,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.275,
+    "med": 3.312,
+    "min": 1.0,
+    "max": 5.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 45.7,
+    "med": 44.0,
+    "min": 22,
+    "max": 69
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.428,
+    "med": 20.816,
+    "min": 11.5,
+    "max": 28.754
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.932,
+    "med": 1.792,
+    "min": 0.343,
+    "max": 3.596
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9129,
+    0.5969,
+    0.3079,
+    0.0985,
+    0.0139,
+    0.0014,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.012,
+     "ci": [
+      -0.0114,
+      0.0353
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0278,
+     "ci": [
+      0.0074,
+      0.0483
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5692,
+     "ci": [
+      0.4561,
+      0.6823
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k5": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.351,
+    "med": 23.135,
+    "min": 11.52,
+    "max": 138.46
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 417.045,
+    "med": 432.6,
+    "min": 305.0,
+    "max": 452.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98199.6,
+    "med": 102408.0,
+    "min": 32556,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.425,
+    "med": 2.562,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.069,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 26.925,
+    "med": 28.062,
+    "min": 9.625,
+    "max": 38.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.85,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.062,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.45,
+    "med": 41.0,
+    "min": 24,
+    "max": 61
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 17.101,
+    "med": 17.678,
+    "min": 9.576,
+    "max": 23.107
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.68,
+    "med": 1.595,
+    "min": 0.309,
+    "max": 3.314
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8862,
+    0.5048,
+    0.2206,
+    0.0623,
+    0.0053,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0004,
+     "ci": [
+      -0.013,
+      0.0123
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0185,
+     "ci": [
+      0.009,
+      0.028
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5824,
+     "ci": [
+      0.4773,
+      0.6874
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok1": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.925,
+    "med": 34.06,
+    "min": 10.07,
+    "max": 143.26
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 400.47,
+    "med": 425.15,
+    "min": 276.7,
+    "max": 450.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 73531.75,
+    "med": 81851.0,
+    "min": 27526,
+    "max": 102406
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.106,
+    "med": 4.562,
+    "min": 0.0,
+    "max": 7.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.844,
+    "med": 4.125,
+    "min": 0.0,
+    "max": 7.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 52.694,
+    "med": 53.875,
+    "min": 9.375,
+    "max": 91.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 6.9,
+    "med": 7.0,
+    "min": 1,
+    "max": 12
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.938,
+    "med": 5.125,
+    "min": 1.0,
+    "max": 8.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 92.2,
+    "med": 93.5,
+    "min": 32,
+    "max": 152
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 39.89,
+    "med": 42.284,
+    "min": 10.758,
+    "max": 67.104
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.291,
+    "med": 3.305,
+    "min": 0.344,
+    "max": 6.884
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8844,
+    0.8083,
+    0.5277,
+    0.4746,
+    0.2281,
+    0.1867,
+    0.0803,
+    0.0692,
+    0.0175,
+    0.0131,
+    0.0012,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 5,
+    "rate": 0.25,
+    "ci": [
+     0.1119,
+     0.4687
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.3333,
+     "ci": [
+      0.2012,
+      0.4654
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.3345,
+     "ci": [
+      0.203,
+      0.466
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6383,
+     "ci": [
+      0.5335,
+      0.7432
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 34.12,
+    "med": 26.55,
+    "min": 13.37,
+    "max": 148.3
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 409.405,
+    "med": 434.45,
+    "min": 293.8,
+    "max": 453.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94870.75,
+    "med": 102408.0,
+    "min": 37383,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.981,
+    "med": 3.188,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.513,
+    "med": 2.625,
+    "min": 0.0,
+    "max": 4.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 35.331,
+    "med": 36.312,
+    "min": 9.375,
+    "max": 58.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.35,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.456,
+    "med": 3.625,
+    "min": 1.0,
+    "max": 5.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 52.2,
+    "med": 51.5,
+    "min": 23,
+    "max": 78
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 22.182,
+    "med": 22.886,
+    "min": 10.117,
+    "max": 30.746
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.039,
+    "med": 2.152,
+    "min": 0.34,
+    "max": 3.653
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8765,
+    0.7102,
+    0.3034,
+    0.1243,
+    0.0208,
+    0.0033,
+    0.0007
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0538,
+     "ci": [
+      0.0246,
+      0.0829
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0562,
+     "ci": [
+      0.0279,
+      0.0844
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.605,
+     "ci": [
+      0.4998,
+      0.7102
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok3": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.066,
+    "med": 25.27,
+    "min": 11.57,
+    "max": 135.93
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 414.1,
+    "med": 435.25,
+    "min": 302.0,
+    "max": 451.7
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97591.25,
+    "med": 102407.5,
+    "min": 37251,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.525,
+    "med": 2.688,
+    "min": 0.0,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.15,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 29.356,
+    "med": 32.312,
+    "min": 9.375,
+    "max": 43.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.85,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.169,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 43.25,
+    "med": 44.5,
+    "min": 21,
+    "max": 61
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 18.38,
+    "med": 19.633,
+    "min": 9.9,
+    "max": 24.712
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.754,
+    "med": 1.707,
+    "min": 0.23,
+    "max": 3.429
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8728,
+    0.5821,
+    0.2287,
+    0.0642,
+    0.0059,
+    0.0008,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0204,
+     "ci": [
+      -0.0021,
+      0.0428
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0248,
+     "ci": [
+      0.0033,
+      0.0464
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5984,
+     "ci": [
+      0.4904,
+      0.7065
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f0": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.848,
+    "med": 24.965,
+    "min": 11.14,
+    "max": 126.86
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 430.8,
+    "med": 440.75,
+    "min": 361.8,
+    "max": 459.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98940.75,
+    "med": 102408.0,
+    "min": 36577,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.337,
+    "med": 2.375,
+    "min": 0.375,
+    "max": 4.375
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.962,
+    "med": 2.125,
+    "min": 0.25,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 24.613,
+    "med": 25.5,
+    "min": 9.0,
+    "max": 36.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.8,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.031,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 36.15,
+    "med": 35.5,
+    "min": 15,
+    "max": 57
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.139,
+    "med": 15.904,
+    "min": 7.137,
+    "max": 20.743
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.568,
+    "med": 1.653,
+    "min": 0.252,
+    "max": 3.282
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8712,
+    0.4581,
+    0.1829,
+    0.0517,
+    0.0036,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0003,
+     "ci": [
+      -0.0083,
+      0.0076
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0139,
+     "ci": [
+      0.009,
+      0.0188
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6005,
+     "ci": [
+      0.501,
+      0.6999
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 2
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.876,
+    "med": 24.88,
+    "min": 11.65,
+    "max": 139.58
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 430.265,
+    "med": 440.85,
+    "min": 356.6,
+    "max": 456.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98872.7,
+    "med": 102408.0,
+    "min": 37266,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.5,
+    "min": 0.375,
+    "max": 4.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.944,
+    "med": 2.062,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 25.663,
+    "med": 26.125,
+    "min": 10.875,
+    "max": 37.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.75,
+    "med": 3.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.0,
+    "med": 3.0,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 38.6,
+    "med": 36.0,
+    "min": 19,
+    "max": 59
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.491,
+    "med": 16.279,
+    "min": 7.646,
+    "max": 21.05
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.576,
+    "med": 1.647,
+    "min": 0.239,
+    "max": 3.287
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8681,
+    0.4584,
+    0.1894,
+    0.0531,
+    0.0055,
+    0.0008,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.001,
+     "ci": [
+      -0.0091,
+      0.0072
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0138,
+     "ci": [
+      0.0085,
+      0.0192
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5902,
+     "ci": [
+      0.4885,
+      0.692
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 2
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.743,
+    "med": 26.515,
+    "min": 9.97,
+    "max": 146.75
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 417.685,
+    "med": 438.65,
+    "min": 305.2,
+    "max": 456.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98008.55,
+    "med": 102396.5,
+    "min": 31030,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.069,
+    "med": 3.0,
+    "min": 0.375,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.362,
+    "med": 2.188,
+    "min": 0.0,
+    "max": 4.375
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 35.094,
+    "med": 35.438,
+    "min": 15.5,
+    "max": 49.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.688,
+    "med": 3.75,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 54.5,
+    "med": 56.0,
+    "min": 27,
+    "max": 89
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.737,
+    "med": 20.762,
+    "min": 10.565,
+    "max": 28.698
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.929,
+    "med": 1.846,
+    "min": 0.283,
+    "max": 3.686
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8865,
+    0.5719,
+    0.3077,
+    0.1229,
+    0.0368,
+    0.0032,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0131,
+     "ci": [
+      -0.0267,
+      0.0004
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0249,
+     "ci": [
+      0.0153,
+      0.0345
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6233,
+     "ci": [
+      0.5208,
+      0.7258
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 34.537,
+    "med": 24.445,
+    "min": 6.36,
+    "max": 138.52
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 386.32,
+    "med": 385.85,
+    "min": 276.9,
+    "max": 447.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95645.35,
+    "med": 102350.0,
+    "min": 12572,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.275,
+    "med": 3.25,
+    "min": 0.0,
+    "max": 5.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.9,
+    "med": 2.875,
+    "min": 0.0,
+    "max": 4.625
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 40.875,
+    "med": 41.562,
+    "min": 11.75,
+    "max": 59.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.0,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.913,
+    "med": 4.125,
+    "min": 0.875,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.6,
+    "med": 60.0,
+    "min": 28,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 25.782,
+    "med": 26.082,
+    "min": 12.31,
+    "max": 35.005
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.292,
+    "med": 2.236,
+    "min": 0.342,
+    "max": 4.037
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9118,
+    0.6925,
+    0.436,
+    0.1867,
+    0.0533,
+    0.0095,
+    0.0018,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.006,
+     "ci": [
+      -0.0173,
+      0.0294
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0381,
+     "ci": [
+      0.022,
+      0.0542
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6186,
+     "ci": [
+      0.4998,
+      0.7375
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 40.365,
+    "med": 28.985,
+    "min": 5.96,
+    "max": 155.07
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 384.37,
+    "med": 389.25,
+    "min": 268.4,
+    "max": 446.7
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 90566.0,
+    "med": 101836.5,
+    "min": 9806,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.144,
+    "med": 4.5,
+    "min": 0.375,
+    "max": 6.875
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.619,
+    "med": 3.562,
+    "min": 0.375,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 54.106,
+    "med": 56.562,
+    "min": 17.25,
+    "max": 87.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.6,
+    "med": 6.0,
+    "min": 1,
+    "max": 10
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.575,
+    "med": 4.688,
+    "min": 0.75,
+    "max": 7.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 75.9,
+    "med": 76.5,
+    "min": 30,
+    "max": 121
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 34.951,
+    "med": 36.766,
+    "min": 15.132,
+    "max": 51.542
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.921,
+    "med": 2.91,
+    "min": 0.357,
+    "max": 5.024
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9485,
+    0.7934,
+    0.5654,
+    0.3503,
+    0.1694,
+    0.0614,
+    0.0261,
+    0.0054,
+    0.0006,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0407,
+     "ci": [
+      0.0069,
+      0.0745
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0604,
+     "ci": [
+      0.0332,
+      0.0877
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6079,
+     "ci": [
+      0.5008,
+      0.7151
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.424,
+    "med": 27.455,
+    "min": 7.05,
+    "max": 168.66
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 389.725,
+    "med": 404.2,
+    "min": 283.5,
+    "max": 444.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94683.3,
+    "med": 102110.5,
+    "min": 14795,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.562,
+    "med": 3.438,
+    "min": 0.375,
+    "max": 6.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.25,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 43.819,
+    "med": 43.562,
+    "min": 16.75,
+    "max": 66.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.0,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.962,
+    "med": 4.188,
+    "min": 0.875,
+    "max": 6.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.1,
+    "med": 58.5,
+    "min": 30,
+    "max": 93
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 28.195,
+    "med": 28.616,
+    "min": 14.816,
+    "max": 40.091
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.504,
+    "med": 2.392,
+    "min": 0.358,
+    "max": 4.205
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9462,
+    0.7439,
+    0.4715,
+    0.238,
+    0.0771,
+    0.0212,
+    0.0055,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0331,
+     "ci": [
+      0.0014,
+      0.0648
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0532,
+     "ci": [
+      0.0276,
+      0.0788
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.546,
+     "ci": [
+      0.4331,
+      0.659
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.781,
+    "med": 25.545,
+    "min": 10.44,
+    "max": 137.91
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 407.5,
+    "med": 425.3,
+    "min": 297.4,
+    "max": 445.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98055.7,
+    "med": 102408.0,
+    "min": 28202,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.706,
+    "med": 2.688,
+    "min": 0.25,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.319,
+    "med": 2.188,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 31.281,
+    "med": 32.25,
+    "min": 12.5,
+    "max": 45.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.9,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.312,
+    "min": 1.0,
+    "max": 5.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 45.95,
+    "med": 43.0,
+    "min": 20,
+    "max": 69
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.335,
+    "med": 20.87,
+    "min": 11.225,
+    "max": 28.46
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.931,
+    "med": 1.779,
+    "min": 0.344,
+    "max": 3.575
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9123,
+    0.5962,
+    0.3101,
+    0.0968,
+    0.0139,
+    0.0018,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.012,
+     "ci": [
+      -0.011,
+      0.0351
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0287,
+     "ci": [
+      0.0088,
+      0.0485
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5656,
+     "ci": [
+      0.4537,
+      0.6774
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 41.573,
+    "med": 28.13,
+    "min": 6.7,
+    "max": 159.35
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 392.075,
+    "med": 414.3,
+    "min": 281.4,
+    "max": 446.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94320.7,
+    "med": 101889.5,
+    "min": 14153,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.125,
+    "med": 4.312,
+    "min": 0.375,
+    "max": 7.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.644,
+    "med": 3.625,
+    "min": 0.375,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 53.556,
+    "med": 53.5,
+    "min": 17.25,
+    "max": 86.75
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.55,
+    "med": 6.0,
+    "min": 1,
+    "max": 9
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.487,
+    "med": 4.562,
+    "min": 0.75,
+    "max": 7.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 76.6,
+    "med": 77.5,
+    "min": 30,
+    "max": 114
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 34.147,
+    "med": 34.565,
+    "min": 14.946,
+    "max": 54.921
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.888,
+    "med": 2.911,
+    "min": 0.357,
+    "max": 5.039
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9478,
+    0.7762,
+    0.5477,
+    0.3497,
+    0.1666,
+    0.0651,
+    0.0284,
+    0.0063,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.034,
+     "ci": [
+      0.0005,
+      0.0674
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0631,
+     "ci": [
+      0.0397,
+      0.0865
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6164,
+     "ci": [
+      0.5132,
+      0.7196
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 46.466,
+    "med": 34.32,
+    "min": 8.91,
+    "max": 185.32
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 482.12,
+    "med": 505.05,
+    "min": 314.2,
+    "max": 565.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 88290.85,
+    "med": 101371.5,
+    "min": 12294,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.275,
+    "med": 4.25,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.625,
+    "med": 3.75,
+    "min": 0.5,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 55.35,
+    "med": 51.25,
+    "min": 27.0,
+    "max": 97.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.1,
+    "med": 5.5,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 65.6,
+    "med": 61.0,
+    "min": 30,
+    "max": 113
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 36.855,
+    "med": 36.304,
+    "min": 19.513,
+    "max": 56.922
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.112,
+    "med": 3.154,
+    "min": 0.963,
+    "max": 5.854
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9937,
+    0.8145,
+    0.5805,
+    0.3917,
+    0.2066,
+    0.0894,
+    0.0316,
+    0.0039
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0045,
+     "ci": [
+      -0.1501,
+      0.141
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1653,
+     "ci": [
+      0.0402,
+      0.2905
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6574,
+     "ci": [
+      0.5252,
+      0.7896
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 46.743,
+    "med": 32.29,
+    "min": 8.19,
+    "max": 201.93
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 367.025,
+    "med": 394.55,
+    "min": 222.1,
+    "max": 436.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 82298.8,
+    "med": 101044.0,
+    "min": 7437,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.25,
+    "med": 4.5,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.75,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 57.95,
+    "med": 61.0,
+    "min": 26.0,
+    "max": 96.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.75,
+    "med": 62.5,
+    "min": 30,
+    "max": 96
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 39.695,
+    "med": 37.862,
+    "min": 19.743,
+    "max": 62.079
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.339,
+    "med": 3.482,
+    "min": 0.981,
+    "max": 6.485
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9968,
+    0.8471,
+    0.5878,
+    0.455,
+    0.2705,
+    0.1282,
+    0.0455,
+    0.0084
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0204,
+     "ci": [
+      -0.1409,
+      0.1816
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.2084,
+     "ci": [
+      0.0769,
+      0.3399
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7777,
+     "ci": [
+      0.6523,
+      0.9031
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 53.168,
+    "med": 37.185,
+    "min": 8.06,
+    "max": 170.08
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 364.435,
+    "med": 394.45,
+    "min": 223.4,
+    "max": 445.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 82274.25,
+    "med": 99491.5,
+    "min": 7557,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.9,
+    "med": 6.0,
+    "min": 1.0,
+    "max": 10.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 4.0,
+    "med": 4.0,
+    "min": 0.0,
+    "max": 9.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 67.7,
+    "med": 70.5,
+    "min": 27.0,
+    "max": 115.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.35,
+    "med": 6.0,
+    "min": 1,
+    "max": 10
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 5.35,
+    "med": 6.0,
+    "min": 1.0,
+    "max": 10.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 75.7,
+    "med": 74.0,
+    "min": 30,
+    "max": 134
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 47.066,
+    "med": 44.744,
+    "min": 20.517,
+    "max": 75.915
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.769,
+    "med": 4.187,
+    "min": 0.981,
+    "max": 7.09
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9969,
+    0.8638,
+    0.6128,
+    0.5246,
+    0.3998,
+    0.2324,
+    0.1011,
+    0.0346,
+    0.003,
+    0.0003
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 10,
+    "rate": 0.5,
+    "ci": [
+     0.2993,
+     0.7007
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0246,
+     "ci": [
+      -0.141,
+      0.1902
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.2151,
+     "ci": [
+      0.0802,
+      0.35
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7416,
+     "ci": [
+      0.6071,
+      0.876
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 10
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 49.301,
+    "med": 37.73,
+    "min": 9.27,
+    "max": 163.86
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 479.965,
+    "med": 516.1,
+    "min": 316.6,
+    "max": 563.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 88920.65,
+    "med": 100227.0,
+    "min": 12392,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.5,
+    "min": 0.5,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 65.55,
+    "med": 63.25,
+    "min": 27.0,
+    "max": 111.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.5,
+    "med": 6.0,
+    "min": 1,
+    "max": 9
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 5.1,
+    "med": 5.75,
+    "min": 1.0,
+    "max": 8.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 77.95,
+    "med": 79.5,
+    "min": 30,
+    "max": 131
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 44.239,
+    "med": 39.563,
+    "min": 20.494,
+    "max": 71.73
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.564,
+    "med": 3.686,
+    "min": 0.963,
+    "max": 6.406
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.994,
+    0.8415,
+    0.6275,
+    0.4935,
+    0.3371,
+    0.1795,
+    0.0711,
+    0.0175,
+    0.0025
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0061,
+     "ci": [
+      -0.1425,
+      0.1547
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1791,
+     "ci": [
+      0.0542,
+      0.304
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6637,
+     "ci": [
+      0.536,
+      0.7914
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 37.421,
+    "med": 25.86,
+    "min": 9.24,
+    "max": 136.19
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 408.67,
+    "med": 429.9,
+    "min": 302.9,
+    "max": 459.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97420.8,
+    "med": 102401.0,
+    "min": 23268,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.431,
+    "med": 3.5,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.975,
+    "med": 3.062,
+    "min": 0.125,
+    "max": 5.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 41.281,
+    "med": 38.188,
+    "min": 14.5,
+    "max": 70.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.95,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.894,
+    "med": 4.25,
+    "min": 0.75,
+    "max": 6.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 64.35,
+    "med": 63.5,
+    "min": 28,
+    "max": 118
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 25.028,
+    "med": 25.848,
+    "min": 10.887,
+    "max": 44.094
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.275,
+    "med": 2.308,
+    "min": 0.343,
+    "max": 3.905
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9046,
+    0.6381,
+    0.404,
+    0.2081,
+    0.0819,
+    0.0276,
+    0.0094,
+    0.0008
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0146,
+     "ci": [
+      -0.0218,
+      0.0511
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.054,
+     "ci": [
+      0.026,
+      0.0819
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5472,
+     "ci": [
+      0.4418,
+      0.6526
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 40.724,
+    "med": 25.29,
+    "min": 7.21,
+    "max": 158.9
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 392.64,
+    "med": 411.05,
+    "min": 298.6,
+    "max": 457.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95331.3,
+    "med": 101866.5,
+    "min": 16145,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.031,
+    "med": 4.312,
+    "min": 0.375,
+    "max": 7.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.438,
+    "med": 3.625,
+    "min": 0.125,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 51.15,
+    "med": 45.625,
+    "min": 14.5,
+    "max": 92.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 6.15,
+    "med": 6.5,
+    "min": 1,
+    "max": 11
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.606,
+    "med": 5.125,
+    "min": 0.5,
+    "max": 7.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 82.85,
+    "med": 76.0,
+    "min": 31,
+    "max": 155
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 31.52,
+    "med": 31.076,
+    "min": 12.792,
+    "max": 55.417
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.708,
+    "med": 2.915,
+    "min": 0.352,
+    "max": 4.784
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9181,
+    0.7124,
+    0.4874,
+    0.3061,
+    0.1646,
+    0.0746,
+    0.0338,
+    0.0097,
+    0.0012,
+    0.0001,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 5,
+    "rate": 0.25,
+    "ci": [
+     0.1119,
+     0.4687
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0225,
+     "ci": [
+      -0.0204,
+      0.0653
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0652,
+     "ci": [
+      0.0324,
+      0.098
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5764,
+     "ci": [
+      0.4686,
+      0.6842
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  }
+ },
+ "all": {
+  "ceiling": {
+   "n": 99,
+   "cpu_sec": {
+    "n": 99,
+    "mean": 28.682,
+    "med": 22.53,
+    "min": 0.81,
+    "max": 146.25
+   },
+   "rss_mb": {
+    "n": 99,
+    "mean": 416.092,
+    "med": 440.1,
+    "min": 222.3,
+    "max": 481.2
+   },
+   "nodes": {
+    "n": 99,
+    "mean": 92600.586,
+    "med": 102408,
+    "min": 331,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 99,
+    "mean": 2.159,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 5.25
+   },
+   "pv10_turns_mean": {
+    "n": 99,
+    "mean": 1.761,
+    "med": 1.75,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv_len_mean": {
+    "n": 99,
+    "mean": 25.702,
+    "med": 26.75,
+    "min": 4.5,
+    "max": 44.125
+   },
+   "max_turns_max": {
+    "n": 99,
+    "mean": 3.566,
+    "med": 3,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 99,
+    "mean": 2.957,
+    "med": 2.75,
+    "min": 1.0,
+    "max": 5.875
+   },
+   "max_depth_max": {
+    "n": 99,
+    "mean": 38.687,
+    "med": 38,
+    "min": 17,
+    "max": 69
+   },
+   "mean_depth": {
+    "n": 99,
+    "mean": 16.195,
+    "med": 16.689,
+    "min": 5.165,
+    "max": 25.885
+   },
+   "mean_turns": {
+    "n": 99,
+    "mean": 1.455,
+    "med": 1.361,
+    "min": 0.0,
+    "max": 3.776
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8177,
+    0.4056,
+    0.1658,
+    0.0532,
+    0.0114,
+    0.0012,
+    0.0
+   ],
+   "vs_base": {
+    "n": 99,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0374
+    ],
+    "root_v_shift": {
+     "n": 99,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 99,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "top_share": {
+     "n": 99,
+     "mean": 0.6222,
+     "ci": [
+      0.5785,
+      0.6658
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 99,
+    "changed": 23
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 99,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "base": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 30.417,
+    "med": 23.825,
+    "min": 10.87,
+    "max": 106.14
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 427.705,
+    "med": 441.8,
+    "min": 299.8,
+    "max": 461.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97704.0,
+    "med": 102408.0,
+    "min": 36582,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.362,
+    "med": 2.75,
+    "min": 0.125,
+    "max": 4.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.956,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 25.806,
+    "med": 27.625,
+    "min": 9.375,
+    "max": 36.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.95,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.212,
+    "med": 3.25,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.4,
+    "med": 38.5,
+    "min": 29,
+    "max": 67
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.558,
+    "med": 16.032,
+    "min": 8.847,
+    "max": 20.668
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.595,
+    "med": 1.666,
+    "min": 0.23,
+    "max": 3.319
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8759,
+    0.4718,
+    0.1913,
+    0.0519,
+    0.0042,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1611
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0,
+     "ci": [
+      0.0,
+      0.0
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6034,
+     "ci": [
+      0.5006,
+      0.7061
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 3
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 20,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.028,
+    "med": 23.625,
+    "min": 10.96,
+    "max": 106.19
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 425.32,
+    "med": 440.25,
+    "min": 282.8,
+    "max": 466.0
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97873.95,
+    "med": 102401.0,
+    "min": 36278,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.494,
+    "med": 2.562,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.013,
+    "med": 2.062,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 27.194,
+    "med": 29.688,
+    "min": 8.0,
+    "max": 39.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.15,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.4,
+    "med": 3.562,
+    "min": 1.0,
+    "max": 5.125
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 42.9,
+    "med": 42.5,
+    "min": 27,
+    "max": 63
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 16.902,
+    "med": 17.806,
+    "min": 10.429,
+    "max": 23.373
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.69,
+    "med": 1.761,
+    "min": 0.225,
+    "max": 3.643
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8787,
+    0.5008,
+    0.2268,
+    0.0715,
+    0.0107,
+    0.0013,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 0,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1611
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.005,
+     "ci": [
+      -0.0102,
+      0.0002
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0096,
+     "ci": [
+      0.0058,
+      0.0133
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6262,
+     "ci": [
+      0.5306,
+      0.7219
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 3
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "gain_all": {
+    "n": 20,
+    "mean": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.514,
+    "med": 25.16,
+    "min": 10.9,
+    "max": 104.64
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 423.485,
+    "med": 440.7,
+    "min": 284.2,
+    "max": 466.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98037.1,
+    "med": 102405.5,
+    "min": 35139,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.706,
+    "med": 2.812,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.237,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 29.95,
+    "med": 30.375,
+    "min": 9.625,
+    "max": 42.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.669,
+    "med": 3.812,
+    "min": 1.0,
+    "max": 5.875
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 50.3,
+    "med": 50.0,
+    "min": 28,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 18.982,
+    "med": 19.417,
+    "min": 10.274,
+    "max": 26.836
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.852,
+    "med": 1.831,
+    "min": 0.231,
+    "max": 3.845
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8824,
+    0.5518,
+    0.2846,
+    0.1034,
+    0.0261,
+    0.0034,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0083,
+     "ci": [
+      -0.0194,
+      0.0027
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0217,
+     "ci": [
+      0.0152,
+      0.0281
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6287,
+     "ci": [
+      0.5265,
+      0.7308
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "c8": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 29.976,
+    "med": 24.74,
+    "min": 10.3,
+    "max": 113.34
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 418.39,
+    "med": 433.1,
+    "min": 288.0,
+    "max": 466.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97921.75,
+    "med": 102388.5,
+    "min": 33552,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.938,
+    "med": 2.812,
+    "min": 0.125,
+    "max": 5.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.431,
+    "med": 2.375,
+    "min": 0.0,
+    "max": 4.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 33.212,
+    "med": 33.875,
+    "min": 10.125,
+    "max": 50.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.25,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.881,
+    "med": 3.938,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 58.4,
+    "med": 60.0,
+    "min": 32,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 21.488,
+    "med": 21.255,
+    "min": 10.28,
+    "max": 32.333
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.033,
+    "med": 2.111,
+    "min": 0.247,
+    "max": 4.12
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8853,
+    0.5962,
+    0.3551,
+    0.1423,
+    0.0444,
+    0.0097,
+    0.0002,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 6,
+    "rate": 0.3,
+    "ci": [
+     0.1455,
+     0.519
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0112,
+     "ci": [
+      -0.0313,
+      0.0089
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.038,
+     "ci": [
+      0.0262,
+      0.0497
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6365,
+     "ci": [
+      0.5353,
+      0.7376
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 36.303,
+    "med": 27.14,
+    "min": 13.17,
+    "max": 126.4
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 550.685,
+    "med": 546.55,
+    "min": 496.1,
+    "max": 623.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98186.45,
+    "med": 102402.0,
+    "min": 63552,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.95,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.5,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 33.4,
+    "med": 38.0,
+    "min": 9.5,
+    "max": 46.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.25,
+    "med": 4.0,
+    "min": 1,
+    "max": 6
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.875,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 43.65,
+    "med": 44.0,
+    "min": 28,
+    "max": 64
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.47,
+    "med": 22.362,
+    "min": 12.605,
+    "max": 27.851
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.041,
+    "med": 1.992,
+    "min": 0.423,
+    "max": 3.691
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.945,
+    0.6213,
+    0.3332,
+    0.1228,
+    0.0179,
+    0.0005
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0543,
+     "ci": [
+      -0.1857,
+      0.0771
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1175,
+     "ci": [
+      -0.0052,
+      0.2403
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6692,
+     "ci": [
+      0.5489,
+      0.7894
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 35.794,
+    "med": 29.515,
+    "min": 12.89,
+    "max": 140.42
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 435.625,
+    "med": 440.45,
+    "min": 351.5,
+    "max": 491.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 96914.75,
+    "med": 102401.0,
+    "min": 57881,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.7,
+    "med": 2.0,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.2,
+    "med": 2.0,
+    "min": 0.0,
+    "max": 4.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 32.0,
+    "med": 29.5,
+    "min": 9.0,
+    "max": 61.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.8,
+    "med": 42.5,
+    "min": 28,
+    "max": 64
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 21.44,
+    "med": 21.936,
+    "min": 11.534,
+    "max": 35.67
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.116,
+    "med": 2.046,
+    "min": 0.484,
+    "max": 4.098
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9557,
+    0.6304,
+    0.3391,
+    0.1573,
+    0.0325,
+    0.0013,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0634,
+     "ci": [
+      -0.2064,
+      0.0795
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1551,
+     "ci": [
+      0.0271,
+      0.2831
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.728,
+     "ci": [
+      0.6057,
+      0.8503
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 36.697,
+    "med": 25.79,
+    "min": 13.83,
+    "max": 141.96
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 550.88,
+    "med": 568.6,
+    "min": 389.6,
+    "max": 645.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97624.35,
+    "med": 102397.5,
+    "min": 45559,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.25,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 6.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.725,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 5.5
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 38.725,
+    "med": 38.75,
+    "min": 13.5,
+    "max": 61.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.425,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 6.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 51.85,
+    "med": 52.0,
+    "min": 26,
+    "max": 75
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 24.69,
+    "med": 24.852,
+    "min": 12.546,
+    "max": 35.483
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.315,
+    "med": 2.059,
+    "min": 0.586,
+    "max": 4.73
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9518,
+    0.6738,
+    0.4068,
+    0.1894,
+    0.0775,
+    0.0152,
+    0.0002
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 6,
+    "rate": 0.3,
+    "ci": [
+     0.1455,
+     0.519
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0553,
+     "ci": [
+      -0.1883,
+      0.0776
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1182,
+     "ci": [
+      -0.0062,
+      0.2426
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7027,
+     "ci": [
+      0.5905,
+      0.815
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 9
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 37.907,
+    "med": 28.275,
+    "min": 13.13,
+    "max": 178.61
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 442.75,
+    "med": 450.3,
+    "min": 317.7,
+    "max": 528.5
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95702.7,
+    "med": 102391.0,
+    "min": 25558,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.45,
+    "med": 3.5,
+    "min": 0.0,
+    "max": 7.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.75,
+    "med": 3.0,
+    "min": 0.0,
+    "max": 6.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 40.5,
+    "med": 41.0,
+    "min": 15.0,
+    "max": 62.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.55,
+    "med": 5.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.55,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 50.3,
+    "med": 50.5,
+    "min": 27,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 26.145,
+    "med": 24.258,
+    "min": 13.818,
+    "max": 44.582
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.431,
+    "med": 2.226,
+    "min": 0.664,
+    "max": 4.581
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.967,
+    0.6966,
+    0.4321,
+    0.2372,
+    0.0819,
+    0.0154,
+    0.0007
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.064,
+     "ci": [
+      -0.2119,
+      0.084
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.167,
+     "ci": [
+      0.0363,
+      0.2977
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7899,
+     "ci": [
+      0.6793,
+      0.9006
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 9
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.455,
+    "med": 25.82,
+    "min": 10.21,
+    "max": 114.98
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 423.235,
+    "med": 439.0,
+    "min": 307.0,
+    "max": 462.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97919.2,
+    "med": 102408.0,
+    "min": 32767,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.725,
+    "med": 2.875,
+    "min": 0.0,
+    "max": 5.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.75,
+    "min": 0.0,
+    "max": 4.375
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 30.869,
+    "med": 34.0,
+    "min": 10.5,
+    "max": 43.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.2,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.444,
+    "med": 3.812,
+    "min": 1.0,
+    "max": 5.875
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 46.35,
+    "med": 43.5,
+    "min": 29,
+    "max": 77
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 17.822,
+    "med": 18.812,
+    "min": 9.27,
+    "max": 24.63
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.768,
+    "med": 1.823,
+    "min": 0.253,
+    "max": 3.451
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8797,
+    0.5222,
+    0.2652,
+    0.0837,
+    0.014,
+    0.0025,
+    0.0003
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0011,
+     "ci": [
+      -0.0083,
+      0.0105
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0144,
+     "ci": [
+      0.0076,
+      0.0213
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5777,
+     "ci": [
+      0.4743,
+      0.6811
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.985,
+    "med": 26.47,
+    "min": 9.91,
+    "max": 118.04
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 414.26,
+    "med": 433.35,
+    "min": 317.2,
+    "max": 463.5
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97409.05,
+    "med": 102401.5,
+    "min": 28505,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.219,
+    "med": 3.438,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.819,
+    "med": 3.0,
+    "min": 0.125,
+    "max": 5.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 38.188,
+    "med": 38.562,
+    "min": 15.875,
+    "max": 57.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.85,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.825,
+    "med": 4.125,
+    "min": 0.875,
+    "max": 6.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 58.55,
+    "med": 57.0,
+    "min": 33,
+    "max": 92
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 22.013,
+    "med": 24.502,
+    "min": 10.862,
+    "max": 30.39
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.087,
+    "med": 2.175,
+    "min": 0.303,
+    "max": 3.732
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8944,
+    0.5984,
+    0.3677,
+    0.1653,
+    0.0487,
+    0.01,
+    0.0027,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0021,
+     "ci": [
+      -0.0176,
+      0.0135
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0249,
+     "ci": [
+      0.014,
+      0.0358
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5536,
+     "ci": [
+      0.446,
+      0.6612
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.748,
+    "med": 27.405,
+    "min": 6.58,
+    "max": 171.54
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 389.71,
+    "med": 402.75,
+    "min": 281.6,
+    "max": 445.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94490.8,
+    "med": 102052.0,
+    "min": 14324,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.581,
+    "med": 3.562,
+    "min": 0.375,
+    "max": 6.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.312,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 44.169,
+    "med": 43.375,
+    "min": 16.75,
+    "max": 65.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.95,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.95,
+    "med": 4.188,
+    "min": 0.875,
+    "max": 6.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.9,
+    "med": 62.0,
+    "min": 30,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 28.211,
+    "med": 28.827,
+    "min": 14.837,
+    "max": 40.19
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.502,
+    "med": 2.405,
+    "min": 0.358,
+    "max": 4.228
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9462,
+    0.7445,
+    0.47,
+    0.2382,
+    0.0763,
+    0.0213,
+    0.0055,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0333,
+     "ci": [
+      0.0019,
+      0.0647
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.053,
+     "ci": [
+      0.0277,
+      0.0783
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5552,
+     "ci": [
+      0.4418,
+      0.6686
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.777,
+    "med": 26.27,
+    "min": 10.44,
+    "max": 142.55
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 405.835,
+    "med": 423.7,
+    "min": 291.3,
+    "max": 446.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97839.35,
+    "med": 102408.0,
+    "min": 26914,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.75,
+    "med": 2.812,
+    "min": 0.375,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.344,
+    "med": 2.25,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 31.481,
+    "med": 33.812,
+    "min": 13.0,
+    "max": 45.75
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.9,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.275,
+    "med": 3.312,
+    "min": 1.0,
+    "max": 5.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 45.7,
+    "med": 44.0,
+    "min": 22,
+    "max": 69
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.428,
+    "med": 20.816,
+    "min": 11.5,
+    "max": 28.754
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.932,
+    "med": 1.792,
+    "min": 0.343,
+    "max": 3.596
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9129,
+    0.5969,
+    0.3079,
+    0.0985,
+    0.0139,
+    0.0014,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.012,
+     "ci": [
+      -0.0114,
+      0.0353
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0278,
+     "ci": [
+      0.0074,
+      0.0483
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5692,
+     "ci": [
+      0.4561,
+      0.6823
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k5": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.351,
+    "med": 23.135,
+    "min": 11.52,
+    "max": 138.46
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 417.045,
+    "med": 432.6,
+    "min": 305.0,
+    "max": 452.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98199.6,
+    "med": 102408.0,
+    "min": 32556,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.425,
+    "med": 2.562,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.069,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 26.925,
+    "med": 28.062,
+    "min": 9.625,
+    "max": 38.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.85,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.062,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 41.45,
+    "med": 41.0,
+    "min": 24,
+    "max": 61
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 17.101,
+    "med": 17.678,
+    "min": 9.576,
+    "max": 23.107
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.68,
+    "med": 1.595,
+    "min": 0.309,
+    "max": 3.314
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8862,
+    0.5048,
+    0.2206,
+    0.0623,
+    0.0053,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0004,
+     "ci": [
+      -0.013,
+      0.0123
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0185,
+     "ci": [
+      0.009,
+      0.028
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5824,
+     "ci": [
+      0.4773,
+      0.6874
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok1": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.925,
+    "med": 34.06,
+    "min": 10.07,
+    "max": 143.26
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 400.47,
+    "med": 425.15,
+    "min": 276.7,
+    "max": 450.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 73531.75,
+    "med": 81851.0,
+    "min": 27526,
+    "max": 102406
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.106,
+    "med": 4.562,
+    "min": 0.0,
+    "max": 7.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.844,
+    "med": 4.125,
+    "min": 0.0,
+    "max": 7.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 52.694,
+    "med": 53.875,
+    "min": 9.375,
+    "max": 91.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 6.9,
+    "med": 7.0,
+    "min": 1,
+    "max": 12
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.938,
+    "med": 5.125,
+    "min": 1.0,
+    "max": 8.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 92.2,
+    "med": 93.5,
+    "min": 32,
+    "max": 152
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 39.89,
+    "med": 42.284,
+    "min": 10.758,
+    "max": 67.104
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.291,
+    "med": 3.305,
+    "min": 0.344,
+    "max": 6.884
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8844,
+    0.8083,
+    0.5277,
+    0.4746,
+    0.2281,
+    0.1867,
+    0.0803,
+    0.0692,
+    0.0175,
+    0.0131,
+    0.0012,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 5,
+    "rate": 0.25,
+    "ci": [
+     0.1119,
+     0.4687
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.3333,
+     "ci": [
+      0.2012,
+      0.4654
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.3345,
+     "ci": [
+      0.203,
+      0.466
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6383,
+     "ci": [
+      0.5335,
+      0.7432
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 34.12,
+    "med": 26.55,
+    "min": 13.37,
+    "max": 148.3
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 409.405,
+    "med": 434.45,
+    "min": 293.8,
+    "max": 453.1
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94870.75,
+    "med": 102408.0,
+    "min": 37383,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.981,
+    "med": 3.188,
+    "min": 0.0,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.513,
+    "med": 2.625,
+    "min": 0.0,
+    "max": 4.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 35.331,
+    "med": 36.312,
+    "min": 9.375,
+    "max": 58.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.35,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.456,
+    "med": 3.625,
+    "min": 1.0,
+    "max": 5.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 52.2,
+    "med": 51.5,
+    "min": 23,
+    "max": 78
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 22.182,
+    "med": 22.886,
+    "min": 10.117,
+    "max": 30.746
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.039,
+    "med": 2.152,
+    "min": 0.34,
+    "max": 3.653
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8765,
+    0.7102,
+    0.3034,
+    0.1243,
+    0.0208,
+    0.0033,
+    0.0007
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0538,
+     "ci": [
+      0.0246,
+      0.0829
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0562,
+     "ci": [
+      0.0279,
+      0.0844
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.605,
+     "ci": [
+      0.4998,
+      0.7102
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "ok3": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.066,
+    "med": 25.27,
+    "min": 11.57,
+    "max": 135.93
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 414.1,
+    "med": 435.25,
+    "min": 302.0,
+    "max": 451.7
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97591.25,
+    "med": 102407.5,
+    "min": 37251,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.525,
+    "med": 2.688,
+    "min": 0.0,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.15,
+    "med": 2.125,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 29.356,
+    "med": 32.312,
+    "min": 9.375,
+    "max": 43.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.85,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.169,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 43.25,
+    "med": 44.5,
+    "min": 21,
+    "max": 61
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 18.38,
+    "med": 19.633,
+    "min": 9.9,
+    "max": 24.712
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.754,
+    "med": 1.707,
+    "min": 0.23,
+    "max": 3.429
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8728,
+    0.5821,
+    0.2287,
+    0.0642,
+    0.0059,
+    0.0008,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0204,
+     "ci": [
+      -0.0021,
+      0.0428
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0248,
+     "ci": [
+      0.0033,
+      0.0464
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5984,
+     "ci": [
+      0.4904,
+      0.7065
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f0": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.848,
+    "med": 24.965,
+    "min": 11.14,
+    "max": 126.86
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 430.8,
+    "med": 440.75,
+    "min": 361.8,
+    "max": 459.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98940.75,
+    "med": 102408.0,
+    "min": 36577,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.337,
+    "med": 2.375,
+    "min": 0.375,
+    "max": 4.375
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.962,
+    "med": 2.125,
+    "min": 0.25,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 24.613,
+    "med": 25.5,
+    "min": 9.0,
+    "max": 36.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.8,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.031,
+    "med": 3.125,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 36.15,
+    "med": 35.5,
+    "min": 15,
+    "max": 57
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.139,
+    "med": 15.904,
+    "min": 7.137,
+    "max": 20.743
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.568,
+    "med": 1.653,
+    "min": 0.252,
+    "max": 3.282
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8712,
+    0.4581,
+    0.1829,
+    0.0517,
+    0.0036,
+    0.0004,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0003,
+     "ci": [
+      -0.0083,
+      0.0076
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0139,
+     "ci": [
+      0.009,
+      0.0188
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6005,
+     "ci": [
+      0.501,
+      0.6999
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 2
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 31.876,
+    "med": 24.88,
+    "min": 11.65,
+    "max": 139.58
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 430.265,
+    "med": 440.85,
+    "min": 356.6,
+    "max": 456.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98872.7,
+    "med": 102408.0,
+    "min": 37266,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.375,
+    "med": 2.5,
+    "min": 0.375,
+    "max": 4.25
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 1.944,
+    "med": 2.062,
+    "min": 0.0,
+    "max": 3.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 25.663,
+    "med": 26.125,
+    "min": 10.875,
+    "max": 37.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.75,
+    "med": 3.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.0,
+    "med": 3.0,
+    "min": 1.0,
+    "max": 5.25
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 38.6,
+    "med": 36.0,
+    "min": 19,
+    "max": 59
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 15.491,
+    "med": 16.279,
+    "min": 7.646,
+    "max": 21.05
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.576,
+    "med": 1.647,
+    "min": 0.239,
+    "max": 3.287
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8681,
+    0.4584,
+    0.1894,
+    0.0531,
+    0.0055,
+    0.0008,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.001,
+     "ci": [
+      -0.0091,
+      0.0072
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0138,
+     "ci": [
+      0.0085,
+      0.0192
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5902,
+     "ci": [
+      0.4885,
+      0.692
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 2
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.743,
+    "med": 26.515,
+    "min": 9.97,
+    "max": 146.75
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 417.685,
+    "med": 438.65,
+    "min": 305.2,
+    "max": 456.4
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98008.55,
+    "med": 102396.5,
+    "min": 31030,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.069,
+    "med": 3.0,
+    "min": 0.375,
+    "max": 5.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.362,
+    "med": 2.188,
+    "min": 0.0,
+    "max": 4.375
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 35.094,
+    "med": 35.438,
+    "min": 15.5,
+    "max": 49.375
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 4.5,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.688,
+    "med": 3.75,
+    "min": 1.0,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 54.5,
+    "med": 56.0,
+    "min": 27,
+    "max": 89
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.737,
+    "med": 20.762,
+    "min": 10.565,
+    "max": 28.698
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.929,
+    "med": 1.846,
+    "min": 0.283,
+    "max": 3.686
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.8865,
+    0.5719,
+    0.3077,
+    0.1229,
+    0.0368,
+    0.0032,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 2,
+    "rate": 0.1,
+    "ci": [
+     0.0279,
+     0.301
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0131,
+     "ci": [
+      -0.0267,
+      0.0004
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0249,
+     "ci": [
+      0.0153,
+      0.0345
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6233,
+     "ci": [
+      0.5208,
+      0.7258
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 4
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 34.537,
+    "med": 24.445,
+    "min": 6.36,
+    "max": 138.52
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 386.32,
+    "med": 385.85,
+    "min": 276.9,
+    "max": 447.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95645.35,
+    "med": 102350.0,
+    "min": 12572,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.275,
+    "med": 3.25,
+    "min": 0.0,
+    "max": 5.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.9,
+    "med": 2.875,
+    "min": 0.0,
+    "max": 4.625
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 40.875,
+    "med": 41.562,
+    "min": 11.75,
+    "max": 59.25
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.0,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.913,
+    "med": 4.125,
+    "min": 0.875,
+    "max": 6.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.6,
+    "med": 60.0,
+    "min": 28,
+    "max": 94
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 25.782,
+    "med": 26.082,
+    "min": 12.31,
+    "max": 35.005
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.292,
+    "med": 2.236,
+    "min": 0.342,
+    "max": 4.037
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9118,
+    0.6925,
+    0.436,
+    0.1867,
+    0.0533,
+    0.0095,
+    0.0018,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.006,
+     "ci": [
+      -0.0173,
+      0.0294
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0381,
+     "ci": [
+      0.022,
+      0.0542
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6186,
+     "ci": [
+      0.4998,
+      0.7375
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 40.365,
+    "med": 28.985,
+    "min": 5.96,
+    "max": 155.07
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 384.37,
+    "med": 389.25,
+    "min": 268.4,
+    "max": 446.7
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 90566.0,
+    "med": 101836.5,
+    "min": 9806,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.144,
+    "med": 4.5,
+    "min": 0.375,
+    "max": 6.875
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.619,
+    "med": 3.562,
+    "min": 0.375,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 54.106,
+    "med": 56.562,
+    "min": 17.25,
+    "max": 87.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.6,
+    "med": 6.0,
+    "min": 1,
+    "max": 10
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.575,
+    "med": 4.688,
+    "min": 0.75,
+    "max": 7.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 75.9,
+    "med": 76.5,
+    "min": 30,
+    "max": 121
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 34.951,
+    "med": 36.766,
+    "min": 15.132,
+    "max": 51.542
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.921,
+    "med": 2.91,
+    "min": 0.357,
+    "max": 5.024
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9485,
+    0.7934,
+    0.5654,
+    0.3503,
+    0.1694,
+    0.0614,
+    0.0261,
+    0.0054,
+    0.0006,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0407,
+     "ci": [
+      0.0069,
+      0.0745
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0604,
+     "ci": [
+      0.0332,
+      0.0877
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6079,
+     "ci": [
+      0.5008,
+      0.7151
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 39.424,
+    "med": 27.455,
+    "min": 7.05,
+    "max": 168.66
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 389.725,
+    "med": 404.2,
+    "min": 283.5,
+    "max": 444.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94683.3,
+    "med": 102110.5,
+    "min": 14795,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.562,
+    "med": 3.438,
+    "min": 0.375,
+    "max": 6.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.25,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 43.819,
+    "med": 43.562,
+    "min": 16.75,
+    "max": 66.625
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.0,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.962,
+    "med": 4.188,
+    "min": 0.875,
+    "max": 6.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.1,
+    "med": 58.5,
+    "min": 30,
+    "max": 93
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 28.195,
+    "med": 28.616,
+    "min": 14.816,
+    "max": 40.091
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.504,
+    "med": 2.392,
+    "min": 0.358,
+    "max": 4.205
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9462,
+    0.7439,
+    0.4715,
+    0.238,
+    0.0771,
+    0.0212,
+    0.0055,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0331,
+     "ci": [
+      0.0014,
+      0.0648
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0532,
+     "ci": [
+      0.0276,
+      0.0788
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.546,
+     "ci": [
+      0.4331,
+      0.659
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k3f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 33.781,
+    "med": 25.545,
+    "min": 10.44,
+    "max": 137.91
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 407.5,
+    "med": 425.3,
+    "min": 297.4,
+    "max": 445.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 98055.7,
+    "med": 102408.0,
+    "min": 28202,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 2.706,
+    "med": 2.688,
+    "min": 0.25,
+    "max": 4.5
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.319,
+    "med": 2.188,
+    "min": 0.0,
+    "max": 4.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 31.281,
+    "med": 32.25,
+    "min": 12.5,
+    "max": 45.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 3.9,
+    "med": 4.0,
+    "min": 1,
+    "max": 7
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.244,
+    "med": 3.312,
+    "min": 1.0,
+    "max": 5.625
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 45.95,
+    "med": 43.0,
+    "min": 20,
+    "max": 69
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 20.335,
+    "med": 20.87,
+    "min": 11.225,
+    "max": 28.46
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 1.931,
+    "med": 1.779,
+    "min": 0.344,
+    "max": 3.575
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9123,
+    0.5962,
+    0.3101,
+    0.0968,
+    0.0139,
+    0.0018,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 3,
+    "rate": 0.15,
+    "ci": [
+     0.0524,
+     0.3604
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.012,
+     "ci": [
+      -0.011,
+      0.0351
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0287,
+     "ci": [
+      0.0088,
+      0.0485
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5656,
+     "ci": [
+      0.4537,
+      0.6774
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 5
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 41.573,
+    "med": 28.13,
+    "min": 6.7,
+    "max": 159.35
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 392.075,
+    "med": 414.3,
+    "min": 281.4,
+    "max": 446.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 94320.7,
+    "med": 101889.5,
+    "min": 14153,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.125,
+    "med": 4.312,
+    "min": 0.375,
+    "max": 7.125
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.644,
+    "med": 3.625,
+    "min": 0.375,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 53.556,
+    "med": 53.5,
+    "min": 17.25,
+    "max": 86.75
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.55,
+    "med": 6.0,
+    "min": 1,
+    "max": 9
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.487,
+    "med": 4.562,
+    "min": 0.75,
+    "max": 7.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 76.6,
+    "med": 77.5,
+    "min": 30,
+    "max": 114
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 34.147,
+    "med": 34.565,
+    "min": 14.946,
+    "max": 54.921
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.888,
+    "med": 2.911,
+    "min": 0.357,
+    "max": 5.039
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9478,
+    0.7762,
+    0.5477,
+    0.3497,
+    0.1666,
+    0.0651,
+    0.0284,
+    0.0063,
+    0.0001
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.034,
+     "ci": [
+      0.0005,
+      0.0674
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0631,
+     "ci": [
+      0.0397,
+      0.0865
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6164,
+     "ci": [
+      0.5132,
+      0.7196
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 46.466,
+    "med": 34.32,
+    "min": 8.91,
+    "max": 185.32
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 482.12,
+    "med": 505.05,
+    "min": 314.2,
+    "max": 565.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 88290.85,
+    "med": 101371.5,
+    "min": 12294,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.275,
+    "med": 4.25,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.625,
+    "med": 3.75,
+    "min": 0.5,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 55.35,
+    "med": 51.25,
+    "min": 27.0,
+    "max": 97.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.1,
+    "med": 5.5,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 65.6,
+    "med": 61.0,
+    "min": 30,
+    "max": 113
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 36.855,
+    "med": 36.304,
+    "min": 19.513,
+    "max": 56.922
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.112,
+    "med": 3.154,
+    "min": 0.963,
+    "max": 5.854
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9937,
+    0.8145,
+    0.5805,
+    0.3917,
+    0.2066,
+    0.0894,
+    0.0316,
+    0.0039
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": -0.0045,
+     "ci": [
+      -0.1501,
+      0.141
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1653,
+     "ci": [
+      0.0402,
+      0.2905
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6574,
+     "ci": [
+      0.5252,
+      0.7896
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1k2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 46.743,
+    "med": 32.29,
+    "min": 8.19,
+    "max": 201.93
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 367.025,
+    "med": 394.55,
+    "min": 222.1,
+    "max": 436.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 82298.8,
+    "med": 101044.0,
+    "min": 7437,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.25,
+    "med": 4.5,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.75,
+    "med": 4.0,
+    "min": 1.0,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 57.95,
+    "med": 61.0,
+    "min": 26.0,
+    "max": 96.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.8,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 61.75,
+    "med": 62.5,
+    "min": 30,
+    "max": 96
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 39.695,
+    "med": 37.862,
+    "min": 19.743,
+    "max": 62.079
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.339,
+    "med": 3.482,
+    "min": 0.981,
+    "max": 6.485
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9968,
+    0.8471,
+    0.5878,
+    0.455,
+    0.2705,
+    0.1282,
+    0.0455,
+    0.0084
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 7,
+    "rate": 0.35,
+    "ci": [
+     0.1812,
+     0.5671
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0204,
+     "ci": [
+      -0.1409,
+      0.1816
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.2084,
+     "ci": [
+      0.0769,
+      0.3399
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7777,
+     "ci": [
+      0.6523,
+      0.9031
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 7
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w1k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 53.168,
+    "med": 37.185,
+    "min": 8.06,
+    "max": 170.08
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 364.435,
+    "med": 394.45,
+    "min": 223.4,
+    "max": 445.6
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 82274.25,
+    "med": 99491.5,
+    "min": 7557,
+    "max": 102401
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.9,
+    "med": 6.0,
+    "min": 1.0,
+    "max": 10.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 4.0,
+    "med": 4.0,
+    "min": 0.0,
+    "max": 9.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 67.7,
+    "med": 70.5,
+    "min": 27.0,
+    "max": 115.0
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.35,
+    "med": 6.0,
+    "min": 1,
+    "max": 10
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 5.35,
+    "med": 6.0,
+    "min": 1.0,
+    "max": 10.0
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 75.7,
+    "med": 74.0,
+    "min": 30,
+    "max": 134
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 47.066,
+    "med": 44.744,
+    "min": 20.517,
+    "max": 75.915
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.769,
+    "med": 4.187,
+    "min": 0.981,
+    "max": 7.09
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9969,
+    0.8638,
+    0.6128,
+    0.5246,
+    0.3998,
+    0.2324,
+    0.1011,
+    0.0346,
+    0.003,
+    0.0003
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 10,
+    "rate": 0.5,
+    "ci": [
+     0.2993,
+     0.7007
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0246,
+     "ci": [
+      -0.141,
+      0.1902
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.2151,
+     "ci": [
+      0.0802,
+      0.35
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.7416,
+     "ci": [
+      0.6071,
+      0.876
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 10
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "w2k2f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 49.301,
+    "med": 37.73,
+    "min": 9.27,
+    "max": 163.86
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 479.965,
+    "med": 516.1,
+    "min": 316.6,
+    "max": 563.3
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 88920.65,
+    "med": 100227.0,
+    "min": 12392,
+    "max": 102402
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.75,
+    "med": 5.0,
+    "min": 1.0,
+    "max": 8.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 4.1,
+    "med": 4.5,
+    "min": 0.5,
+    "max": 7.0
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 65.55,
+    "med": 63.25,
+    "min": 27.0,
+    "max": 111.5
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 5.5,
+    "med": 6.0,
+    "min": 1,
+    "max": 9
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 5.1,
+    "med": 5.75,
+    "min": 1.0,
+    "max": 8.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 77.95,
+    "med": 79.5,
+    "min": 30,
+    "max": 131
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 44.239,
+    "med": 39.563,
+    "min": 20.494,
+    "max": 71.73
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 3.564,
+    "med": 3.686,
+    "min": 0.963,
+    "max": 6.406
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.994,
+    0.8415,
+    0.6275,
+    0.4935,
+    0.3371,
+    0.1795,
+    0.0711,
+    0.0175,
+    0.0025
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 8,
+    "rate": 0.4,
+    "ci": [
+     0.2188,
+     0.6134
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0061,
+     "ci": [
+      -0.1425,
+      0.1547
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.1791,
+     "ci": [
+      0.0542,
+      0.304
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.6637,
+     "ci": [
+      0.536,
+      0.7914
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 8
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4f2": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 37.421,
+    "med": 25.86,
+    "min": 9.24,
+    "max": 136.19
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 408.67,
+    "med": 429.9,
+    "min": 302.9,
+    "max": 459.2
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 97420.8,
+    "med": 102401.0,
+    "min": 23268,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 3.431,
+    "med": 3.5,
+    "min": 0.375,
+    "max": 5.75
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 2.975,
+    "med": 3.062,
+    "min": 0.125,
+    "max": 5.125
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 41.281,
+    "med": 38.188,
+    "min": 14.5,
+    "max": 70.875
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 4.95,
+    "med": 5.0,
+    "min": 1,
+    "max": 8
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 3.894,
+    "med": 4.25,
+    "min": 0.75,
+    "max": 6.75
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 64.35,
+    "med": 63.5,
+    "min": 28,
+    "max": 118
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 25.028,
+    "med": 25.848,
+    "min": 10.887,
+    "max": 44.094
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.275,
+    "med": 2.308,
+    "min": 0.343,
+    "max": 3.905
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9046,
+    0.6381,
+    0.404,
+    0.2081,
+    0.0819,
+    0.0276,
+    0.0094,
+    0.0008
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 4,
+    "rate": 0.2,
+    "ci": [
+     0.0807,
+     0.416
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0146,
+     "ci": [
+      -0.0218,
+      0.0511
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.054,
+     "ci": [
+      0.026,
+      0.0819
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5472,
+     "ci": [
+      0.4418,
+      0.6526
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  },
+  "t4f2c4": {
+   "n": 20,
+   "cpu_sec": {
+    "n": 20,
+    "mean": 40.724,
+    "med": 25.29,
+    "min": 7.21,
+    "max": 158.9
+   },
+   "rss_mb": {
+    "n": 20,
+    "mean": 392.64,
+    "med": 411.05,
+    "min": 298.6,
+    "max": 457.8
+   },
+   "nodes": {
+    "n": 20,
+    "mean": 95331.3,
+    "med": 101866.5,
+    "min": 16145,
+    "max": 102408
+   },
+   "pv_turns_mean": {
+    "n": 20,
+    "mean": 4.031,
+    "med": 4.312,
+    "min": 0.375,
+    "max": 7.0
+   },
+   "pv10_turns_mean": {
+    "n": 20,
+    "mean": 3.438,
+    "med": 3.625,
+    "min": 0.125,
+    "max": 6.25
+   },
+   "pv_len_mean": {
+    "n": 20,
+    "mean": 51.15,
+    "med": 45.625,
+    "min": 14.5,
+    "max": 92.125
+   },
+   "max_turns_max": {
+    "n": 20,
+    "mean": 6.15,
+    "med": 6.5,
+    "min": 1,
+    "max": 11
+   },
+   "max_turns_mean": {
+    "n": 20,
+    "mean": 4.606,
+    "med": 5.125,
+    "min": 0.5,
+    "max": 7.5
+   },
+   "max_depth_max": {
+    "n": 20,
+    "mean": 82.85,
+    "med": 76.0,
+    "min": 31,
+    "max": 155
+   },
+   "mean_depth": {
+    "n": 20,
+    "mean": 31.52,
+    "med": 31.076,
+    "min": 12.792,
+    "max": 55.417
+   },
+   "mean_turns": {
+    "n": 20,
+    "mean": 2.708,
+    "med": 2.915,
+    "min": 0.352,
+    "max": 4.784
+   },
+   "reach_turns_frac": [
+    1.0,
+    0.9181,
+    0.7124,
+    0.4874,
+    0.3061,
+    0.1646,
+    0.0746,
+    0.0338,
+    0.0097,
+    0.0012,
+    0.0001,
+    0.0
+   ],
+   "vs_base": {
+    "n": 20,
+    "changed": 5,
+    "rate": 0.25,
+    "ci": [
+     0.1119,
+     0.4687
+    ],
+    "root_v_shift": {
+     "n": 20,
+     "mean": 0.0225,
+     "ci": [
+      -0.0204,
+      0.0653
+     ]
+    },
+    "abs_root_v_shift": {
+     "n": 20,
+     "mean": 0.0652,
+     "ci": [
+      0.0324,
+      0.098
+     ]
+    },
+    "top_share": {
+     "n": 20,
+     "mean": 0.5764,
+     "ci": [
+      0.4686,
+      0.6842
+     ]
+    }
+   },
+   "vs_x1_changed": {
+    "n": 20,
+    "changed": 6
+   },
+   "judged": 0,
+   "gain_changed": {
+    "n": 0,
+    "mean": null,
+    "ci": [
+     null,
+     null
+    ]
+   },
+   "points_better": 0,
+   "points_worse": 0
+  }
+ }
+}

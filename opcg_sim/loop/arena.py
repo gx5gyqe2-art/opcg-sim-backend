@@ -272,6 +272,17 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ q_min_n の訪問下限の割合（既定 0.125＝sims/8）")
     ap.add_argument("--cand-root-prior-temp", type=float, default=None,
                     help="候補席だけ根の事前分布の平坦化 P^(1/t)（§20.5・既定 1.0）")
+    # 読みを深さへ振る形（`docs/search_efficiency_plan.md` §7.91・WP `search-deep`・測定専用・省略＝既定）。
+    ap.add_argument("--cand-c-puct", type=float, default=None,
+                    help="候補席だけ探索の広がりの係数（既定 1.5・窓の短い木にも同じ値が渡る）")
+    ap.add_argument("--cand-tree-prior-temp", type=float, default=None,
+                    help="候補席だけ、木の根以外の節の事前分布を P^(1/t) で尖らせる（§7.91・既定 1.0）")
+    ap.add_argument("--cand-tree-topk", type=int, default=None,
+                    help="候補席だけ、木の根以外の節で事前分布の上位 k 手だけを残す（§7.91・既定 0＝絞らない）")
+    ap.add_argument("--cand-tree-topk-side", default=None, choices=("all", "opp"),
+                    help="候補席の上位 k 手の絞りを掛ける節（opp＝相手の番の節だけ・§7.91）")
+    ap.add_argument("--cand-tree-fpu-red", type=float, default=None,
+                    help="候補席だけ、根以外の節のまだ読んでいない手の値を「節の平均 − これ」に置く（§7.91・省略＝0 のまま）")
     ap.add_argument("--cand-worlds", type=int, default=None,
                     help="候補席だけ世界サンプルの本数 K（§20.7.1・既定 1）。K 本ぶん"
                          "スレッドを使うので --workers を下げること")
@@ -348,6 +359,11 @@ CAND_VALUE_FLAGS = {
     "cand_q_min_frac": "q_min_frac",
     "cand_root_prior_temp": "root_prior_temp",
     "cand_worlds": "worlds",
+    "cand_c_puct": "c_puct",
+    "cand_tree_prior_temp": "tree_prior_temp",
+    "cand_tree_topk": "tree_topk",
+    "cand_tree_topk_side": "tree_topk_side",
+    "cand_tree_fpu_red": "tree_fpu_red",
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
     "cand_reveal": "reveal",
