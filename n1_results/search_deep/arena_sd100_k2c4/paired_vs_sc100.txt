@@ -1,0 +1,3 @@
+common seeds 120 (deep 121, current 125)
+deep-100x wr 0.5292 (+20.3)  current-100x wr 0.5667 (+46.6)
+paired diff (deep - current) -0.0375 [-0.0979, +0.0229]  approx Elo -26.1 [-68.1, +15.9]
