@@ -12,6 +12,7 @@
   "dir": "n1_results/loss_map/w04",
   "files": [
    "n1_results/loss_map/w04/games.jsonl",
+   "n1_results/loss_map/w04/judge.jsonl",
    "n1_results/loss_map/w04/reads.jsonl",
    "n1_results/loss_map/w04/worker_steps.json"
   ]
@@ -31,6 +32,7 @@
   },
   "lines": {
    "games.jsonl": 15,
+   "judge.jsonl": 34,
    "reads.jsonl": 660
   }
  },
