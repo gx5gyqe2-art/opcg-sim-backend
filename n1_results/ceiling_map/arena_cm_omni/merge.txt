@@ -1,0 +1,14 @@
+候補席の探索設定: {"budget": 0, "lethal_proof": "root", "omniscient": true, "sims": 1280, "worlds": 8}
+  cm_omni_real_w01.jsonl       70.0/112 = 0.6250 void 0
+  cm_omni_real_w02.jsonl       66.0/112 = 0.5893 void 0
+  cm_omni_real_w03.jsonl       61.0/112 = 0.5446 void 0
+  cm_omni_real_w04.jsonl       61.0/112 = 0.5446 void 0
+  cm_omni_real_w05.jsonl       68.0/112 = 0.6071 void 0
+  cm_omni_real_w06.jsonl       71.0/112 = 0.6339 void 0
+  cm_omni_real_w07.jsonl       60.0/112 = 0.5357 void 0
+  cm_omni_real_w08.jsonl       68.0/112 = 0.6071 void 0
+  cm_omni_real_w09.jsonl       68.0/112 = 0.6071 void 0
+  cm_omni_real_w10.jsonl       66.0/112 = 0.5893 void 0
+  cm_omni_real_w11.jsonl       64.0/112 = 0.5714 void 0
+  cm_omni_real_w12.jsonl       66.0/112 = 0.5893 void 0
+[cm_omni] ARENA_MERGE_FINAL {"pairs": 672, "games": 1344, "void": 0, "wins": 789.0, "wr": 0.5871, "ci95": [0.5666, 0.6075], "elo": 61.1, "elo95": [46.5, 75.9], "promoted": true, "shards": 12, "dup_seeds": 0, "cand_opts": [{"budget": 0, "lethal_proof": "root", "omniscient": true, "sims": 1280, "worlds": 8}]}
