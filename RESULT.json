@@ -1,7 +1,7 @@
 {
  "job": "arena-cm-r13d-w08",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "候補＝旧い世代 r13d",
   "baseline": "nrel_r29f4.npz (fair)",
