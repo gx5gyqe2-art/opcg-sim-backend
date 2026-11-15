@@ -1,7 +1,7 @@
 {
  "job": "arena-cm-opp-w09",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "候補＝r29f4・相手の手札だけ見える",
   "baseline": "nrel_r29f4.npz (fair)",
