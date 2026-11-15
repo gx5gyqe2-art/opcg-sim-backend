@@ -1,7 +1,7 @@
 {
  "job": "arena-cm-omni-w05",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "候補＝r29f4・全部見える",
   "baseline": "nrel_r29f4.npz (fair)",
