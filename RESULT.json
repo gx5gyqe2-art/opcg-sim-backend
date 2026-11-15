@@ -28,11 +28,14 @@
    },
    "read": {
     "sec": 4556
+   },
+   "judge": {
+    "sec": 3389
    }
   },
   "lines": {
    "games.jsonl": 15,
-   "judge.jsonl": 95,
+   "judge.jsonl": 116,
    "reads.jsonl": 654
   }
  },
