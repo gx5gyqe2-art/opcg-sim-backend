@@ -12,6 +12,7 @@
   "dir": "n1_results/loss_map/w12",
   "files": [
    "n1_results/loss_map/w12/games.jsonl",
+   "n1_results/loss_map/w12/reads.jsonl",
    "n1_results/loss_map/w12/worker_steps.json"
   ]
  },
@@ -19,14 +20,15 @@
   "games": 15,
   "games_expected": 15,
   "void_games": 0,
-  "points": 0,
+  "points": 118,
   "steps": {
    "play": {
     "sec": 720
    }
   },
   "lines": {
-   "games.jsonl": 15
+   "games.jsonl": 15,
+   "reads.jsonl": 118
   }
  },
  "notes": "",
