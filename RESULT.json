@@ -32,7 +32,7 @@
   },
   "lines": {
    "games.jsonl": 15,
-   "judge.jsonl": 31,
+   "judge.jsonl": 60,
    "reads.jsonl": 654
   }
  },
