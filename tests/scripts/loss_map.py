@@ -19,12 +19,14 @@
     python tests/scripts/loss_map.py play --games 15 --seed-base 7341000 --out n1_results/loss_map/w01 --workers 4
     python tests/scripts/loss_map.py read --out n1_results/loss_map/w01 --workers 4
     python tests/scripts/loss_map.py judge --out n1_results/loss_map/w01 --workers 4
-    python tests/scripts/loss_map.py summary --shards 'n1_results/loss_map/w*' --out n1_results/loss_map
+    python tests/scripts/loss_map.py merge --shards 'shards/w*' --out n1_results/loss_map     # シャードをつなぐ
+    python tests/scripts/loss_map.py summary --shards n1_results/loss_map --out n1_results/loss_map
 
 再開できる（終えた局・点は飛ばす）。
 """
 import argparse
 import glob
+import gzip
 import json
 import math
 import os
@@ -57,8 +59,10 @@ _G: Dict[str, Any] = {}
 
 def read_jsonl(path: str) -> List[Dict[str, Any]]:
     out = []
+    if not os.path.exists(path) and os.path.exists(path + ".gz"):
+        path += ".gz"                    # つないだ記録（`merge`）は games だけ gzip
     if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
+        for line in (gzip.open(path, "rt", encoding="utf-8") if path.endswith(".gz") else open(path, encoding="utf-8")):
             line = line.strip()
             if not line:
                 continue
@@ -317,7 +321,95 @@ def cmd_judge(a):
     print("JUDGE_DONE", flush=True)
 
 
-# ---------------------------------------------------------------- 4. summary
+# ---------------------------------------------------------------- 3b. verify
+
+#: 確かめにかけるメインの組の割合（窓の組は全部）。
+VERIFY_MAIN_FRAC = 0.11
+
+
+def verify_pick(g, p) -> bool:
+    """確かめにかける組か: 短い木の窓の組は全部・木の組は局と手から決まる乱数で約 1 割。"""
+    if p["kind"] == "window":
+        return True
+    return random.Random(g["seed"] * 1009 + p["step"]).random() < VERIFY_MAIN_FRAC
+
+
+def verify_point(job):
+    """`judge` と同じ配り方（番号の頭から K 通り）で、**今のターンの残りは両席とも出荷の設定が打つ**形の対の差
+    （`blunder_audit.rollout_ship`・§7.50）。守りの手で審判の攻め手（160 回）が詰めを打ち損じる偏りと、
+    箱の 1 段目の後を審判が打ち継げない偏りを除く。"""
+    g, p, r = job
+    t0 = time.time()
+    out = {"seed": g["seed"], "step": p["step"], "key_b": r["key_b"], "kind": p["kind"]}
+    try:
+        game = BA.replay(g, p["step"])
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = "replay: %s: %s" % (type(exc).__name__, str(exc)[:120])
+        return out
+    ma, mb = p.get("a_box") or p["move"], r["b"]
+    wa, wb, errs = [], [], {}
+    for i in range(_G["k"]):
+        ws = MJ.world_seed(g["seed"], p["step"], JUDGE_OFFSET + i)
+        ra, ea = BA.rollout_ship(game, p["seat"], ma, ws, _G["ref"], _G["spec"])
+        rb, eb = BA.rollout_ship(game, p["seat"], mb, ws, _G["ref"], _G["spec"])
+        wa.append(ra)
+        wb.append(rb)
+        for e in (ea, eb):
+            if e:
+                errs[e] = errs.get(e, 0) + 1
+    out.update(MJ.paired(wa, wb), a=wa, b=wb, errs=errs or None, k=_G["k"], sec=round(time.time() - t0, 1))
+    return out
+
+
+def cmd_verify(a):
+    games = read_jsonl(os.path.join(a.src, "games.jsonl"))
+    seeds = sorted(g["seed"] for g in games)
+    if a.shard:
+        k, n = (int(x) for x in a.shard.split("/"))
+        seeds = [s for i, s in enumerate(seeds) if i % n == k - 1]
+    mine = set(seeds)
+    gby = {g["seed"]: g for g in games if g["seed"] in mine}
+    reads = [r for r in read_jsonl(os.path.join(a.src, "reads.jsonl"))
+             if r["seed"] in mine and r.get("changed") and not r.get("error") and r.get("repro")]
+    os.makedirs(a.out, exist_ok=True)
+    vpath = os.path.join(a.out, "verify.jsonl")
+    done = {(r["seed"], r["step"]) for r in read_jsonl(vpath)}
+    jobs = []
+    for r in reads:
+        g = gby[r["seed"]]
+        p = next(x for x in g["points"] if x["step"] == r["step"])
+        if verify_pick(g, p) and (r["seed"], r["step"]) not in done:
+            jobs.append((_slim(g), p, r))
+    random.Random(3).shuffle(jobs)
+    print(f"VERIFY todo {len(jobs)} (done {len(done)}) k={a.k} games={len(mine)}", flush=True)
+    t0 = time.time()
+    with get_context("fork").Pool(a.workers, initializer=_init, initargs=(a.k,), maxtasksperchild=10) as pool:
+        for i, r in enumerate(pool.imap_unordered(verify_point, jobs, chunksize=1)):
+            with open(vpath, "a", encoding="utf-8") as f:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"VERIFY {i + 1}/{len(jobs)} seed={r['seed']} step={r['step']} {r.get('kind')} diff={r.get('diff')} {r.get('ci')} "
+                  f"sec={r.get('sec')} {r.get('error') or ''} ({time.time() - t0:.0f}s)", flush=True)
+    print("VERIFY_DONE", flush=True)
+
+
+# ---------------------------------------------------------------- 4. merge／summary
+
+def cmd_merge(a):
+    """シャードの記録を 1 つにつなぐ（`games.jsonl.gz`・`reads.jsonl`・`judge.jsonl`）。局の seed の順。"""
+    dirs = sorted(d for pat in a.shards for d in glob.glob(pat) if os.path.isdir(d))
+    os.makedirs(a.out, exist_ok=True)
+    n = {}
+    for name, key in (("games", lambda r: (r["seed"],)), ("reads", lambda r: (r["seed"], r["step"])),
+                      ("judge", lambda r: (r["seed"], r["step"]))):
+        rows = sorted((r for d in dirs for r in read_jsonl(os.path.join(d, name + ".jsonl"))), key=key)
+        path = os.path.join(a.out, name + ".jsonl" + (".gz" if name == "games" else ""))
+        with (gzip.open(path, "wt", encoding="utf-8") if path.endswith(".gz") else open(path, "w", encoding="utf-8")) as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        n[name] = len(rows)
+    print("MERGE", json.dumps({"shards": len(dirs), **n}))
+
+
 
 #: §7.90 段 2 の 10 倍の対戦（512 ペア）: +29.9［+15.1, +44.8］Elo。
 ARENA_ELO = (29.9, 15.1, 44.8)
@@ -397,10 +489,15 @@ def cmd_summary(a):
     dirs = sorted(d for pat in a.shards for d in glob.glob(pat) if os.path.isdir(d))
     colors = leader_colors()
     games, rows, pop = [], [], []        # rows＝読んだ点（重みつき）・pop＝母集団の点（層 T／S）
+    verify: Dict[Any, Dict[str, Any]] = {}
     miss = {"void_games": 0, "read_missing": 0, "read_error": 0, "not_repro": 0, "judge_missing": 0, "judge_void": 0}
     for d in dirs:
         reads = {(r["seed"], r["step"]): r for r in read_jsonl(os.path.join(d, "reads.jsonl"))}
         judge = {(r["seed"], r["step"]): r for r in read_jsonl(os.path.join(d, "judge.jsonl"))}
+        for vd in sorted(v for pat in (a.verify or []) for v in glob.glob(pat)):
+            for r in read_jsonl(os.path.join(vd, "verify.jsonl")):
+                if not r.get("error") and r.get("diff") is not None:
+                    verify[(r["seed"], r["step"])] = r
         for g in read_jsonl(os.path.join(d, "games.jsonl")):
             if g.get("void"):
                 miss["void_games"] += 1
@@ -438,7 +535,8 @@ def cmd_summary(a):
                         loss = float(j["diff"])
                         if r.get("q10_a") is not None and r.get("q10_b") is not None:
                             est = (float(r["q10_b"]) - float(r["q10_a"])) / 2.0
-                    ok.append({"gi": gi, "stratum": s, "p": by[st], "r": r, "j": j, "loss": loss, "est": est})
+                    ok.append({"gi": gi, "stratum": s, "p": by[st], "r": r, "j": j, "loss": loss, "est": est,
+                               "v": verify.get((g["seed"], st)) if r["changed"] else None})
                 n_pop = g["n_T"] if s == "T" else g["n_S"]
                 for x in ok:
                     x["w"] = n_pop / len(ok)
@@ -530,6 +628,14 @@ def cmd_summary(a):
     big = sorted(jr, key=lambda x: -x["loss"])[:30]
     T = [x for x in rows if x["stratum"] == "T"]
     S = [x for x in rows if x["stratum"] == "S"]
+    # 10 倍の手は、出荷の読みの根で何番目だったか（木の点・記録は上位 3 手まで）
+    mc = [x for x in T if x["r"]["changed"] and x["p"]["kind"] == "main"]
+    rank_b: Dict[str, int] = {}
+    for x in mc:
+        keys = [BA.key(t["mv"]) for t in x["p"].get("top") or []]
+        kb = x["r"]["key_b"]
+        lab = "上位 3 手の外" if kb not in keys else f"{keys.index(kb) + 1} 番目"
+        rank_b[lab] = rank_b.get(lab, 0) + 1
     kinds_sorted = list(tables["種類"].values())
     pos_sum = sum(max(0.0, c["損（1 席 1 局）"]) for c in kinds_sorted)
     top3 = sum(sorted((max(0.0, c["損（1 席 1 局）"]) for c in kinds_sorted), reverse=True)[:3])
@@ -537,6 +643,51 @@ def cmd_summary(a):
     cpos = sum(max(0.0, c["損（1 席 1 局）"]) for c in cross)
     ctop3 = sum(sorted((max(0.0, c["損（1 席 1 局）"]) for c in cross), reverse=True)[:3])
     exp = [elo_gain(e) for e in ARENA_ELO]
+
+    # ---- 確かめ（今のターンの残りを両席とも出荷の設定で打つ形）との突き合わせ
+    def pair_ci(xs):
+        n = len(xs)
+        if n < 2:
+            return {"n": n, "mean": None, "ci": [None, None]}
+        m = sum(xs) / n
+        h = 1.96 * math.sqrt(sum((x - m) ** 2 for x in xs) / (n - 1) / n)
+        return {"n": n, "mean": round(m, 4), "ci": [round(m - h, 4), round(m + h, 4)]}
+
+    def same_deals(x):
+        """素の審判の、確かめと同じ配り方（頭から K 通り）だけの対の差。"""
+        k = len(x["v"]["a"])
+        d = MJ.paired(x["j"]["a"][:k], x["j"]["b"][:k])["diff"]
+        return 0.0 if d is None else float(d)
+
+    vblock = None
+    vr = [x for x in rows if x["v"]]
+    if vr:
+        def vgroup(xs):
+            if not xs:
+                return None
+            ids = {id(x) for x in xs}
+            pl = per_game(lambda x: id(x) in ids, lambda x: x["loss"])
+            ve = per_game(lambda x: id(x) in ids, lambda x: float(x["v"]["diff"]))
+            m1, c1, _ = stat(pl)
+            m2, c2, _ = stat(ve)
+            return {"組": len(xs),
+                    "素の審判の差（K 通り全部）": pair_ci([x["loss"] for x in xs]),
+                    "素の審判の差（確かめと同じ配り方）": pair_ci([same_deals(x) for x in xs]),
+                    "確かめの差": pair_ci([float(x["v"]["diff"]) for x in xs]),
+                    "確かめ − 素（同じ配り方）": pair_ci([float(x["v"]["diff"]) - same_deals(x) for x in xs]),
+                    "素の損（1 席 1 局・この組だけ）": round(m1, 5), "素の 95% 区間": [round(c1[0], 5), round(c1[1], 5)],
+                    "確かめの損（1 席 1 局・この組だけ）": round(m2, 5), "確かめの 95% 区間": [round(c2[0], 5), round(c2[1], 5)]}
+        win = [x for x in vr if x["p"]["kind"] == "window"]
+        mainv = [x for x in vr if x["p"]["kind"] != "window"]
+        win_all = [x for x in rows if x["r"]["changed"] and x["p"]["kind"] == "window"]
+        # 合計の入れ替え: 短い木の窓の組は確かめの差・ほかは素の差
+        mix_v = per_game(lambda x: True, lambda x: float(x["v"]["diff"]) if (x["v"] and x["p"]["kind"] == "window") else x["loss"])
+        mm, mc_, _ = stat(mix_v)
+        vblock = {"verified_pairs": len(vr), "window_pairs_total": len(win_all),
+                  "短い木の窓（全部）": vgroup(win), "木（約 1 割の標本）": vgroup(mainv),
+                  "窓の種類別": {k: vgroup([x for x in win if x["f"]["種類"] == k]) for k in sorted({x["f"]["種類"] for x in win})},
+                  "合計（窓の組だけ確かめの差に入れ替え）": {"損（1 席 1 局・勝率）": round(mm, 5), "95% 区間": [round(mc_[0], 5), round(mc_[1], 5)],
+                                              "損 ÷ 対戦の値": round(mm / exp[0], 3)}}
     summary = {
         "shards": dirs, "games": G, "missing": miss,
         "game_stats": {"turns_mean": round(sum(g["turns"] for g in games) / G, 2),
@@ -549,6 +700,8 @@ def cmd_summary(a):
                    "T_changed": sum(x["r"]["changed"] for x in T), "S_changed": sum(x["r"]["changed"] for x in S),
                    "T_noise_changed": sum(x["r"]["noise_changed"] for x in T),
                    "S_noise_changed": sum(x["r"]["noise_changed"] for x in S),
+                   "main_changed": len(mc), "rank_of_10x_move_in_ship_root": dict(sorted(rank_b.items())),
+                   "main_changed_a_was_top": sum(1 for x in mc if x["p"].get("a_rank") == 0),
                    "judged_pairs": len(jr), "pairs_10x_better_sig": sig_pos, "pairs_10x_worse_sig": sig_neg,
                    "cpu10_mean_T": round(sum(x["r"]["cpu10"] for x in T) / max(1, len(T)), 2),
                    "cpu1_mean_T": round(sum(x["r"]["cpu1"] for x in T) / max(1, len(T)), 2),
@@ -558,6 +711,7 @@ def cmd_summary(a):
                   "10 倍の読み自身の見立て（1 席 1 局・勝率）": round(est, 5), "見立ての 95% 区間": [round(est_ci[0], 5), round(est_ci[1], 5)],
                   "対戦の +29.9 Elo を勝率に直した値": round(exp[0], 4), "その 95% 区間": [round(exp[1], 4), round(exp[2], 4)],
                   "損 ÷ 対戦の値": round(tot / exp[0], 3)},
+        "verify": vblock,
         "concentration": {"種類の上位 3 個の取り分（正の損の合計に対して）": round(top3 / pos_sum, 3) if pos_sum else None,
                           "種類 × 時期の上位 3 個の取り分（同）": round(ctop3 / cpos, 3) if cpos else None},
         "top10_single_axis": top(["種類", "時期", "自分のライフ", "相手のライフ", "リーダーの色", "有利不利"]),
@@ -581,7 +735,7 @@ def cmd_summary(a):
                                 "ci": x["j"]["ci"] if x["j"] else None, "f": x["f"],
                                 "a": x["r"]["desc_a"], "b": x["r"]["desc_b"] if x["r"]["changed"] else None},
                                ensure_ascii=False) + "\n")
-    print(json.dumps({k: summary[k] for k in ("games", "missing", "game_stats", "sample", "total", "concentration")},
+    print(json.dumps({k: summary[k] for k in ("games", "missing", "game_stats", "sample", "total", "verify", "concentration")},
                      ensure_ascii=False, indent=1))
     for c in summary["top10_single_axis"]:
         print(c["切り口"], c["値"], c["点の数（1 席 1 局）"], c["替わる割合"], c["替わった 1 点の損"], c["損（1 席 1 局）"], c["損の 95% 区間"], c["取り分"])
@@ -604,12 +758,22 @@ def main(argv=None):
     p.add_argument("--k", type=int, default=32)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default=OUT_DIR)
+    p = sub.add_parser("verify")
+    p.add_argument("--src", default=OUT_DIR, help="つないだ記録（games.jsonl.gz・reads.jsonl）の置き場")
+    p.add_argument("--shard", default=None, help="k/N（局を seed の順に N 個に割った k 番目・1 始まり）")
+    p.add_argument("--k", type=int, default=16)
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--out", default=os.path.join(OUT_DIR, "verify"))
+    p = sub.add_parser("merge")
+    p.add_argument("--shards", nargs="+", default=[os.path.join(OUT_DIR, "w*")])
+    p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
     p.add_argument("--shards", nargs="+", default=[os.path.join(OUT_DIR, "w*")])
+    p.add_argument("--verify", nargs="*", default=None, help="確かめの記録（verify.jsonl）の置き場（glob 可）")
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--out", default=OUT_DIR)
     a = ap.parse_args(argv)
-    {"play": cmd_play, "read": cmd_read, "judge": cmd_judge, "summary": cmd_summary}[a.cmd](a)
+    {"play": cmd_play, "read": cmd_read, "judge": cmd_judge, "verify": cmd_verify, "merge": cmd_merge, "summary": cmd_summary}[a.cmd](a)
 
 
 if __name__ == "__main__":
