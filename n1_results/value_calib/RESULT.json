@@ -1,0 +1,165 @@
+{
+ "wp": "ceiling-map",
+ "section": "§7.92",
+ "stage": "C",
+ "date": "2026-11-15",
+ "branch": "claude/value-calib",
+ "report": "docs/reports/2026-11-15_value_calib.md",
+ "tool": "tests/scripts/value_calib.py",
+ "net": "opcg_sim/data/learned/nrel_r29f4.npz",
+ "inputs": {
+  "waves": [
+   "83f",
+   "84f"
+  ],
+  "branches": "claude/n83f-w01..32, claude/n84f-w01..32",
+  "shards": 64,
+  "read_in_tree_of": "wave commit (2026-11-07, before the 2026-11-09 card DB swap; card numbering differs from the current tree)"
+ },
+ "rows": 5305741,
+ "games": 30720,
+ "seat_check": 1.0,
+ "overall": {
+  "bias": -0.0088,
+  "ci": [
+   -0.0097,
+   -0.0078
+  ],
+  "mse": 0.4932,
+  "mse_const": 0.9997,
+  "calibration_slope_z_on_v": 0.995,
+  "search_root_bias_main": 0.0274,
+  "search_root_ci": [
+   0.0262,
+   0.0286
+  ],
+  "net_mse_main": 0.5184,
+  "search_root_mse_main": 0.5165,
+  "policy_points": 2085416,
+  "policy_top_vs_visit_top_disagree": 0.4493,
+  "policy_disagree_ci": [
+   0.4482,
+   0.4504
+  ],
+  "mean_q_gap": 0.0268
+ },
+ "multiple_testing": {
+  "cells_single": 434,
+  "cells_pair": 8630,
+  "ci_excludes_zero": {
+   "single": 200,
+   "pair": 3570
+  },
+  "expected_by_chance": {
+   "single": 21.7,
+   "pair": 431.5
+  },
+  "bonferroni": {
+   "tests": 9064,
+   "z": 4.544,
+   "single": 94,
+   "pair": 1063
+  }
+ },
+ "forecast_check": {
+  "overall_within_0.02": "hit (-0.009)",
+  "concentrates_late": "miss (late +0.004..+0.007; early turns 0-4 are -0.032..-0.038)",
+  "concentrates_low_life_side": "half (life 0-1 +0.02, but life 5+ is -0.042; main rows at life 0-1 +0.056)",
+  "concentrates_specific_leaders": "hit (26/105 leaders, max -0.281)"
+ },
+ "candidates": [
+  {
+   "id": 1,
+   "what": "per-leader (deck) strength misjudged; side of leaders with abilities working on the opponent's turn is undervalued",
+   "numbers": {
+    "OP14-060_own": -0.281,
+    "OP14-060_opp": 0.246,
+    "OP16-080_own": -0.146,
+    "OP07-019_own": -0.1,
+    "leaders_ci_excl_zero": "26/105",
+    "opp_attack_reaction_flag": -0.059,
+    "flag_share": 0.204
+   },
+   "fixed_by_search": false
+  },
+  {
+   "id": 2,
+   "what": "board (power sum, standing blockers) overvalued relative to life",
+   "numbers": {
+    "life<=-3_x_board>+12000": 0.073,
+    "life+2_x_board<=-12000": -0.068,
+    "own_life5+_x_board<=-12000": -0.107,
+    "per_1000_power_within_matchup": 0.0047,
+    "per_blocker_within_matchup": 0.0185,
+    "share": 0.275
+   },
+   "fixed_by_search": "partly"
+  },
+  {
+   "id": 3,
+   "what": "first player undervalued in the opening (zero-sum break at game start)",
+   "numbers": {
+    "mulligan_first": -0.064,
+    "mulligan_second": -0.011,
+    "turn1-2_first": -0.056,
+    "turn3-4_first": -0.064,
+    "sum_both_seats_at_start": -0.076,
+    "share": 0.062
+   },
+   "fixed_by_search": true
+  },
+  {
+   "id": 4,
+   "what": "side to move valued high, responding side valued low",
+   "numbers": {
+    "main": 0.016,
+    "main_without_randomised_rows": 0.005,
+    "opp_turn_response": -0.026,
+    "own_turn_dialog": -0.035,
+    "commit": -0.025,
+    "response_x_own_life5+": -0.072,
+    "is_my_turn_coef": 0.021
+   },
+   "fixed_by_search": "not measurable"
+  },
+  {
+   "id": 5,
+   "what": "search root value optimistic on attacking turns; policy/visit disagreement concentrates there",
+   "numbers": {
+    "attackers4+_search_root_bias": 0.116,
+    "attackers4+_net_bias": 0.017,
+    "search_mse": 0.431,
+    "net_mse": 0.406,
+    "disagree": 0.688,
+    "q_gap": 0.055,
+    "share_of_q_gap": 0.24
+   },
+   "fixed_by_search": "search-side issue"
+  }
+ ],
+ "minor": {
+  "own_deck<=5": {
+   "bias": 0.131,
+   "ci": [
+    0.053,
+    0.208
+   ],
+   "share": 0.002
+  }
+ },
+ "caveats": [
+  "outcomes are under r29f4's generation play (1 world, 1280 sims, 40% late sampling, eps), not production settings",
+  "same net played both seats: errors on lines it avoids are invisible",
+  "causes of candidates 1 and 4 not separated (teaching waves predate the 2026-11-07 defense-dialog change)",
+  "leader and deck are nearly 1:1 in the real-deck band",
+  "Python forward; not cross-checked against the Rust forward (corr with search root value 0.96)"
+ ],
+ "gate": "make test green (cargo 646 passed; pytest 937 passed, 17 skipped)",
+ "files": [
+  "summary.json",
+  "cells_single.jsonl",
+  "cells_pair.jsonl.gz",
+  "linear_map.json"
+ ],
+ "npz_committed": false
+}
