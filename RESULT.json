@@ -1,7 +1,7 @@
 {
  "job": "loss-map-w20",
  "role": "audit",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "setting": "§7.92 段 B: 両席 r29f4・出荷の設定（1,280 回・世界 8 本）・random × real・10 倍の読み・審判 r29f4（160 回・K＝32）",
   "tool": "tests/scripts/loss_map.py",
