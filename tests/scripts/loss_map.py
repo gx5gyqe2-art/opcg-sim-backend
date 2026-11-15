@@ -403,9 +403,9 @@ def cmd_merge(a):
                       ("judge", lambda r: (r["seed"], r["step"]))):
         rows = sorted((r for d in dirs for r in read_jsonl(os.path.join(d, name + ".jsonl"))), key=key)
         path = os.path.join(a.out, name + ".jsonl" + (".gz" if name == "games" else ""))
-        with (gzip.open(path, "wt", encoding="utf-8") if path.endswith(".gz") else open(path, "w", encoding="utf-8")) as f:
-            for r in rows:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows).encode("utf-8")
+        with open(path, "wb") as f:      # gzip は時刻を埋めない（同じ中身なら同じバイト列）
+            f.write(gzip.compress(body, mtime=0) if path.endswith(".gz") else body)
         n[name] = len(rows)
     print("MERGE", json.dumps({"shards": len(dirs), **n}))
 
@@ -441,7 +441,9 @@ def move_kind(mv: Optional[Dict[str, Any]]) -> str:
         k = int(p.get("don_k") or 0)
         return "攻撃" if k <= 0 and p.get("target_ids") else ("付与して攻撃" if p.get("target_ids") else "付与")
     return {"PLAY": "展開", "ATTACK": "攻撃", "ATTACH_DON": "付与", "ACTIVATE_MAIN": "起動", "TURN_END": "ターン終了",
-            "SETUP_BOX": "準備の箱"}.get(at, str(at))
+            "SETUP_BOX": "準備の箱", "PASS": "受ける（何もしない）", "SELECT_COUNTER": "カウンターを切る",
+            "SELECT_BLOCKER": "ブロックする", "RESOLVE_EFFECT_SELECTION": "対話の選択", "MULLIGAN": "引き直す",
+            "KEEP_HAND": "引き直さない"}.get(at, str(at))
 
 
 def band(x, edges, labels):
@@ -468,6 +470,14 @@ def features(g, p, colors) -> Dict[str, str]:
         "手札": band(p["my_hand"], [2, 5, 8], ["0〜2 枚", "3〜5 枚", "6〜8 枚", "9 枚以上"]),
         "先攻後攻": "先攻" if (p["turn"] % 2 == 1) == p["own"] and p["turn"] > 0 else ("後攻" if p["turn"] > 0 else "（マリガン）"),
     }
+    top = p.get("top") or []
+    if p["kind"] != "main":
+        f["迷い"] = "（木でない）"
+    elif len(top) < 2 or not top[0]["n"]:
+        f["迷い"] = "2 番手なし"
+    else:
+        f["迷い"] = band(top[1]["n"] / top[0]["n"], [0.2, 0.5, 0.8, 0.9],
+                       ["2 番手 ÷ 1 番手 〜0.2", "0.2〜0.5", "0.5〜0.8", "0.8〜0.9", "0.9〜"])
     f["種類 × 時期"] = f["種類"] + " ／ " + f["時期"]
     f["種類 × 有利不利"] = f["種類"] + " ／ " + f["有利不利"]
     f["リーダー"] = g["leaders"][seat_i]
@@ -569,10 +579,16 @@ def cmd_summary(a):
 
     tot_v = per_game(lambda x: True, lambda x: x["loss"])
     tot, tot_ci, tot_bs = stat(tot_v)
+    tot0, tot0_bs = tot, tot_bs
+    tree_v = per_game(lambda x: x["p"]["kind"] == "main", lambda x: x["loss"])
+    tree_tot, tree_ci, tree_bs = stat(tree_v)
+    tree_est = float(per_game(lambda x: x["p"]["kind"] == "main", lambda x: x["est"]).sum() / denom)
     est_v = per_game(lambda x: True, lambda x: x["est"])
     est, est_ci, _ = stat(est_v)
 
-    def cell(sel, popsel):
+    def cell(sel, popsel, ref=None):
+        """`ref`＝取り分の分母（(値, 引き直しの列)・省略＝全体の損）。"""
+        tot, tot_bs, est_ref = ref or (tot0, tot0_bs, est)
         n_pop = sum(1 for (_gi, _s, f) in pop if popsel(f))
         xs = [x for x in rows if sel(x)]
         w = sum(x["w"] for x in xs)
@@ -592,17 +608,27 @@ def cmd_summary(a):
                 "取り分": round(m / tot, 3) if abs(tot) > 1e-12 else None,
                 "取り分の 95% 区間": [round(float(np.nanpercentile(share_bs, 2.5)), 3), round(float(np.nanpercentile(share_bs, 97.5)), 3)],
                 "10 倍の読み自身の見立て（1 席 1 局）": round(float(ev.sum() / denom), 5),
-                "見立ての取り分": round(float(ev.sum() / denom) / est, 3) if abs(est) > 1e-12 else None}
+                "見立ての取り分": round(float(ev.sum() / denom) / est_ref, 3) if abs(est_ref) > 1e-12 else None}
 
     axes = ["種類", "時期", "自分のライフ", "相手のライフ", "リーダーの色", "有利不利", "手番の持ち主", "候補の数", "決め方", "手札",
-            "先攻後攻", "種類 × 時期", "種類 × 有利不利", "リーダー"]
+            "先攻後攻", "迷い", "種類 × 時期", "種類 × 有利不利", "リーダー"]
     tables = {}
     for ax in axes:
         vals = sorted({f[ax] for (_gi, _s, f) in pop})
         t = {v: cell(lambda x, v=v: x["f"][ax] == v, lambda f, v=v: f[ax] == v) for v in vals}
         tables[ax] = dict(sorted(t.items(), key=lambda kv: -(kv[1]["損（1 席 1 局）"])))
 
-    def top(axs, n=10):
+    # 木で決めた点だけの表（取り分の分母は木の点の損の合計）
+    tables_tree = {}
+    for ax in axes:
+        if ax == "決め方":
+            continue
+        vals = sorted({f[ax] for (_gi, _s, f) in pop if f["決め方"] == "木"})
+        t = {v: cell(lambda x, v=v: x["p"]["kind"] == "main" and x["f"][ax] == v,
+                     lambda f, v=v: f["決め方"] == "木" and f[ax] == v, ref=(tree_tot, tree_bs, tree_est)) for v in vals}
+        tables_tree[ax] = dict(sorted(t.items(), key=lambda kv: -(kv[1]["損（1 席 1 局）"])))
+
+    def top(axs, n=10, tables=tables):
         allc = [dict(c, 切り口=ax, 値=v) for ax in axs for v, c in tables[ax].items()]
         allc.sort(key=lambda c: -c["損（1 席 1 局）"])
         return allc[:n]
@@ -631,15 +657,24 @@ def cmd_summary(a):
     # 10 倍の手は、出荷の読みの根で何番目だったか（木の点・記録は上位 3 手まで）
     mc = [x for x in T if x["r"]["changed"] and x["p"]["kind"] == "main"]
     rank_b: Dict[str, int] = {}
+    rank_rows: Dict[str, Any] = {}
     for x in mc:
         keys = [BA.key(t["mv"]) for t in x["p"].get("top") or []]
         kb = x["r"]["key_b"]
         lab = "上位 3 手の外" if kb not in keys else f"{keys.index(kb) + 1} 番目"
         rank_b[lab] = rank_b.get(lab, 0) + 1
-    kinds_sorted = list(tables["種類"].values())
+        x["rank_b"] = lab
+    for lab in sorted(rank_b):
+        v = per_game(lambda x, lab=lab: x.get("rank_b") == lab, lambda x: x["loss"])
+        m, ci, _ = stat(v)
+        w = sum(x["w"] for x in mc if x["rank_b"] == lab)
+        rank_rows[lab] = {"替わった点": rank_b[lab], "替わった 1 点の損": round(float(v.sum()) / w, 4),
+                          "損（1 席 1 局）": round(m, 5), "損の 95% 区間": [round(ci[0], 5), round(ci[1], 5)],
+                          "取り分": round(m / tree_tot, 3)}
+    kinds_sorted = list(tables_tree["種類"].values())
     pos_sum = sum(max(0.0, c["損（1 席 1 局）"]) for c in kinds_sorted)
     top3 = sum(sorted((max(0.0, c["損（1 席 1 局）"]) for c in kinds_sorted), reverse=True)[:3])
-    cross = list(tables["種類 × 時期"].values())
+    cross = list(tables_tree["種類 × 時期"].values())
     cpos = sum(max(0.0, c["損（1 席 1 局）"]) for c in cross)
     ctop3 = sum(sorted((max(0.0, c["損（1 席 1 局）"]) for c in cross), reverse=True)[:3])
     exp = [elo_gain(e) for e in ARENA_ELO]
@@ -700,7 +735,7 @@ def cmd_summary(a):
                    "T_changed": sum(x["r"]["changed"] for x in T), "S_changed": sum(x["r"]["changed"] for x in S),
                    "T_noise_changed": sum(x["r"]["noise_changed"] for x in T),
                    "S_noise_changed": sum(x["r"]["noise_changed"] for x in S),
-                   "main_changed": len(mc), "rank_of_10x_move_in_ship_root": dict(sorted(rank_b.items())),
+                   "main_changed": len(mc), "rank_of_10x_move_in_ship_root": rank_rows,
                    "main_changed_a_was_top": sum(1 for x in mc if x["p"].get("a_rank") == 0),
                    "judged_pairs": len(jr), "pairs_10x_better_sig": sig_pos, "pairs_10x_worse_sig": sig_neg,
                    "cpu10_mean_T": round(sum(x["r"]["cpu10"] for x in T) / max(1, len(T)), 2),
@@ -712,12 +747,17 @@ def cmd_summary(a):
                   "対戦の +29.9 Elo を勝率に直した値": round(exp[0], 4), "その 95% 区間": [round(exp[1], 4), round(exp[2], 4)],
                   "損 ÷ 対戦の値": round(tot / exp[0], 3)},
         "verify": vblock,
-        "concentration": {"種類の上位 3 個の取り分（正の損の合計に対して）": round(top3 / pos_sum, 3) if pos_sum else None,
-                          "種類 × 時期の上位 3 個の取り分（同）": round(ctop3 / cpos, 3) if cpos else None},
+        "concentration": {"木の点・種類の上位 3 個の取り分（正の損の合計に対して）": round(top3 / pos_sum, 3) if pos_sum else None,
+                          "木の点・種類 × 時期の上位 3 個の取り分（同）": round(ctop3 / cpos, 3) if cpos else None},
         "top10_single_axis": top(["種類", "時期", "自分のライフ", "相手のライフ", "リーダーの色", "有利不利"]),
         "top10_kind_x_turn": top(["種類 × 時期"]),
         "top10_kind_x_adv": top(["種類 × 有利不利"]),
-        "tables": tables, "transitions": trans_out,
+        "tree_total": {"損（1 席 1 局・勝率）": round(tree_tot, 5), "95% 区間": [round(tree_ci[0], 5), round(tree_ci[1], 5)],
+                       "損 ÷ 対戦の値": round(tree_tot / exp[0], 3)},
+        "tree_top10_single_axis": top(["種類", "時期", "自分のライフ", "相手のライフ", "リーダーの色", "有利不利"], tables=tables_tree),
+        "tree_top10_kind_x_turn": top(["種類 × 時期"], tables=tables_tree),
+        "tree_top10_kind_x_adv": top(["種類 × 有利不利"], tables=tables_tree),
+        "tables": tables, "tables_tree": tables_tree, "transitions": trans_out,
         "biggest_points": [{"seed": games[x["gi"]]["seed"], "step": x["p"]["step"], "turn": x["p"]["turn"], "種類": x["f"]["種類"],
                             "diff": x["j"]["diff"], "ci": x["j"]["ci"], "a": x["r"]["desc_a"], "b": x["r"]["desc_b"],
                             "root_v": x["p"].get("root_v"), "my_life": x["p"]["my_life"], "opp_life": x["p"]["opp_life"]} for x in big],
@@ -727,15 +767,15 @@ def cmd_summary(a):
         json.dump(summary, f, ensure_ascii=False, indent=1)
         f.write("\n")
     # 点ごとの 1 行（切り口・重み・損）＝報告の表を作り直せる生の記録
-    with open(os.path.join(a.out, "points.jsonl"), "w", encoding="utf-8") as f:
+    with gzip.GzipFile(os.path.join(a.out, "points.jsonl.gz"), "wb", mtime=0) as fz:
         for x in rows:
-            f.write(json.dumps({"seed": games[x["gi"]]["seed"], "step": x["p"]["step"], "seat": x["p"]["seat"], "turn": x["p"]["turn"],
+            fz.write((json.dumps({"seed": games[x["gi"]]["seed"], "step": x["p"]["step"], "seat": x["p"]["seat"], "turn": x["p"]["turn"],
                                 "stratum": x["stratum"], "w": round(x["w"], 4), "changed": x["r"]["changed"],
                                 "noise_changed": x["r"]["noise_changed"], "loss": x["loss"], "est": round(x["est"], 4),
                                 "ci": x["j"]["ci"] if x["j"] else None, "f": x["f"],
                                 "a": x["r"]["desc_a"], "b": x["r"]["desc_b"] if x["r"]["changed"] else None},
-                               ensure_ascii=False) + "\n")
-    print(json.dumps({k: summary[k] for k in ("games", "missing", "game_stats", "sample", "total", "verify", "concentration")},
+                               ensure_ascii=False) + "\n").encode("utf-8"))
+    print(json.dumps({k: summary[k] for k in ("games", "missing", "game_stats", "sample", "total", "tree_total", "verify", "concentration")},
                      ensure_ascii=False, indent=1))
     for c in summary["top10_single_axis"]:
         print(c["切り口"], c["値"], c["点の数（1 席 1 局）"], c["替わる割合"], c["替わった 1 点の損"], c["損（1 席 1 局）"], c["損の 95% 区間"], c["取り分"])

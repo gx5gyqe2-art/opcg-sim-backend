@@ -1,60 +1,613 @@
 {
- "job": "value-split-b",
- "section": "§7.74",
+ "wp": "ceiling-map stage B (loss map)",
+ "spec": "docs/search_efficiency_plan.md §7.92",
+ "report": "docs/reports/2026-11-15_loss_map.md",
  "status": "done",
- "branch": "claude/value-split-b",
- "report": "docs/reports/2026-11-03_value_split_epochs.md",
- "results_dir": "n1_results/value_split",
- "gate": "make test green（2026-11-03 17:48・cargo test 640 passed・pytest 894 passed 14 skipped・付録の道具 1 ファイルを足したため 1 回だけ回した）",
- "what": "r28x4 を土台に波 70f＋71f（535 万行）で α 2e-4・4 周／β 1e-4・4 周を訓練し、各周の重み 8 本＋r28x4＋r29f4 を同じ試験台（ドンの比 tvval・6キング 53 点 rocks・検証の誤差）にかけた。付録: 波 70f のドンの総数の規則からの外れ（don_variation.py）。",
- "invariants": {
-  "r27_tvval_matches_7_71": true,
-  "r27_b_close": 0.115,
-  "r28x4_b_close": 0.078,
-  "r28x4_b_close_ratio": 0.23,
-  "note_r28x4": "§7.73 の『r28x4 0.26』は 2 波の r28x の値（0.088・0.262）。4 波の r28x4 は本計測が初めて＝0.23 を正本にする",
-  "r29f4_b_close": 0.113,
-  "r29f4_b_close_ratio": 0.34
+ "base": "6bb4366",
+ "net": "nrel_r29f4",
+ "branch": "claude/loss-map",
+ "setting": "both seats r29f4, shipping (1280 sims, 8 worlds, budget 0, lethal proof root, fair, defense dialog tree all), random x real",
+ "seeds": "7341000 + (k-1)*1000 + 0..14, k=1..22 (330 games, void 0)",
+ "tool": "tests/scripts/loss_map.py",
+ "jobs": [
+  "opcg_sim/loop/jobs/audit_loss_map.json",
+  "opcg_sim/loop/jobs/audit_loss_map_v.json"
+ ],
+ "shard_branches": "claude/loss-map-w01..w22 (n1_results/loss_map/wKK, verify in vKK)",
+ "gate": {
+  "cargo": "646 passed",
+  "pytest": "937 passed, 17 skipped",
+  "engine_changed": false
  },
- "train": {
-  "waves": ["n70f", "n71f"],
-  "rows_value": 5353107, "rows_value_holdout": 764389, "points_policy": 2102485,
-  "common_args": "train_r29f4.json の common_args と同じ（--epochs 4・--save-each-epoch・warm-start r28x4）",
-  "alpha_lr2e-4": {"val_vmse": [0.3594, 0.3473, 0.3581, 0.3570], "val_vsign": [0.870, 0.876, 0.871, 0.873], "val_pi_top1": [0.498, 0.506, 0.497, 0.504], "train_mse": [0.4712, 0.4637, 0.4586, 0.4544], "best_ep": 1, "sec_per_epoch": 1200},
-  "beta_lr1e-4": {"val_vmse": [0.3554, 0.3473, 0.3550, 0.3530], "val_vsign": [0.871, 0.874, 0.873, 0.875], "val_pi_top1": [0.502, 0.505, 0.501, 0.501], "train_mse": [0.4715, 0.4656, 0.4619, 0.4589], "best_ep": 1}
+ "unit": "win probability per seat per game; loss = (10x-read move) - (played move), fixed referee r29f4 160 sims, K=32 paired deals",
+ "sample": {
+  "games": 330,
+  "read_points": 14460,
+  "sims_dependent_points": 13140,
+  "sims_independent_points": 1320,
+  "changed": 2521,
+  "changed_sims_independent": 0,
+  "reproduced": "14460/14460",
+  "judged_pairs": 2521,
+  "verified_pairs": 646,
+  "cpu_sec_10x_mean": 23.88,
+  "cpu_sec_1x_mean": 2.28
  },
- "testbeds": {
-  "tvval_b_close_ratio": {"r28x4": 0.23, "r29f4": 0.34, "alpha_ep1_4": [0.33, 0.26, 0.22, 0.18], "beta_ep1_4": [0.30, 0.30, 0.29, 0.23]},
-  "tvval_b_close_diff": {"r28x4": 0.078, "r29f4": 0.113, "alpha_ep1_4": [0.110, 0.088, 0.073, 0.060], "beta_ep1_4": [0.102, 0.103, 0.100, 0.077]},
-  "rocks53_chose_b": {"r28x4": 6, "r29f4": 4, "alpha_ep1_4": [6, 5, 3, 2], "beta_ep1_4": [6, 5, 6, 4]},
-  "rocks53_q_diff": {"r28x4": -0.074, "r29f4": -0.096, "alpha_ep1_4": [-0.130, -0.085, -0.055, -0.059], "beta_ep1_4": [-0.092, -0.132, -0.087, -0.052]},
-  "rocks53_share_b": {"r28x4": 0.101, "r29f4": 0.099, "alpha_ep1_4": [0.078, 0.073, 0.068, 0.048], "beta_ep1_4": [0.099, 0.068, 0.095, 0.066]}
+ "check": {
+  "arena_10x_elo": [
+   29.9,
+   15.1,
+   44.8
+  ],
+  "arena_10x_winprob": [
+   0.0429,
+   0.0217,
+   0.0641
+  ],
+  "tree_loss": [
+   0.03636,
+   0.01591,
+   0.05635
+  ],
+  "tree_loss_over_arena": 0.847,
+  "short_tree_window_loss_plain": [
+   -0.01731,
+   -0.02897,
+   -0.00648
+  ],
+  "short_tree_window_loss_verify": [
+   -0.01752,
+   -0.03228,
+   -0.00363
+  ],
+  "total_loss": [
+   0.01904,
+   -0.00409,
+   0.04227
+  ],
+  "total_over_arena": 0.444,
+  "total_loss_windows_by_verify": [
+   0.01883,
+   -0.00743,
+   0.04453
+  ],
+  "self_estimate_of_10x_tree": [
+   0.08519,
+   0.06635,
+   0.10557
+  ]
  },
- "conclusion": {
-  "ratio_vs_epochs": "周を重ねるほど比は単調に縮む（2e-4: 0.33 → 0.18・1e-4: 0.30 → 0.23）。1 周目の 0.33 は土台 0.23 からの過渡で、当てはめが進むと土台を通り越して縮む",
-  "ratio_vs_lr": "速さ半分は縮みを遅らせるだけ（3 周まで 0.29〜0.30・4 周で 0.23）。同じ周数では速さ半分の方が比は大きいが、周を重ねれば同じ向き",
-  "ratio_vs_validation": "検証の誤差の最良（2 周目・0.3473）の後も比は縮み続け、訓練の誤差の低下に連れて動く＝汎化ではなく当てはまりが決める",
-  "prediction_play_cause_pm005": "外れ（周で −0.15 動く）",
-  "prediction_fit_cause_plus01": "外れ（向きが逆・速さ半分は同じ周数でなら字面どおり +0.05 だが周を重ねれば縮む）",
-  "reading": "当てはめの縮みは実在するが訓練の量・速さの不足ではなく、教材に当てはまるほど進む。計測 A の暫定（教材の打ち方でも差は 0.24〜0.35 残る）と合わせ、ドン 1 枚の偏微分が教材から同定されにくい形（付録）が次の候補。直し先は周・速さ・時間の解像度ではない"
+ "tree_points": {
+  "change_rate": 0.1961,
+  "noise_floor_change_rate": 0.1217,
+  "by_hesitation_second_over_first_visits": {
+   "0.9〜": {
+    "points_per_seat_game": 4.5,
+    "change_rate": 0.4271,
+    "loss_per_changed": 0.0112,
+    "loss": 0.02131,
+    "ci": [
+     0.01044,
+     0.03229
+    ],
+    "share_of_tree_loss": 0.586
+   },
+   "0.5〜0.8": {
+    "points_per_seat_game": 8.38,
+    "change_rate": 0.2362,
+    "loss_per_changed": 0.0037,
+    "loss": 0.00711,
+    "ci": [
+     -0.0061,
+     0.02022
+    ],
+    "share_of_tree_loss": 0.196
+   },
+   "0.8〜0.9": {
+    "points_per_seat_game": 3.23,
+    "change_rate": 0.355,
+    "loss_per_changed": 0.0059,
+    "loss": 0.00689,
+    "ci": [
+     -0.00257,
+     0.01654
+    ],
+    "share_of_tree_loss": 0.19
+   },
+   "0.2〜0.5": {
+    "points_per_seat_game": 7.25,
+    "change_rate": 0.0843,
+    "loss_per_changed": 0.0063,
+    "loss": 0.00391,
+    "ci": [
+     -0.004,
+     0.01206
+    ],
+    "share_of_tree_loss": 0.107
+   },
+   "2 番手 ÷ 1 番手 〜0.2": {
+    "points_per_seat_game": 5.85,
+    "change_rate": 0.0156,
+    "loss_per_changed": -0.0314,
+    "loss": -0.00286,
+    "ci": [
+     -0.00655,
+     0.00042
+    ],
+    "share_of_tree_loss": -0.079
+   }
+  },
+  "by_opp_life": {
+   "3": {
+    "points_per_seat_game": 6.34,
+    "change_rate": 0.2268,
+    "loss_per_changed": 0.0156,
+    "loss": 0.02242,
+    "ci": [
+     0.01038,
+     0.03576
+    ],
+    "share_of_tree_loss": 0.617
+   },
+   "4 以上": {
+    "points_per_seat_game": 12.53,
+    "change_rate": 0.1627,
+    "loss_per_changed": 0.0063,
+    "loss": 0.01289,
+    "ci": [
+     0.00155,
+     0.02469
+    ],
+    "share_of_tree_loss": 0.355
+   },
+   "1": {
+    "points_per_seat_game": 3.83,
+    "change_rate": 0.211,
+    "loss_per_changed": 0.0034,
+    "loss": 0.0027,
+    "ci": [
+     -0.00532,
+     0.01116
+    ],
+    "share_of_tree_loss": 0.074
+   },
+   "0": {
+    "points_per_seat_game": 2.25,
+    "change_rate": 0.194,
+    "loss_per_changed": -0.0015,
+    "loss": -0.00065,
+    "ci": [
+     -0.00732,
+     0.00627
+    ],
+    "share_of_tree_loss": -0.018
+   },
+   "2": {
+    "points_per_seat_game": 4.28,
+    "change_rate": 0.2378,
+    "loss_per_changed": -0.001,
+    "loss": -0.001,
+    "ci": [
+     -0.01044,
+     0.00746
+    ],
+    "share_of_tree_loss": -0.028
+   }
+  },
+  "by_turn_band": {
+   "手番 9〜12": {
+    "points_per_seat_game": 10.98,
+    "change_rate": 0.2319,
+    "loss_per_changed": 0.0061,
+    "loss": 0.01543,
+    "ci": [
+     0.00119,
+     0.02874
+    ],
+    "share_of_tree_loss": 0.424
+   },
+   "手番 5〜8": {
+    "points_per_seat_game": 9.19,
+    "change_rate": 0.1935,
+    "loss_per_changed": 0.0082,
+    "loss": 0.01462,
+    "ci": [
+     0.00282,
+     0.02638
+    ],
+    "share_of_tree_loss": 0.402
+   },
+   "手番 13〜": {
+    "points_per_seat_game": 3.25,
+    "change_rate": 0.2348,
+    "loss_per_changed": 0.0059,
+    "loss": 0.00444,
+    "ci": [
+     -0.00293,
+     0.01201
+    ],
+    "share_of_tree_loss": 0.122
+   },
+   "手番 1〜4": {
+    "points_per_seat_game": 4.8,
+    "change_rate": 0.1091,
+    "loss_per_changed": 0.0029,
+    "loss": 0.0015,
+    "ci": [
+     -0.00458,
+     0.00775
+    ],
+    "share_of_tree_loss": 0.041
+   },
+   "0（マリガン）": {
+    "points_per_seat_game": 1.0,
+    "change_rate": 0.1253,
+    "loss_per_changed": 0.0029,
+    "loss": 0.00037,
+    "ci": [
+     -0.00348,
+     0.00466
+    ],
+    "share_of_tree_loss": 0.01
+   }
+  },
+  "by_kind": {
+   "攻撃": {
+    "points_per_seat_game": 9.26,
+    "change_rate": 0.2091,
+    "loss_per_changed": 0.0058,
+    "loss": 0.01086,
+    "ci": [
+     -0.00044,
+     0.02247
+    ],
+    "share_of_tree_loss": 0.299
+   },
+   "起動": {
+    "points_per_seat_game": 2.1,
+    "change_rate": 0.1921,
+    "loss_per_changed": 0.0182,
+    "loss": 0.00762,
+    "ci": [
+     0.00267,
+     0.01305
+    ],
+    "share_of_tree_loss": 0.21
+   },
+   "展開": {
+    "points_per_seat_game": 6.43,
+    "change_rate": 0.1917,
+    "loss_per_changed": 0.0054,
+    "loss": 0.00664,
+    "ci": [
+     -0.00362,
+     0.01686
+    ],
+    "share_of_tree_loss": 0.183
+   },
+   "ドンの付与（付与して攻撃の箱を含む）": {
+    "points_per_seat_game": 6.46,
+    "change_rate": 0.2578,
+    "loss_per_changed": 0.0036,
+    "loss": 0.0061,
+    "ci": [
+     -0.00546,
+     0.018
+    ],
+    "share_of_tree_loss": 0.168
+   },
+   "ターン終了": {
+    "points_per_seat_game": 2.25,
+    "change_rate": 0.1219,
+    "loss_per_changed": 0.0138,
+    "loss": 0.00367,
+    "ci": [
+     -0.0019,
+     0.00953
+    ],
+    "share_of_tree_loss": 0.101
+   },
+   "効果の対話（自分の手番）": {
+    "points_per_seat_game": 1.6,
+    "change_rate": 0.05,
+    "loss_per_changed": 0.0105,
+    "loss": 0.00083,
+    "ci": [
+     -0.00251,
+     0.00438
+    ],
+    "share_of_tree_loss": 0.023
+   },
+   "マリガン": {
+    "points_per_seat_game": 1.0,
+    "change_rate": 0.1253,
+    "loss_per_changed": 0.0029,
+    "loss": 0.00037,
+    "ci": [
+     -0.00348,
+     0.00466
+    ],
+    "share_of_tree_loss": 0.01
+   },
+   "効果の対話（相手の手番）": {
+    "points_per_seat_game": 0.12,
+    "change_rate": 0.0305,
+    "loss_per_changed": 0.0625,
+    "loss": 0.00027,
+    "ci": [
+     0.0,
+     0.00081
+    ],
+    "share_of_tree_loss": 0.007
+   }
+  },
+  "by_advantage": {
+   "五分（−0.2〜+0.2）": {
+    "points_per_seat_game": 3.85,
+    "change_rate": 0.1667,
+    "loss_per_changed": 0.0206,
+    "loss": 0.01304,
+    "ci": [
+     0.00273,
+     0.02445
+    ],
+    "share_of_tree_loss": 0.359
+   },
+   "大きく不利（〜−0.6）": {
+    "points_per_seat_game": 7.96,
+    "change_rate": 0.2213,
+    "loss_per_changed": 0.0071,
+    "loss": 0.01238,
+    "ci": [
+     0.00208,
+     0.02202
+    ],
+    "share_of_tree_loss": 0.341
+   },
+   "大きく有利（+0.6〜）": {
+    "points_per_seat_game": 8.46,
+    "change_rate": 0.218,
+    "loss_per_changed": 0.005,
+    "loss": 0.00937,
+    "ci": [
+     0.00169,
+     0.018
+    ],
+    "share_of_tree_loss": 0.258
+   },
+   "不利（−0.6〜−0.2）": {
+    "points_per_seat_game": 4.49,
+    "change_rate": 0.1705,
+    "loss_per_changed": 0.0073,
+    "loss": 0.00569,
+    "ci": [
+     -0.00412,
+     0.01654
+    ],
+    "share_of_tree_loss": 0.157
+   },
+   "有利（+0.2〜+0.6）": {
+    "points_per_seat_game": 4.46,
+    "change_rate": 0.1597,
+    "loss_per_changed": -0.006,
+    "loss": -0.00413,
+    "ci": [
+     -0.01505,
+     0.00639
+    ],
+    "share_of_tree_loss": -0.114
+   }
+  },
+  "by_own_life": {
+   "0": {
+    "points_per_seat_game": 2.42,
+    "change_rate": 0.2497,
+    "loss_per_changed": 0.0186,
+    "loss": 0.01118,
+    "ci": [
+     0.00327,
+     0.02004
+    ],
+    "share_of_tree_loss": 0.307
+   },
+   "3": {
+    "points_per_seat_game": 6.16,
+    "change_rate": 0.1956,
+    "loss_per_changed": 0.0084,
+    "loss": 0.01002,
+    "ci": [
+     0.00077,
+     0.02027
+    ],
+    "share_of_tree_loss": 0.276
+   },
+   "4 以上": {
+    "points_per_seat_game": 11.8,
+    "change_rate": 0.1666,
+    "loss_per_changed": 0.0046,
+    "loss": 0.00913,
+    "ci": [
+     -0.00196,
+     0.02088
+    ],
+    "share_of_tree_loss": 0.251
+   },
+   "1": {
+    "points_per_seat_game": 3.95,
+    "change_rate": 0.2171,
+    "loss_per_changed": 0.009,
+    "loss": 0.0076,
+    "ci": [
+     -0.00243,
+     0.01783
+    ],
+    "share_of_tree_loss": 0.209
+   },
+   "2": {
+    "points_per_seat_game": 4.88,
+    "change_rate": 0.2252,
+    "loss_per_changed": -0.0014,
+    "loss": -0.00157,
+    "ci": [
+     -0.01228,
+     0.00856
+    ],
+    "share_of_tree_loss": -0.043
+   }
+  },
+  "rank_of_10x_move_in_ship_root": {
+   "2 番目": {
+    "替わった点": 1258,
+    "替わった 1 点の損": 0.0072,
+    "損（1 席 1 局）": 0.02484,
+    "損の 95% 区間": [
+     0.00893,
+     0.04108
+    ],
+    "取り分": 0.683
+   },
+   "3 番目": {
+    "替わった点": 381,
+    "替わった 1 点の損": 0.0017,
+    "損（1 席 1 局）": 0.0017,
+    "損の 95% 区間": [
+     -0.00685,
+     0.01064
+    ],
+    "取り分": 0.047
+   },
+   "上位 3 手の外": {
+    "替わった点": 455,
+    "替わった 1 点の損": 0.008,
+    "損（1 席 1 局）": 0.00981,
+    "損の 95% 区間": [
+     -0.00026,
+     0.02047
+    ],
+    "取り分": 0.27
+   }
+  },
+  "concentration": {
+   "木の点・種類の上位 3 個の取り分（正の損の合計に対して）": 0.691,
+   "木の点・種類 × 時期の上位 3 個の取り分（同）": 0.423
+  }
  },
- "appendix_don_variation_n70f": {
-  "rows": 2642087, "sum10_share": 0.975, "nonzero_share_all": 0.128, "nonzero_share_main_my": 0.125, "nonzero_share_window_opp": 0.147,
-  "nonzero_share_purple_leaders": 0.542, "nonzero_share_non_purple_leaders": 0.0034,
-  "diff_me_minus_opp_my_turn": {"+1": 0.481, "0": 0.353}, "diff_minus_rule_diff_zero": 0.769,
-  "corr_total_vs_turn": 0.82, "mode_share_within_seat_turn": 0.87,
-  "reading": "ドンの総数は手番数でほぼ決まり、同じ手番でドンだけ違う行は紫を含むリーダー（教材の 23%）にしか実質的に無い。仮説（同じ盤面でドンだけ違う対が教材にほとんど無い）はこの数えで支持される"
+ "top10_tree_single_axis": [
+  {
+   "axis": "相手のライフ",
+   "value": "3",
+   "loss": 0.02242,
+   "ci": [
+    0.01038,
+    0.03576
+   ],
+   "share": 0.617
+  },
+  {
+   "axis": "時期",
+   "value": "手番 9〜12",
+   "loss": 0.01543,
+   "ci": [
+    0.00119,
+    0.02874
+   ],
+   "share": 0.424
+  },
+  {
+   "axis": "時期",
+   "value": "手番 5〜8",
+   "loss": 0.01462,
+   "ci": [
+    0.00282,
+    0.02638
+   ],
+   "share": 0.402
+  },
+  {
+   "axis": "有利不利",
+   "value": "五分（−0.2〜+0.2）",
+   "loss": 0.01304,
+   "ci": [
+    0.00273,
+    0.02445
+   ],
+   "share": 0.359
+  },
+  {
+   "axis": "相手のライフ",
+   "value": "4 以上",
+   "loss": 0.01289,
+   "ci": [
+    0.00155,
+    0.02469
+   ],
+   "share": 0.355
+  },
+  {
+   "axis": "有利不利",
+   "value": "大きく不利（〜−0.6）",
+   "loss": 0.01238,
+   "ci": [
+    0.00208,
+    0.02202
+   ],
+   "share": 0.341
+  },
+  {
+   "axis": "自分のライフ",
+   "value": "0",
+   "loss": 0.01118,
+   "ci": [
+    0.00327,
+    0.02004
+   ],
+   "share": 0.307
+  },
+  {
+   "axis": "種類",
+   "value": "攻撃",
+   "loss": 0.01086,
+   "ci": [
+    -0.00044,
+    0.02247
+   ],
+   "share": 0.299
+  },
+  {
+   "axis": "自分のライフ",
+   "value": "3",
+   "loss": 0.01002,
+   "ci": [
+    0.00077,
+    0.02027
+   ],
+   "share": 0.276
+  },
+  {
+   "axis": "有利不利",
+   "value": "大きく有利（+0.6〜）",
+   "loss": 0.00937,
+   "ci": [
+    0.00169,
+    0.018
+   ],
+   "share": 0.258
+  }
+ ],
+ "predictions": {
+  "top3_share_ge_50pct": "hit on hesitation / opp life / turn band; kinds 69% but only 5 kinds; kind x turn cells 42% (miss)",
+  "check_vs_arena": "tree points 85%; all points 44% (CIs overlap)"
  },
- "artifacts": {
-  "nets": "n1_results/value_split/nets/nrel_vsb_{a,b}.ep{0..3}.npz（同梱しない・結果ブランチだけ）",
-  "logs": ["n1_results/value_split/train_vsb_a.log", "n1_results/value_split/train_vsb_b.log", "n1_results/value_split/don_variation_n70f.log"],
-  "tvval": "n1_results/value_split/tvval_*.json", "rocks": "n1_results/value_split/rocks_*.jsonl", "summary": "n1_results/value_split/summary.json",
-  "tool": "tests/scripts/don_variation.py（付録・TEST_SPEC §3 に 1 行）"
- },
+ "candidates": [
+  "A: deepen only hesitant points (2nd/1st visits >= 0.9: 15% of tree points, 59% of loss, ~+15 Elo at ~2.4x tree cost)",
+  "B: short-tree defence windows do not improve with 10x reads (-0.017, same under verify form); decouple window budget and measure",
+  "C: mid-game attack entry (opp life >= 3: 98% of loss); ordering attack/play/attach and don on attacks (3 transitions = 41%)",
+  "D: activate and turn-end decisions (15% of points, 31% of loss; heavy per point)",
+  "E: own life 0 turns (8% of points, 31% of loss; the three biggest single losses)"
+ ],
  "notes": [
-  "訓練は 2 本を並べず順に回した（1 本の RSS が約 11GB＝cgroup 14GB に 2 本は載らない）。1 周 約 20 分・2 本で約 3 時間",
-  "検証の誤差は同じ 2 波の取り置きに対する値（評価帯では測っていない）",
-  "試験台の列は 1 種・読みの乱数 1 本（前の報告どおり 6キングの列は ±0.05 揺れる）",
-  "コードは付録の道具 1 ファイルだけ（訓練器・試験台・エンジンは変えていない）"
+  "19 of 20 worker sessions waited ~2h in PENDING until nudged; 10 sessions declined the follow-up verify job sent by cross-session message, so new sessions were started for those shards",
+  "second push (one job json) went out ~2 min before the pytest half of the gate finished; it passed (937 passed)",
+  "measurement only: engine, nets and defaults unchanged; no tests added"
  ]
 }
