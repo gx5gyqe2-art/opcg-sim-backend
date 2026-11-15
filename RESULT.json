@@ -1,7 +1,7 @@
 {
  "job": "loss-map-v02",
  "role": "audit",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "setting": "§7.92 段 B の確かめ: 審判 r29f4（160 回）・今のターンの残りは両席とも出荷の設定・K＝16・配り方は judge の頭の 16 通りと同じ",
   "tool": "tests/scripts/loss_map_v.py",
