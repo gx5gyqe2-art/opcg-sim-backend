@@ -11,17 +11,22 @@
  "outputs": {
   "dir": "n1_results/loss_map/w02",
   "files": [
-   "n1_results/loss_map/w02/games.jsonl"
+   "n1_results/loss_map/w02/games.jsonl",
+   "n1_results/loss_map/w02/worker_steps.json"
   ]
  },
  "metrics": {
-  "games": 12,
+  "games": 15,
   "games_expected": 15,
   "void_games": 0,
   "points": 0,
-  "steps": {},
+  "steps": {
+   "play": {
+    "sec": 959
+   }
+  },
   "lines": {
-   "games.jsonl": 12
+   "games.jsonl": 15
   }
  },
  "notes": "",
