@@ -11,17 +11,22 @@
  "outputs": {
   "dir": "n1_results/loss_map/v18",
   "files": [
-   "n1_results/loss_map/v18/verify.jsonl"
+   "n1_results/loss_map/v18/verify.jsonl",
+   "n1_results/loss_map/v18/worker_steps.json"
   ]
  },
  "metrics": {
   "games": 0,
   "games_expected": 0,
   "void_games": 0,
-  "points": 22,
-  "steps": {},
+  "points": 30,
+  "steps": {
+   "verify": {
+    "sec": 1571
+   }
+  },
   "lines": {
-   "verify.jsonl": 22
+   "verify.jsonl": 30
   }
  },
  "notes": "",
