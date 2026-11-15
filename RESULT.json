@@ -1,47 +1,32 @@
 {
- "job": "loss-map-w18",
+ "job": "loss-map-v18",
  "role": "audit",
- "status": "done",
+ "status": "partial",
  "inputs": {
-  "setting": "§7.92 段 B: 両席 r29f4・出荷の設定（1,280 回・世界 8 本）・random × real・10 倍の読み・審判 r29f4（160 回・K＝32）",
-  "tool": "tests/scripts/loss_map.py",
-  "seed_base": 7358000,
-  "games": 15
+  "setting": "§7.92 段 B の確かめ: 審判 r29f4（160 回）・今のターンの残りは両席とも出荷の設定・K＝16・配り方は judge の頭の 16 通りと同じ",
+  "tool": "tests/scripts/loss_map_v.py",
+  "seed_base": 7341000,
+  "games": 0
  },
  "outputs": {
-  "dir": "n1_results/loss_map/w18",
+  "dir": "n1_results/loss_map/v18",
   "files": [
-   "n1_results/loss_map/w18/games.jsonl",
-   "n1_results/loss_map/w18/judge.jsonl",
-   "n1_results/loss_map/w18/reads.jsonl",
-   "n1_results/loss_map/w18/worker_steps.json"
+   "n1_results/loss_map/v18/verify.jsonl"
   ]
  },
  "metrics": {
-  "games": 15,
-  "games_expected": 15,
+  "games": 0,
+  "games_expected": 0,
   "void_games": 0,
-  "points": 659,
-  "steps": {
-   "play": {
-    "sec": 795
-   },
-   "read": {
-    "sec": 4337
-   },
-   "judge": {
-    "sec": 4247
-   }
-  },
+  "points": 11,
+  "steps": {},
   "lines": {
-   "games.jsonl": 15,
-   "judge.jsonl": 116,
-   "reads.jsonl": 659
+   "verify.jsonl": 11
   }
  },
  "notes": "",
  "worker": {
-  "spec": "origin/claude/loss-map:opcg_sim/loop/jobs/audit_loss_map.json",
+  "spec": "origin/claude/loss-map:opcg_sim/loop/jobs/audit_loss_map_v.json",
   "k": 18,
   "branch": "claude/loss-map-w18",
   "code_commit": "62d80ca186c22acdffdb99f042ed3eb7533072e7"
