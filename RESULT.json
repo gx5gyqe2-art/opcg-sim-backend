@@ -18,10 +18,10 @@
   "games": 0,
   "games_expected": 0,
   "void_games": 0,
-  "points": 4,
+  "points": 8,
   "steps": {},
   "lines": {
-   "verify.jsonl": 4
+   "verify.jsonl": 8
   }
  },
  "notes": "",
