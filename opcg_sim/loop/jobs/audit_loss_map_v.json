@@ -1,0 +1,50 @@
+{
+ "kind": "audit",
+ "section": "§7.92",
+ "ledger_grep": "7.45 WP `worker-audit`",
+ "about": "負け方の内訳（§7.92 段 B）の確かめ: 10 倍の読みで手が替わった点のうち短い木の窓の組の全部と木の組の約 1 割を、今のターンの残りを両席とも出荷の設定で打つ形の審判で打ち直す（330 局を 20 に割った k 番目）。結果はシャードの結果ブランチに足す（道具と入力は claude/loss-map から取り出す）",
+ "job": "loss-map-v{KK}",
+ "branch": "claude/loss-map-w{KK}",
+ "base": {
+  "branch": "claude/loss-map"
+ },
+ "shards": 20,
+ "hours": 2,
+ "tool": "tests/scripts/loss_map_v.py",
+ "seed_base": "7341000",
+ "games": 0,
+ "out_dir": "n1_results/loss_map/v{KK}",
+ "push_every_min": 10,
+ "args": [
+  "--workers",
+  "4"
+ ],
+ "steps": [
+  {
+   "name": "verify",
+   "args": [
+    "verify",
+    "--src",
+    "n1_results/loss_map",
+    "--shard",
+    "{k}/20",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  }
+ ],
+ "points_file": {
+  "file": "verify.jsonl",
+  "skip_key": "error"
+ },
+ "inputs": {
+  "setting": "§7.92 段 B の確かめ: 審判 r29f4（160 回）・今のターンの残りは両席とも出荷の設定・K＝16・配り方は judge の頭の 16 通りと同じ"
+ },
+ "commit_message": "loss map verify shard {KK}",
+ "fetch": {
+  "tests/scripts/loss_map_v.py": "claude/loss-map:tests/scripts/loss_map.py",
+  "n1_results/loss_map/reads.jsonl": "claude/loss-map:n1_results/loss_map/reads.jsonl",
+  "n1_results/loss_map/games.jsonl.gz": "claude/loss-map:n1_results/loss_map/games.jsonl.gz"
+ }
+}

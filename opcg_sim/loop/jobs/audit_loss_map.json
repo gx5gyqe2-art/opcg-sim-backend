@@ -1,0 +1,32 @@
+{
+ "kind": "audit",
+ "section": "§7.92",
+ "ledger_grep": "7.45 WP `worker-audit`",
+ "about": "負け方の内訳（§7.92 段 B）: 出荷の設定の 300 局（seed 7341000 + (k−1)×1000 から 15 局 × 20 シャード）の判断点で、打った手と 10 倍の読みの手を比べ、固定の審判で損を測る",
+ "job": "loss-map-w{KK}",
+ "branch": "claude/loss-map-w{KK}",
+ "base": {
+  "branch": "claude/loss-map"
+ },
+ "shards": 20,
+ "hours": 4,
+ "tool": "tests/scripts/loss_map.py",
+ "seed_base": "7341000 + (k - 1)*1000",
+ "games": 15,
+ "out_dir": "n1_results/loss_map/w{KK}",
+ "push_every_min": 15,
+ "args": [
+  "--workers",
+  "4"
+ ],
+ "steps": [
+  {"name": "play", "args": ["play", "--games", "{GAMES}", "--seed-base", "{SEED}", "--out", "{OUT}"], "with_args": true},
+  {"name": "read", "args": ["read", "--out", "{OUT}"], "with_args": true},
+  {"name": "judge", "args": ["judge", "--out", "{OUT}"], "with_args": true}
+ ],
+ "games_file": {"file": "games.jsonl", "seed_key": "seed", "void_key": "void"},
+ "points_file": {"file": "reads.jsonl", "skip_key": "error"},
+ "require": [{"file": "tests/scripts/loss_map.py", "grep": "def cmd_judge"}],
+ "inputs": {"setting": "§7.92 段 B: 両席 r29f4・出荷の設定（1,280 回・世界 8 本）・random × real・10 倍の読み・審判 r29f4（160 回・K＝32）"},
+ "commit_message": "loss map shard {KK}"
+}
