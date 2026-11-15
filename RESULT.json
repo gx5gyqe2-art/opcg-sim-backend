@@ -20,15 +20,18 @@
   "games": 15,
   "games_expected": 15,
   "void_games": 0,
-  "points": 613,
+  "points": 647,
   "steps": {
    "play": {
     "sec": 470
+   },
+   "read": {
+    "sec": 2909
    }
   },
   "lines": {
    "games.jsonl": 15,
-   "reads.jsonl": 613
+   "reads.jsonl": 647
   }
  },
  "notes": "",
