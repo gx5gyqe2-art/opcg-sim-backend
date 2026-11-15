@@ -1,0 +1,67 @@
+{
+ "kind": "arena",
+ "section": "§7.92",
+ "ledger_grep": "WP `ceiling-map` の上限の目安",
+ "about": "上限の目安（§7.92 段 A）: 候補＝旧い世代 a1 vs 基準＝r29f4・公平。両席 出荷の設定（1,280 回・世界 8 本・枝予算なし・詰みの証明 root）・random×real。1 シャード 56 ペア",
+ "job": "arena-cm-a1-w{KK}",
+ "branch": "claude/arena-cm-a1-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 12,
+ "hours": 4,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_a1.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r29f4.npz"
+ },
+ "out_dir": "arena_cm_a1",
+ "pairs": 56,
+ "chunk_pairs": 14,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "8",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "8",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "7321000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "cm_a1_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "候補＝旧い世代 a1",
+  "baseline": "nrel_r29f4.npz (fair)",
+  "both": "sims 1280 x worlds 8 x budget 0 x lethal root",
+  "pairs": 56
+ },
+ "commit_message": "arena cm_a1 shard {KK}"
+}
