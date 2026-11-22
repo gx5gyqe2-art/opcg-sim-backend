@@ -251,6 +251,7 @@ pub fn get_target_cards(
     let fl_trait_partial = query.has_flag("TRAIT_PARTIAL");
     // 「イベントか特徴《X》を持つカード」（EB05-007）＝種類 OR 特徴。
     let fl_type_or_trait = query.has_flag("TYPE_OR_TRAIT");
+    let fl_traits_all = query.has_flag("TRAITS_ALL");
 
     for cand in candidates {
         // Python: `if exclude_source and source_card is not None and card is source_card: continue`
@@ -445,15 +446,21 @@ pub fn get_target_cards(
         };
         // 「『X』を含む特徴」（TRAIT_PARTIAL）は特徴名の部分一致（「元ロックス海賊団」等も該当）。
         let trait_partial = fl_trait_partial;
+        let has_trait = |t: &String| -> bool {
+            if trait_partial {
+                master.traits.iter().any(|x| x.contains(t.as_str()))
+            } else {
+                master.traits.contains(t)
+            }
+        };
+        // 「特徴《A》と《B》を両方持つ」（TRAITS_ALL・OP18-001/011/012）は全特徴の AND。既定は OR。
         let trait_in = || -> bool {
             !query.traits.is_empty()
-                && query.traits.iter().any(|t| {
-                    if trait_partial {
-                        master.traits.iter().any(|x| x.contains(t.as_str()))
-                    } else {
-                        master.traits.contains(t)
-                    }
-                })
+                && if fl_traits_all {
+                    query.traits.iter().all(has_trait)
+                } else {
+                    query.traits.iter().any(has_trait)
+                }
         };
 
         if fl_selector_or {
@@ -718,6 +725,19 @@ pub(crate) mod tests {
         if all.len() > 2 {
             assert_eq!(ends, vec![all[0].clone(), all[all.len() - 1].clone()]);
         }
+    }
+
+    /// 「特徴《A》と《B》を両方持つ」（TRAITS_ALL・OP18-001/011/012）は全特徴の AND、既定は OR。
+    #[test]
+    fn traits_all_flag_requires_every_trait() {
+        let f = fixture();
+        let q = r#""traits":["麦わらの一味","海軍"],"card_type":["CHARACTER"]"#;
+        assert_eq!(f.run(&query(q), "p1-char-a"), ["p1-char-a", "p1-char-b"]);
+        assert!(f.run(&query(&format!(r#"{q},"flags":["TRAITS_ALL"]"#)), "p1-char-a").is_empty());
+        assert_eq!(
+            f.run(&query(r#""traits":["麦わらの一味"],"card_type":["CHARACTER"],"flags":["TRAITS_ALL"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
     }
 
     #[test]

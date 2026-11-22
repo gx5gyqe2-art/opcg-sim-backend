@@ -1625,10 +1625,18 @@ class EffectParser:
             # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
             # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
             _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
+            # 「〈…キャラすべて〉は、【X】を得て、パワー+N」（OP18-001）: 「すべて」の主語は後句にも掛かる
+            # （全体指定なので後句で引き直しても同じ集合）。枚数指定（1枚まで等）は同一対象の継承が要るので
+            # ここでは扱わない。
+            _all_subj_re = re.compile(_nfc(r'^(.+?(?:すべて|全て))は、?(?:[^、]*、)?【[^】]+】を得て$'))
             _carry_subj = None
             _carry_per = None
             for _pi, _p in enumerate(parts):
-                if _carry_subj and _bare_buff_re.match(_p):
+                if _carry_subj and _bare_buff_re.match(_p) and _carry_subj.endswith((_nfc('すべて'), _nfc('全て'))):
+                    _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
+                    _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
+                    parts[_pi] = _carry_subj + 'は、' + _dur + _p
+                elif _carry_subj and _bare_buff_re.match(_p):
                     _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
                     _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
                     _own_per = _per_re.match(_p) is not None
@@ -1639,8 +1647,12 @@ class EffectParser:
                     else:
                         parts[_pi] = _carry_subj + 'の' + _p
                 else:
+                    _am = _all_subj_re.match(_p)
                     _sm = _subj_re.search(_p)
-                    if _sm:
+                    if _am:
+                        _carry_subj = _am.group(1)
+                        _carry_per = None
+                    elif _sm:
                         _carry_subj = _sm.group(1)
                         _pm = _per_re.search(_p)
                         _carry_per = (_pm.group(1) + '、') if _pm else None
