@@ -568,6 +568,9 @@ class EffectParser:
             norm_text = re.sub(
                 _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
                 r'\1\2\3', norm_text)
+            # 「公開したカードの【トリガー】効果を発動する」（OP18-105）: 参照先が【トリガー】で
+            # あることを保全する（タグ除去で消えると発生源自身の【メイン】の再展開に化ける）。
+            norm_text = re.sub(_nfc(r'(公開したカードの)【(トリガー)】(効果)'), r'\1\2\3', norm_text)
 
             # 「ルール上、…できず、ゲーム開始時、…」（OP13-079）: 前半はデッキ構築制限で
             # ランタイム効果ではない。残すと parse_target が後半の対象解析を汚染する
@@ -1301,7 +1304,15 @@ class EffectParser:
 
             actions = []
             if before_part:
-                before_node = self._parse_to_node(before_part, is_cost=True)
+                # 並列の「と」で動詞を共有する形（「自分の「ゴンベ」1枚とこのキャラをレストにできる」
+                # OP18-028）: 前半だけでは動詞が無く OTHER に落ちる。発生源の句の動詞部
+                # （「をレストにできる」等）を前半に補って解析する。ドン!!（「自分のドン!!1枚と」）は
+                # 前半だけで REST_DON になる従来の形のまま。
+                if head.endswith('と') and _nfc('ドン') not in before_part:
+                    _verb = re.sub(_nfc(r'^この(?:カード|キャラ|リーダー|ステージ)'), '', m.group(0))
+                    before_node = self._parse_to_node(head[:-1] + _verb, is_cost=True)
+                else:
+                    before_node = self._parse_to_node(before_part, is_cost=True)
                 if isinstance(before_node, Sequence):
                     actions.extend(before_node.actions)
                 elif before_node is not None:

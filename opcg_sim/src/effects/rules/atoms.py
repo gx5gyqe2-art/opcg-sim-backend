@@ -1303,24 +1303,35 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("手札") not in t and _nfc("トラッシュ") not in t:
         return None
-    if not re.search(_nfc(r"ライフの(上|下)に(?:[表裏]向きで)?加える"), t):
+    if not re.search(_nfc(r"ライフの(上か下|上|下)に(?:[表裏]向きで)?加える"), t):
         return None
     tq = parse_target(t)
     # 源ゾーン: parse_target が複数ゾーン（「手札かトラッシュ」ST13-003）を検出済みなら尊重する。
     # 単一ゾーンのときのみ手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
     if not isinstance(tq.zone, list):
         tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
-    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     # 「表向きで加える」→ 表向き、「裏向きで」→ 裏向き、明示なし→ゾーン既定(裏向き)。
     face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)
-    return GameAction(
-        type=ActionType.MOVE_CARD,
-        target=tq,
-        destination=Zone.LIFE,
-        dest_position=dest_position,
-        face_up=face_up,
-        raw_text=t,
-    )
+
+    def _move(position: str) -> GameAction:
+        return GameAction(
+            type=ActionType.MOVE_CARD,
+            target=tq,
+            destination=Zone.LIFE,
+            dest_position=position,
+            face_up=face_up,
+            raw_text=t,
+        )
+
+    # 「（自分の）手札から…を、自分のライフの上か下に表向きで加える」（OP18-099/100/101）:
+    # 上か下はプレイヤーが選ぶ（field_char_to_life と同じ Choice の形）。
+    if re.search(_nfc(r"ライフの上か下に"), t):
+        return Choice(
+            message="ライフの上か下に加える",
+            option_labels=["ライフの上に加える", "ライフの下に加える"],
+            options=[_move("TOP"), _move("BOTTOM")],
+        )
+    return _move("TOP" if _nfc("ライフの上") in t else "BOTTOM")
 
 
 @rule("life_to_trash", priority=68)
@@ -2124,7 +2135,8 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
     #   展開しており、【登場時】/【KO時】参照のトリガーが no-op だった）。
     ref = None
     for tag, trig in ((r"登場時", "ON_PLAY"), (r"KO時", "ON_KO"),
-                      (r"アタック時", "ON_ATTACK"), (r"起動メイン|メイン", "ACTIVATE_MAIN")):
+                      (r"アタック時", "ON_ATTACK"), (r"トリガー", "TRIGGER"),
+                      (r"起動メイン|メイン", "ACTIVATE_MAIN")):
         if re.search(_nfc(rf"【?(?:{tag})】?効果"), ctx.text):
             ref = trig
             break
@@ -2132,7 +2144,12 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
     # 発生源自身ではなく、選んだカードの【メイン】効果を発動する。発動するカードを選ぶ
     # ターゲットを付与する（従来は target 無しで発生源を再展開し、選択が脱落していた）。
     target = None
-    if re.search(_nfc(r'(トラッシュ|手札|デッキ).{0,30}効果を発動'), ctx.text):
+    if re.search(_nfc(r'公開したカードの'), ctx.text):
+        # 「公開したカードの【トリガー】効果を発動する」（OP18-105）: 直前の公開（reveal_hand が
+        # saved_targets["revealed_cards"] に保存）で公開したカードの能力を発動する。公開が 0 枚なら何もしない。
+        target = TargetQuery(select_mode="ALL", ref_id="revealed_cards", zone=Zone.HAND, player=Player.SELF,
+                             is_up_to=True, raw_text=ctx.text)
+    elif re.search(_nfc(r'(トラッシュ|手札|デッキ).{0,30}効果を発動'), ctx.text):
         sel = re.sub(_nfc(r'の[、,]?\s*【?(?:起動メイン|メイン)?】?効果を発動.*$'), '', ctx.text)
         target = parse_target(sel)
         if _nfc("トラッシュ") in sel:
@@ -3130,7 +3147,8 @@ def _active_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") in t:
         return None  # ドン!!のアクティブ化は don_set_active が担当
-    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる|し$)"), t.strip()):
+    # 「このリーダーをアクティブにしてもよい」（OP18-022）: 任意は parser の任意効果マーカーが拾う。
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる|し$|してもよい)"), t.strip()):
         return None
     return GameAction(
         type=ActionType.ACTIVE,

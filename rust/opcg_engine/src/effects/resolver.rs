@@ -743,6 +743,56 @@ impl Resolver {
                 }
                 return Ok(true);
             }
+            // コスト付きの【メイン】（「【メイン】自分のキャラ1枚を手札に戻すことができる：…」＋
+            // 「【トリガー】このカードの【メイン】効果を発動する」OP18-058 等）: 効果だけを積むと
+            // コストを払わずに効果が出る。払えるなら払うかを選ばせ（ConfirmOptional）、払うときだけ
+            // コスト→効果の順に積む。払えない・断った＝何もしない（カードのプレイコストは払わない）。
+            if !self.context.main_expanded {
+                if let Some(src) = source_card {
+                    let ids = main_ability_ids(s, masters, src, action.status.as_deref())?;
+                    let mut has_cost = false;
+                    let mut payable: Vec<(u32, bool)> = Vec::new();
+                    for id in &ids {
+                        let ab = super::ability(masters, *id)?;
+                        match ab.cost.as_ref() {
+                            Some(cost) => {
+                                has_cost = true;
+                                let cost_ref = NodeRef::root(*id, NodeRoot::Cost);
+                                if self.can_satisfy_node(s, masters, actor, cost, &cost_ref, Some(src))? {
+                                    payable.push((*id, true));
+                                }
+                            }
+                            None => payable.push((*id, false)),
+                        }
+                    }
+                    if has_cost {
+                        if payable.iter().any(|(_, c)| *c) && !self.context.is_confirmed(node_ref) {
+                            super::interact::suspend_for_optional_confirmation(
+                                s,
+                                masters,
+                                actor,
+                                node_ref,
+                                source_card,
+                                &self.execution_stack,
+                                &self.context,
+                            )?;
+                            return Ok(false);
+                        }
+                        self.context.main_expanded = true;
+                        // 既存スタックの「後」に積む＝先に実行（reversed で push・各能力はコストが上）。
+                        for (id, costed) in payable.iter().rev() {
+                            let ab = super::ability(masters, *id)?;
+                            if ab.effect.is_some() {
+                                self.execution_stack.push(NodeRef::root(*id, NodeRoot::Effect));
+                            }
+                            if *costed {
+                                self.execution_stack.push(NodeRef::root(*id, NodeRoot::Cost));
+                            }
+                        }
+                        return Ok(true);
+                    }
+                }
+            }
             self.expand_main_effect(s, masters, source_card, action.status.as_deref())?;
             return Ok(true);
         }
@@ -1782,6 +1832,8 @@ fn ref_trigger_of(ref_trigger: Option<&str>) -> TriggerType {
         Some("ON_PLAY") => TriggerType::OnPlay,
         Some("ON_KO") => TriggerType::OnKo,
         Some("ON_ATTACK") => TriggerType::OnAttack,
+        // 「公開したカードの【トリガー】効果を発動する」（OP18-105）。
+        Some("TRIGGER") => TriggerType::Trigger,
         _ => TriggerType::ActivateMain,
     }
 }
@@ -1806,7 +1858,8 @@ fn main_ability_indices(
         Ok(out)
     };
     let mut mains = pick(primary)?;
-    if mains.is_empty() {
+    // 【トリガー】の参照は【トリガー】だけ（持たないカードなら何もしない＝【カウンター】へ落とさない）。
+    if mains.is_empty() && primary != TriggerType::Trigger {
         mains = pick(TriggerType::Counter)?;
     }
     Ok(mains)
