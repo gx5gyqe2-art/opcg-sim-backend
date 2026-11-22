@@ -362,9 +362,9 @@
   },
   "EB01-051": {
    "ast_sha": "7b5811cc78ba59e2",
-   "note": "[厳格レビュー]",
-   "probe_sha": "e37797d0d4ff9b23",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: トリガーで確認→TRASH_FROM_DECK2→KO(コスト5以下まで)・払った時だけ効果",
+   "probe_sha": "9e76f0a106cd3f7b",
+   "reviewed": "2026-11-22",
    "text_sha": "5d4c5336df07e4d8",
    "verdict": "ok"
   },
@@ -1738,9 +1738,9 @@
   },
   "EB04-049": {
    "ast_sha": "460d71ce66cc7e8d",
-   "note": "ORIGINAL_COST で解消 [厳格レビュー・修正後再判定]",
-   "probe_sha": "e37797d0d4ff9b23",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: 元々のコストは flags=ORIGINAL_COST で表現(GAP解消)・トリガーは確認→コスト→KO",
+   "probe_sha": "9e76f0a106cd3f7b",
+   "reviewed": "2026-11-22",
    "text_sha": "7e241168485e1ddd",
    "verdict": "ok"
   },
@@ -4450,17 +4450,17 @@
   },
   "OP03-073": {
    "ast_sha": "2613c80970756c1e",
-   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
-   "probe_sha": "6daf070bd2f4c03d",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: ドン!!-1→W7リーダー条件(then)でコスト2以下KO、トリガーは確認→RETURN_DON→KO",
+   "probe_sha": "4a31f0eeddc2442f",
+   "reviewed": "2026-11-22",
    "text_sha": "263fda236753b3c2",
    "verdict": "ok"
   },
   "OP03-074": {
    "ast_sha": "3858aacb77c06f1b",
-   "note": "全句対応(句→ノード一致・QUALIFIER_GAPなし) [厳格レビュー]",
-   "probe_sha": "ddfa13d2baebf33c",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: ドン!!-2→相手コスト4以下までデッキ下、トリガーは確認→RETURN_DON→DECK_BOTTOM",
+   "probe_sha": "fb23fadca3ad8ab8",
+   "reviewed": "2026-11-22",
    "text_sha": "3d8dc8230e30ebc4",
    "verdict": "ok"
   },
@@ -5202,9 +5202,9 @@
   },
   "OP04-055": {
    "ast_sha": "53d1b973b74cfe1f",
-   "note": "[厳格レビュー]",
-   "probe_sha": "b4223474fb219aef",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: コスト 氷鬼捨て＋コスト4以下キャラ1枚デッキ下→トラッシュから氷鬼登場、トリガーは確認→両コスト→登場",
+   "probe_sha": "7c100039d827f695",
+   "reviewed": "2026-11-22",
    "text_sha": "6cc087c90c5e2001",
    "verdict": "ok"
   },
@@ -7290,9 +7290,9 @@
   },
   "OP06-096": {
    "ast_sha": "fcd2b69d1692c440",
-   "note": "全句対応・QUALIFIER_GAPなし（条件/対象/値/期間一致） [厳格レビュー]",
-   "probe_sha": "1643f335e1ed6b1c",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: カウンター ライフ上1枚手札→コスト7以下全てTHIS_TURN BATTLE_KO不可、トリガーはstatus無し→ACTIVATE_MAIN無しでCOUNTERへフォールバック・確認→コスト→効果",
+   "probe_sha": "09ac29dbd97d88e5",
+   "reviewed": "2026-11-22",
    "text_sha": "a36f0a762b198df5",
    "verdict": "ok"
   },
@@ -9058,9 +9058,9 @@
   },
   "OP08-094": {
    "ast_sha": "6c77f7b236b29d82",
-   "note": "全句がノード・対象・条件と一致（再レビュー・修正後） [厳格レビュー]",
-   "probe_sha": "c4c8a1c73378a15b",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: メイン/カウンター両能力、トラッシュ3枚好きな順でデッキ下(ARRANGE)→コスト2以下KO、トリガーはACTIVATE_MAINのみ展開",
+   "probe_sha": "5d2aa50e3e7d60b2",
+   "reviewed": "2026-11-22",
    "text_sha": "d6a673f5ec709c0f",
    "verdict": "ok"
   },
@@ -9146,9 +9146,9 @@
   },
   "OP08-106": {
    "ast_sha": "ea5da1bc3eb1e243",
-   "note": "登場時 手札のトリガー持ち1枚捨て(任意)→相手コスト5以下1枚までKO→手札3以下ならドロー(Branch)／トリガー EXECUTE ON_PLAY 一致 [厳格レビュー]",
-   "probe_sha": "c62c301c7960a12d",
-   "reviewed": "2026-10-01",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: 登場時 トリガー持ち捨て→コスト5以下KO→その後 手札3以下で1ドロー、トリガーはON_PLAY能力を確認1回→コスト→効果",
+   "probe_sha": "0f402995c90b2b37",
+   "reviewed": "2026-11-22",
    "text_sha": "399601b4c8236cf1",
    "verdict": "ok"
   },
@@ -9850,9 +9850,9 @@
   },
   "OP09-084": {
    "ast_sha": "bcacb60f022bee19",
-   "note": "全句対応 [厳格レビュー]",
+   "note": "[厳格レビュー] 修正後の再レビュー。ターン1回＋リーダー特徴《黒ひげ海賊団》、3択キーワードを次の相手ターン終了時まで。master keywords=[]。",
    "probe_sha": "bab0f20e3a748ea6",
-   "reviewed": "2026-10-01",
+   "reviewed": "2026-11-22",
    "text_sha": "a3154290ac1f5741",
    "verdict": "ok"
   },
@@ -16945,12 +16945,12 @@
    "verdict": "ok"
   },
   "OP18-001": {
-   "ast_sha": "527cc89a05a8d806",
-   "note": "「両方持つキャラすべて」: traits は any 照合で OR になる（エンジン matcher）＋パワー+1000 の対象が SELF/FIELD count=1 の選択で『すべて』と特徴の絞りが無い（パーサ）",
-   "probe_sha": "b96749b95b610544",
+   "ast_sha": "ea98fdb95cd6e7b2",
+   "note": "[厳格レビュー] 修正後の再レビュー。TRAITS_ALL（matcher.rs:456 で AND）が【速攻】付与と+1000の両方の対象に付く。KO時リスナーは自分の《アラバスタ王国》キャラで照合。keywords=[]。",
+   "probe_sha": "6e473aa8d34ca997",
    "reviewed": "2026-11-22",
    "text_sha": "7aa2158bc0fdffda",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-002": {
    "ast_sha": "c4d7b62e3d273c7b",
@@ -16961,12 +16961,12 @@
    "verdict": "ok"
   },
   "OP18-004": {
-   "ast_sha": "b4788762ca96c37f",
-   "note": "「5000以上／6000以上／7000以上の場合」が GENERIC EQ 0（常に真, cond.rs:815）でパワー閾値が無い（パーサ）。【ブロック不可】も既知の未処理",
-   "probe_sha": "eb3683c6f7366d24",
+   "ast_sha": "5a0df2abee19be79",
+   "note": "[厳格レビュー] 修正後の再レビュー。3分岐とも SOURCE_STATE GE POWER 5000/6000/7000＝本物の条件。ブロック不可はエンジン処理済み。",
+   "probe_sha": "bc316e4d145a6108",
    "reviewed": "2026-11-22",
    "text_sha": "221b162e9782d002",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-005": {
    "ast_sha": "6c51251865afe917",
@@ -17017,20 +17017,20 @@
    "verdict": "ok"
   },
   "OP18-011": {
-   "ast_sha": "32dc50a14fad1c77",
-   "note": "「《動物》と《アラバスタ王国》を両方持つキャラすべて」が traits any 照合で OR（プローブで《アラバスタ王国》のみのビビ自身も+1000）（エンジン/パーサ）",
+   "ast_sha": "0bb5955414568cb7",
+   "note": "[厳格レビュー] 修正後の再レビュー。TRAITS_ALL の全体+1000（本カードは《動物》なしで対象外＝本文どおり）。相手ターン中ブロッカー+6000。",
    "probe_sha": "697ef581db5b3f65",
    "reviewed": "2026-11-22",
    "text_sha": "e48842b5e30eb35d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-012": {
-   "ast_sha": "238ad29841f5b3bf",
-   "note": "「両方持つキャラ1枚まで」が traits any 照合で OR になる（エンジン/パーサ）",
+   "ast_sha": "63a62dbd38827a79",
+   "note": "[厳格レビュー] 修正後の再レビュー。TRAITS_ALL のキャラ1枚まで このターン+1000。",
    "probe_sha": "0055849212073132",
    "reviewed": "2026-11-22",
    "text_sha": "faf3f42b1670006a",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-013": {
    "ast_sha": "b553385cba1f747d",
@@ -17105,12 +17105,12 @@
    "verdict": "ok"
   },
   "OP18-022": {
-   "ast_sha": "342b18c401c24e96",
-   "note": "「このリーダーをアクティブにしてもよい」が OTHER（未実装）で後続の FREEZE も動かない（パーサ）",
-   "probe_sha": "1eb955a601a5618f",
+   "ast_sha": "d8fbeb3f407a9db8",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: DON×3/ターン1回/任意ACTIVE→そうした場合FREEZE(SOURCE)",
+   "probe_sha": "3d232ecd22af4d78",
    "reviewed": "2026-11-22",
    "text_sha": "dd876f8a4330cb85",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-023": {
    "ast_sha": "83426450e36ad146",
@@ -17153,12 +17153,12 @@
    "verdict": "ok"
   },
   "OP18-028": {
-   "ast_sha": "c3901c943d9955e3",
-   "note": "コストの「自分の「ゴンベ」1枚と（レスト）」が OTHER に分離され未実装（パーサ）",
-   "probe_sha": "1a6bdb2da58e5ccd",
+   "ast_sha": "0c6903089c0ae358",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: コスト ゴンベ1枚REST＋自身REST、リーダー「ルフィ」ACTIVE",
+   "probe_sha": "1c7e200f50177683",
    "reviewed": "2026-11-22",
    "text_sha": "92f401b1001be0ee",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-029": {
    "ast_sha": "af62cc6ca5afd129",
@@ -17177,12 +17177,12 @@
    "verdict": "ok"
   },
   "OP18-031": {
-   "ast_sha": "55da6daee63efb0d",
-   "note": "能力1の「特徴《W7》を持つカード1枚まで」のアクティブ化が欠落し ACTIVE_DON のみ／能力0の【相手のターン中】条件も無い（パーサ）",
-   "probe_sha": "4b56118c713c7a4b",
+   "ast_sha": "6b9b9d2222ff625c",
+   "note": "[厳格レビュー] 修正後の再レビュー。置換 LEAVE＋相手の効果限定＋【相手のターン中】は rules.rs で読む。ターン終了時 W7 カード1枚まで＋ドン1枚までアクティブ。",
+   "probe_sha": "43809ff0d4cb491b",
    "reviewed": "2026-11-22",
    "text_sha": "97c337f42bfdd1fb",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-032": {
    "ast_sha": "aeff5e0b6d9fbd14",
@@ -17201,12 +17201,12 @@
    "verdict": "ok"
   },
   "OP18-034": {
-   "ast_sha": "8aa1dc973cbb1830",
-   "note": "「その後、自分のコスト5以上のステージがある場合」が GENERIC EQ 0（常に真）で条件が無い（パーサ）",
+   "ast_sha": "5fed0acde27c8cc4",
+   "note": "[厳格レビュー] 修正後の再レビュー。手札コスト5以下・特徴OR 1枚まで登場、その後 FIELD_COUNT GE1(STAGE cost_min5) で相手コスト6以下1枚までレスト。",
    "probe_sha": "683893e5ccd38df5",
    "reviewed": "2026-11-22",
    "text_sha": "f93cf4413094b0bc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-036": {
    "ast_sha": "f2bafd8286deb69c",
@@ -17321,12 +17321,12 @@
    "verdict": "ok"
   },
   "OP18-051": {
-   "ast_sha": "2abeefcd521c267e",
-   "note": "「コスト6以下と5以下のキャラ1枚ずつまで」が cost_max6 の1対象だけで、5以下の2体目のノードが無い（パーサ）",
-   "probe_sha": "349c035e892a348e",
+   "ast_sha": "8e4d70421be8a831",
+   "note": "[厳格レビュー] 修正後の再レビュー。cost≤6 と cost≤5 の 2 SELECT（両者の場）、2枚目に EXCLUDE_SAVED:_each_a。デッキ下 ARRANGE。",
+   "probe_sha": "1353347dfea9f9a6",
    "reviewed": "2026-11-22",
    "text_sha": "94c74054eff427a2",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-052": {
    "ast_sha": "52b049993e27eec2",
@@ -17378,11 +17378,11 @@
   },
   "OP18-058": {
    "ast_sha": "c17bed4c94109c70",
-   "note": "【トリガー】でメイン効果を発動する際、EXECUTE_MAIN_EFFECT が効果部だけ積みコスト（自キャラ1枚を手札に戻す）を払わない（エンジン）",
-   "probe_sha": "25184a1da26761cd",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: トリガー→EXECUTE_MAIN_EFFECTはコスト払えるとき確認→承諾でBOUNCE→DECK_BOTTOM、断る/払えない=何もしない(resolver.rs 745-790・events確認)",
+   "probe_sha": "5a044c2e4bcbadf9",
    "reviewed": "2026-11-22",
    "text_sha": "f633541e885b326f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-059": {
    "ast_sha": "472c61212266b8bc",
@@ -17393,20 +17393,20 @@
    "verdict": "ok"
   },
   "OP18-060": {
-   "ast_sha": "49f33c25f45caa28",
-   "note": "能力0「自分のトラッシュからキャラが登場した時」の誘発が trigger=ACTIVATE_MAIN（起動メイン）になっている（パーサ）",
+   "ast_sha": "5fa360eee454928f",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: PASSIVE+played_subject_matches(トラッシュ・自分のキャラ)・ターン1回で2ドロー1捨て、起動メイン 捨てコスト→元々パワー8000以上(ORIGINAL_POWER)いれば ドン1枚までアクティブ追加",
    "probe_sha": "53fd75138e8f99ad",
    "reviewed": "2026-11-22",
    "text_sha": "54571dfff0f700d4",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-061": {
-   "ast_sha": "bd8663232767241b",
-   "note": "「ステージカードか特徴《W7》を持つカード」が card_type=STAGE かつ traits=W7 の AND になり OR になっていない（FIRED_EMPTY・パーサ）",
+   "ast_sha": "b3ae00328c37290e",
+   "note": "[厳格レビュー] 修正後の再レビュー。STAGE か W7 を TYPE_OR_TRAIT で OR、合計2枚まで手札、残りデッキ下。",
    "probe_sha": "299a480b934362d5",
    "reviewed": "2026-11-22",
    "text_sha": "23b55897c0321d0e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-063": {
    "ast_sha": "31f773c8fbc82c89",
@@ -17417,12 +17417,12 @@
    "verdict": "ok"
   },
   "OP18-064": {
-   "ast_sha": "44c581da83973691",
-   "note": "「元々のパワー7000以下と5000以下のキャラ1枚ずつまで」が7000以下の1対象だけ・count=1 で「まで」も欠落（パーサ）",
-   "probe_sha": "5f8554fa411426c2",
+   "ast_sha": "fbb7db5c527ce81c",
+   "note": "[厳格レビュー] 修正後の再レビュー。ORIGINAL_POWER 7000以下／5000以下の 2 SELECT、2枚目 EXCLUDE_SAVED。UNTIL_NEXT_TURN_END アタック不可。KO時ドン-1でトラッシュから自身登場。",
+   "probe_sha": "6e3efb9aa58ed1d4",
    "reviewed": "2026-11-22",
    "text_sha": "6fae7d74a6b3710d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-065": {
    "ast_sha": "e44fb36c8d0062c3",
@@ -17489,12 +17489,12 @@
    "verdict": "ok"
   },
   "OP18-074": {
-   "ast_sha": "b705099c8ce98b91",
-   "note": "【カウンター】の条件「自分のコスト5以上のステージがある場合」が GENERIC（常に真）で評価されない（パーサ）",
+   "ast_sha": "c76a6bb0c3d41f04",
+   "note": "[厳格レビュー] 修正後の再レビュー。FIELD_COUNT GE1(STAGE cost_min5) 条件でリーダーかキャラ1枚まで このバトル+4000。トリガーもドン-1でステージ2枚まで回収。",
    "probe_sha": "8ad678ddc8e8a24c",
    "reviewed": "2026-11-22",
    "text_sha": "564920778b971ec1",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-075": {
    "ast_sha": "648d22e195f8ca6d",
@@ -17505,12 +17505,12 @@
    "verdict": "ok"
   },
   "OP18-076": {
-   "ast_sha": "006eef8d11a28635",
-   "note": "「自分のキャラ2枚までとパワー5000以下のリーダー」が1対象に合算され、キャラにも power_max5000 が掛かりリーダーが2枚枠に含まれる（パーサ）",
-   "probe_sha": "4a4143f1e1205ef5",
+   "ast_sha": "d88d6a7a32a70b1d",
+   "note": "[厳格レビュー] 修正後の再レビュー。キャラ2枚まで+1000 とパワー5000以下(現在値)のリーダー+1000 が別ノード。コストはステージのレスト（任意）。",
+   "probe_sha": "ebd60ff1a164a73c",
    "reviewed": "2026-11-22",
    "text_sha": "ef94c477598fdc46",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-077": {
    "ast_sha": "0b3963203054f8af",
@@ -17521,12 +17521,12 @@
    "verdict": "ok"
   },
   "OP18-078": {
-   "ast_sha": "e6715610d0b4462e",
-   "note": "「リーダーとキャラ合計4枚まで」がリーダー1（必須）＋キャラ1枚までの2対象になり最大2枚（パーサ）",
-   "probe_sha": "6e4fce0659da36fe",
+   "ast_sha": "000f7bfa3c928b21",
+   "note": "[厳格レビュー] 修正後の再レビュー。リーダーとキャラを1つの対象で合計4枚まで、各レストのドン1枚まで付与。",
+   "probe_sha": "b423f224001e4c8d",
    "reviewed": "2026-11-22",
    "text_sha": "42be1c89894590fc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-079": {
    "ast_sha": "58e06953c31095e3",
@@ -17538,19 +17538,19 @@
   },
   "OP18-080": {
    "ast_sha": "82021ffab8b76350",
-   "note": "「自分のリーダー「マーシャル・D・ティーチ」の効果で」の発生源限定が無く、どの効果で手札が捨てられても誘発（エンジン triggers.rs on_hand_discarded_by_effect）",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: YOUR_TURN・ターン1回・on_hand_discarded_by_effectで自分のリーダー「ティーチ」が発生源のときだけ、他のヴァン・オーガー不在(EXCLUDE_SOURCE EQ)で1ドロー、KO時1ドロー",
    "probe_sha": "ca07dfc64ef5d5e5",
    "reviewed": "2026-11-22",
    "text_sha": "425ae8353d8b1874",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-081": {
-   "ast_sha": "110c46674e352895",
-   "note": "「【ダブルアタック】と【ブロッカー】を得る」の GRANT_KEYWORD がダブルアタックのみでブロッカー欠落、さらに master keywords にダブルアタックが無条件で入っている（パーサ）",
-   "probe_sha": "5182914f07845675",
+   "ast_sha": "9314cad093d5e6ad",
+   "note": "[厳格レビュー] 修正後の再レビュー。FIELD_COUNT（ゲッコー・モリア）GE1 で【ダブルアタック】と【ブロッカー】の 2 GRANT。master keywords=[]。",
+   "probe_sha": "989899302116df87",
    "reviewed": "2026-11-22",
    "text_sha": "cfb033c03ef301f3",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-082": {
    "ast_sha": "0123f278da9754b0",
@@ -17578,7 +17578,7 @@
   },
   "OP18-085": {
    "ast_sha": "0a206bd10acb6ef3",
-   "note": "[厳格レビュー] 全句対応（3択キーワード付与・THIS_TURN）。QUALIFIER_GAP(任意)は起動メインのコストで決着。ブロック不可は rust battle.rs:178 で処理",
+   "note": "[厳格レビュー] 修正後の再レビュー。自身バウンスのコストで シャムロック聖1枚まで このターン 3択キーワード。master keywords=[]。",
    "probe_sha": "eaa58d69a17937b9",
    "reviewed": "2026-11-22",
    "text_sha": "17bc6a1c4798d2df",
@@ -17593,12 +17593,12 @@
    "verdict": "ok"
   },
   "OP18-087": {
-   "ast_sha": "adb49a000c6d2343",
-   "note": "「自分のキャラがコスト12以上のキャラのみの場合」が GENERIC 条件（target 無し）で cond.rs:815 により常に真（パーサ）",
+   "ast_sha": "5542c8e3abdb8902",
+   "note": "[厳格レビュー] 修正後の再レビュー。コスト+12 は cost_buff 加算。条件は 自分のコスト11以下キャラ LT 1（current_cost＝自身の+12込み）＝本文と真偽一致。",
    "probe_sha": "6df1597cba8e2647",
    "reviewed": "2026-11-22",
    "text_sha": "c943493ecd747f48",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-088": {
    "ast_sha": "afc3fba52520d40e",
@@ -17681,28 +17681,28 @@
    "verdict": "ok"
   },
   "OP18-099": {
-   "ast_sha": "120f70d03445cb33",
-   "note": "【登場時】「手札のCPカードをライフの上か下に表向きで加える」が OTHER（未実装・上か下/表向きの欄無し）（パーサ/エンジン）",
-   "probe_sha": "5e48e9d65af541e6",
+   "ast_sha": "aac128c925d7973d",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: 登場時CP手札1枚まで→ライフ上/下表向き、トリガー LEADER_TRAIT HAS CP・1ドロー・コスト8以下キャラまでデッキ下",
+   "probe_sha": "0ff007721153b653",
    "reviewed": "2026-11-22",
    "text_sha": "35a0e9c6da90104b",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-100": {
-   "ast_sha": "8c1f4185c4cf812e",
-   "note": "能力0後半「手札のCPカードをライフの上か下に表向きで加える」が OTHER（未実装・上か下/表向きの欄無し）（パーサ/エンジン）",
-   "probe_sha": "0e1023b7d0a56edb",
+   "ast_sha": "ba7bf3e7d59c1010",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: 1ドロー＋CP手札→ライフ上/下表向き、トリガー CP条件・1ドロー・相手リーダーかキャラまでREST",
+   "probe_sha": "af7d3097aeedf5b0",
    "reviewed": "2026-11-22",
    "text_sha": "2c88f270532c44aa",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-101": {
-   "ast_sha": "55e28001312cfbba",
-   "note": "【KO時】「手札のCPカードをライフの上か下に表向きで加える」が OTHER（未実装・上か下/表向きの欄無し）（パーサ/エンジン）",
-   "probe_sha": "7305c72879fe14d8",
+   "ast_sha": "827cbfa5ab482526",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: KO時CP手札→ライフ上/下表向き、トリガー CP条件(各枝)・相手コスト6以下まで KOかREST の選択",
+   "probe_sha": "effe5d390fca6406",
    "reviewed": "2026-11-22",
    "text_sha": "870e0c3bbac5ee8d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-103": {
    "ast_sha": "a1f2a4aec82483a2",
@@ -17721,12 +17721,12 @@
    "verdict": "ok"
   },
   "OP18-105": {
-   "ast_sha": "892f9e80ec8f2e17",
-   "note": "「公開したカードの【トリガー】効果を発動」が EXECUTE_MAIN_EFFECT status=None target=None で発生源の起動メイン扱い、公開カードのトリガーを発動しない（パーサ）",
+   "ast_sha": "74062242e1577895",
+   "note": "[厳格レビュー] 修正後の再レビュー。全句一致: CP条件・スパンダム以外CP1枚まで公開(save)→EXECUTE_MAIN_EFFECT status=TRIGGER は公開札の【トリガー】のみ発動(resolver main_ability_indices・COUNTERへ落ちない・0枚なら無し・tests_op18)",
    "probe_sha": "4c4a2ea4c41a0939",
    "reviewed": "2026-11-22",
    "text_sha": "3cbeff64e7b815f8",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-106": {
    "ast_sha": "97d170e1550eee4a",
@@ -17817,12 +17817,12 @@
    "verdict": "ok"
   },
   "OP18-117": {
-   "ast_sha": "ec929a0a92d5c30c",
-   "note": "「キャラすべてをトラッシュ」が SELF のみ（本文は両者）、「デッキかトラッシュから」が TRASH のみでデッキ側欠落（パーサ）",
-   "probe_sha": "1d84f828385abb02",
+   "ast_sha": "a14178534daddee8",
+   "note": "[厳格レビュー] 修正後の再レビュー。ライフ全部トラッシュ（任意コスト）→LEADER_NAME スパンダム で 両者のキャラ全トラッシュ＋デッキ/トラッシュから異名《中将》キャラ合計5枚まで登場、シャッフル。",
+   "probe_sha": "df5ba047cadaa33f",
    "reviewed": "2026-11-22",
    "text_sha": "e5e5c13f455fa038",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP18-118": {
    "ast_sha": "8981083a2f1be329",
