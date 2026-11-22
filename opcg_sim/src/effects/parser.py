@@ -1375,6 +1375,13 @@ class EffectParser:
                 _nfc(r'(?:した|された|受けた|なった|与えた|戻された|離れた|登場した|終了)時'), norm_text)
             if has_don_tag and not has_turn1 and not reactive_time:
                 return embedded or TriggerType.PASSIVE
+            # 【ターン1回】だけの「（自分の）〈ゾーン〉から…キャラが登場した時、」は起動メインではなく
+            # 他のキャラの登場への誘発（OP18-060「自分のトラッシュからキャラが登場した時」）。PASSIVE なら
+            # 再計算では動かず（反応型）、エンジンの enqueue_char_played_listeners が登場元を見て積む。
+            if (not has_don_tag and has_turn1 and embedded is None
+                    and re.search(_nfc(r'キャラが登場した時、'), norm_text)
+                    and not re.search(_nfc(r'この(?:キャラ|カード)が登場した時'), norm_text)):
+                return TriggerType.PASSIVE
             return embedded or TriggerType.ACTIVATE_MAIN
 
         # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
@@ -2411,6 +2418,32 @@ class EffectParser:
                 op = CompareOperator.GE if pow_m.group(2) == _nfc('以上') else CompareOperator.LE
                 return Condition(type=ConditionType.SOURCE_STATE, value=("POWER", thr), operator=op, player=p, raw_text=norm_text)
 
+        # 「自分のキャラがコストN以上（以下）のキャラのみ」（OP18-087）: 条件を満たさないキャラが 0 枚
+        # （FIELD_COUNT LT 1）。「のみ」は空でも成立（FIELD_ALL_TRAIT と同じ）。コストは今のコスト。
+        only_cost_m = re.search(_nfc(r'キャラが、?コスト(\d+)(以上|以下)のキャラのみ'), norm_text)
+        if only_cost_m and _nfc("特徴") not in norm_text:
+            n_c = int(only_cost_m.group(1))
+            tq_o = TargetQuery(player=Player.OPPONENT if norm_text.startswith(_nfc("相手")) else Player.SELF,
+                               card_type=["CHARACTER"], count=-1, select_mode="ALL", raw_text=norm_text)
+            if only_cost_m.group(2) == _nfc("以上"):
+                tq_o.cost_max = n_c - 1
+            else:
+                tq_o.cost_min = n_c + 1
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_o, operator=CompareOperator.LT,
+                             value=1, player=tq_o.player, raw_text=norm_text)
+
+        # 「自分の（コストN以上の）ステージがある／ない」（OP18-034・OP18-074）: 場のステージの枚数。
+        stage_m = re.fullmatch(_nfc(r'(自分|相手)の((?:コスト\d+(?:以上|以下)の)?)ステージが(ある|ない)(?:場合)?'),
+                               norm_text.strip())
+        if stage_m:
+            tq_s = parse_target(norm_text)
+            tq_s.card_type = ["STAGE"]
+            tq_s.player = Player.OPPONENT if stage_m.group(1) == _nfc("相手") else Player.SELF
+            has = stage_m.group(3) == _nfc("ある")
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_s,
+                             operator=CompareOperator.GE if has else CompareOperator.LT,
+                             value=1, player=tq_s.player, raw_text=norm_text)
+
         # FIELD_ALL_TRAIT: 場のキャラ全員が特定の特徴を持つ（「のみ」条件）
         if _nfc("のみ") in norm_text and _nfc("キャラ") in norm_text:
             # 特徴《X》（完全一致）
@@ -2589,6 +2622,10 @@ class EffectParser:
         項目が割れない/参照ゾーンが取れない場合は None（呼び出し側が従来解析へフォールバック）。
         """
         norm = _nfc(text)
+        # 「このキャラのパワーによって以下の効果をそれぞれ適用する。・N以上の場合、…」（OP18-004）:
+        # 基準は発生源自身のパワー（SOURCE_STATE("POWER", N) GE）。
+        if re.search(_nfc(r'このキャラのパワーによって'), norm):
+            return self._parse_apply_each_source_power(norm, is_cost)
         # 参照ゾーン（枚数の基準）と対象プレイヤーを head から判定。
         head_m = re.search(_nfc(r'(自分|相手|お互い)?の?(トラッシュ|ライフ|手札|デッキ)の枚数によって'), norm)
         if not head_m:
@@ -2635,6 +2672,26 @@ class EffectParser:
                     if_true=eff_node)
             cond = Condition(type=ctype, operator=CompareOperator.GE, value=thr,
                              player=cplayer, raw_text=opt)
+            branches.append(Branch(condition=cond, if_true=eff_node))
+        if not branches:
+            return None
+        return Sequence(actions=branches) if len(branches) > 1 else branches[0]
+
+    def _parse_apply_each_source_power(self, norm: str, is_cost: bool) -> Optional[EffectNode]:
+        """「このキャラのパワーによって以下の効果をそれぞれ適用する。・N以上の場合、…」を
+        Sequence[Branch[SOURCE_STATE(POWER) >= N] → 効果, …] にする（OP18-004・該当段を累積適用）。"""
+        m_end = re.search(_nfc(r'以下の効果を.{0,4}?適用する'), norm)
+        tail = norm[m_end.end():].lstrip(_nfc('。\n 　')) if m_end else ""
+        branches: List[EffectNode] = []
+        for opt in self._extract_options(tail):
+            cm = re.match(_nfc(r'\s*(\d+)以上(?:の)?(?:場合)?[、,]?\s*(.+)$'), opt, re.DOTALL)
+            if not cm:
+                continue
+            eff_node = self._parse_to_node(cm.group(2).strip().rstrip(_nfc('。')), is_cost)
+            if eff_node is None:
+                continue
+            cond = Condition(type=ConditionType.SOURCE_STATE, value=("POWER", int(cm.group(1))),
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=opt)
             branches.append(Branch(condition=cond, if_true=eff_node))
         if not branches:
             return None
