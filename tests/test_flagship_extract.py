@@ -32,7 +32,7 @@ def _leader_rows():
 def test_alias_index_covers_all_137_leaders():
     idx = E._index()
     rows = _leader_rows()
-    assert len(rows) == 144   # OP17 で 137→143（2026-09-03）・EB05 で 143→144（2026-11-09・カードDB 追従）
+    assert len(rows) == 150   # OP17 で 137→143（2026-09-03）・EB05 で 143→144（2026-11-09）・OP18 で 144→150（2026-11-22・カードDB 追従）
     # 全リーダーの正規名・短縮名が辞書から引け、その card_number を含む。
     for number, name, _color in rows:
         full = E._norm(name)
