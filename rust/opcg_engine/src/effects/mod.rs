@@ -51,6 +51,8 @@ mod tests_rest_replace;
 #[cfg(test)]
 mod tests_g3;
 #[cfg(test)]
+mod tests_op18;
+#[cfg(test)]
 mod tests_reactions;
 #[cfg(test)]
 mod tests_trigger_order;
