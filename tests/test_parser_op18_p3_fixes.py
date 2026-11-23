@@ -136,3 +136,14 @@ def test_unsided_all_chars_trash_and_deck_or_trash_play():
     assert tr.target.player == Player.ALL and tr.target.select_mode == "ALL"
     pl = [a for a in acts if a.type.name == "PLAY_CARD"][0]
     assert pl.target.zone == [Zone.DECK, Zone.TRASH] and pl.target.count == 5 and pl.target.is_unique_name
+
+
+def test_shuffle_after_the_gated_search_is_inside_the_gate():
+    """OP18-117: 「〜の場合、…デッキかトラッシュから登場させる。その後、デッキをシャッフルする」の
+    シャッフルは条件の内側（条件が偽なら何も見ていない＝シャッフルも起きない。2026-11-23）。"""
+    eff = _abilities(
+        "【メイン】自分のライフすべてをトラッシュに置くことができる：自分のリーダーが「スパンダム」の場合、"
+        "キャラすべてをトラッシュに置き、自分のデッキかトラッシュからカード名の異なる特徴《中将》を持つ"
+        "キャラカード合計5枚までを、登場させる。その後、デッキをシャッフルする。")[0].effect
+    assert hasattr(eff, "if_true") and eff.condition is not None, eff        # 効果全体が 1 つの分岐
+    assert [a.type.name for a in _actions(eff.if_true)][-1] == "SHUFFLE"

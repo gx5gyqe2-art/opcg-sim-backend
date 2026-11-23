@@ -559,6 +559,10 @@ fn a_replacement_runs_the_sub_effect_instead_of_the_removal() {
 
     let ko = action("KO", "");
     assert_eq!(apply(&mut s, &masters, Seat::P1, &ko, &[rp]), Ok(true));
+    assert!(
+        s.state().active_interaction().is_none(),
+        "任意でない置換（「代わりに〜する」）は確認を出さない"
+    );
     assert!(s.state().player(Seat::P2).field.contains(&rp), "KO は置換された");
     assert_eq!(
         s.state().player(Seat::P2).hand.len(),
@@ -613,6 +617,177 @@ fn an_optional_effect_removal_replacement_asks_first_and_declining_continues_the
             accept,
             "accept={accept}"
         );
+    }
+}
+
+/// 「自分のキャラが相手の効果で場を離れる場合、代わりに〜できる」型（保護者が別のカード）の置換能力。
+fn protector_replacement(raw: &str, sub: Value) -> Value {
+    let mut sub = sub;
+    sub["is_optional"] = json!(true);
+    let mut ab = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "REPLACE_EFFECT", "target": null,
+               "value": value_json(0), "duration": "INSTANT", "status": "LEAVE",
+               "destination": null, "is_rest": null, "dest_position": null, "raw_text": raw,
+               "sub_effect": sub, "is_optional": false, "delay": null, "face_up": null}),
+        raw,
+    );
+    if raw.contains("ターン1回") {
+        ab["condition"] = json!({"node": "Condition", "type": "TURN_LIMIT", "operator": "EQ",
+            "player": "SELF", "value": 1, "target": null, "args": [], "raw_text": ""});
+    }
+    ab
+}
+
+/// 「代わりにこのキャラをレストにできる」（保護者自身をレスト）。
+fn rest_self_sub() -> Value {
+    action_json("REST", query_json(r#""select_mode":"SOURCE""#), value_json(0))
+}
+
+/// p2 の山札を `n` 枚にした [`board`]。
+fn board_with_p2_deck(cards: Value, p2_field: Value, n: usize) -> (MasterTable, Session) {
+    let masters = MasterTable::from_effects_json(&json!({"cards": cards})).expect("masters");
+    let mut p2 = player_json("p2", "p2-leader", p2_field, json!([]));
+    p2["deck"] = Value::Array((0..n).map(|i| card_json("V", &format!("p2-deck{i}"), "p2")).collect());
+    let hidden = json!({
+        "players": {"p1": player_json("p1", "p1-leader", json!([]), json!([])), "p2": p2},
+        "manager": {
+            "turn_count": 4, "phase": "MAIN", "turn_player": "p1", "winner": null,
+            "active_battle": null, "turn_events": {}, "mulligan_done": ["p1", "p2"],
+            "setup_phase_pending": false, "turn_start_pending": false,
+            "interaction_depth": 0, "pending_triggers": 0, "pending_end_of_turn": 0,
+        },
+    });
+    let state = GameState::from_record(&hidden, &masters).expect("board");
+    (masters, Session::new(state))
+}
+
+fn answer(s: &mut Session, masters: &MasterTable, accept: bool) {
+    let it = s.state().active_interaction().cloned().expect("確認で止まる");
+    assert_eq!(it.kind, InteractionKind::ConfirmOptional);
+    assert_eq!(it.player, Seat::P2, "確認するのは守られる側（置換の持ち主）");
+    crate::effects::interact::resolve_interaction(s, masters, Seat::P2, &json!({"accepted": accept}))
+        .expect("resume");
+}
+
+/// 【ターン1回】の任意の置換は、断っても使用回数を消費しない（次の除去で改めて聞く）。
+/// 受け入れたら消費し、同じターンの次の除去では聞かずに除去される。
+#[test]
+fn declining_a_once_per_turn_removal_replacement_does_not_use_it_up() {
+    let raw = "【ターン1回】自分のキャラが相手の効果で場を離れる場合、代わりにカード1枚を引くことができる";
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "P": master_json("P", "CHARACTER",
+            json!([protector_replacement(raw, action_json("DRAW", Value::Null, value_json(1)))])),
+    });
+    let (masters, mut s) = board_with_p2_deck(
+        cards,
+        json!([card_json("P", "p2-p", "p2"), card_json("V", "p2-v1", "p2"),
+               card_json("V", "p2-v2", "p2"), card_json("V", "p2-v3", "p2")]),
+        3,
+    );
+    let [v1, v2, v3] = ["p2-v1", "p2-v2", "p2-v3"].map(|u| find(&s, u));
+    let ko = action("KO", "");
+
+    // 1 回目: 断る → 本来の KO。
+    apply(&mut s, &masters, Seat::P1, &ko, &[v1]).expect("ko");
+    answer(&mut s, &masters, false);
+    assert!(!s.state().player(Seat::P2).field.contains(&v1), "断れば KO される");
+    assert!(s.state().player(Seat::P2).trash.contains(&v1));
+
+    // 2 回目: まだ使える（断った分は消費していない）→ 受け入れる。
+    let hand = s.state().player(Seat::P2).hand.len();
+    apply(&mut s, &masters, Seat::P1, &ko, &[v2]).expect("ko");
+    answer(&mut s, &masters, true);
+    assert!(s.state().player(Seat::P2).field.contains(&v2), "受け入れれば守られる");
+    assert_eq!(s.state().player(Seat::P2).hand.len(), hand + 1, "代わりに 1 枚引いた");
+
+    // 3 回目: 使い切った → 聞かずに KO。
+    apply(&mut s, &masters, Seat::P1, &ko, &[v3]).expect("ko");
+    assert!(s.state().active_interaction().is_none(), "使用済みの置換は聞かない");
+    assert!(!s.state().player(Seat::P2).field.contains(&v3));
+}
+
+/// 置換の持ち主が複数いるとき、1 つ目を断ったら次の保護者の置換を聞く。全部断れば除去される。
+#[test]
+fn declining_one_protectors_replacement_offers_the_next_one() {
+    let raw_rest = "自分のキャラが相手の効果で場を離れる場合、代わりにこのキャラをレストにできる";
+    let raw_draw = "自分のキャラが相手の効果で場を離れる場合、代わりにカード1枚を引くことができる";
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "PR": master_json("PR", "CHARACTER", json!([protector_replacement(raw_rest, rest_self_sub())])),
+        "PD": master_json("PD", "CHARACTER",
+            json!([protector_replacement(raw_draw, action_json("DRAW", Value::Null, value_json(1)))])),
+    });
+    for (second, kept) in [(false, false), (true, true)] {
+        let (masters, mut s) = board_with_p2_deck(
+            cards.clone(),
+            json!([card_json("V", "p2-v", "p2"), card_json("PR", "p2-pr", "p2"),
+                   card_json("PD", "p2-pd", "p2")]),
+            2,
+        );
+        let [v, pr, pd] = ["p2-v", "p2-pr", "p2-pd"].map(|u| find(&s, u));
+        let hand = s.state().player(Seat::P2).hand.len();
+        apply(&mut s, &masters, Seat::P1, &action("KO", ""), &[v]).expect("ko");
+        let first = s.state().active_interaction().cloned().expect("1 つ目の確認");
+        assert!(first.message.contains("PR"), "どの保護者の置換かを示す: {}", first.message);
+        answer(&mut s, &masters, false);
+        let next = s.state().active_interaction().cloned().expect("断ったら次の保護者を聞く");
+        assert!(next.message.contains("PD"), "{}", next.message);
+        assert!(s.state().player(Seat::P2).field.contains(&v), "確認中は除去されない");
+        answer(&mut s, &masters, second);
+        assert!(s.state().active_interaction().is_none());
+        assert_eq!(s.state().player(Seat::P2).field.contains(&v), kept, "second={second}");
+        assert!(!s.state().card(pr).is_rest, "断った置換（レスト）は実行されない");
+        assert_eq!(s.state().player(Seat::P2).hand.len(), hand + usize::from(second));
+        assert!(s.state().player(Seat::P2).field.contains(&pd));
+    }
+}
+
+/// 複数枚を同時に除去する（「すべて」）ときは 1 枚ずつ聞く。保護者をレストする置換は、
+/// 1 枚目で受け入れて保護者がレストになったら 2 枚目には使えない（代わりの行動が取れない）。
+#[test]
+fn a_multi_target_removal_asks_for_each_target_in_turn() {
+    let raw = "自分のキャラが相手の効果で場を離れる場合、代わりにこのキャラをレストにできる";
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "PR": master_json("PR", "CHARACTER", json!([protector_replacement(raw, rest_self_sub())])),
+        // 除去する側の効果（退避した残りの対象は、このノードを引き直して再開する）。
+        "KO": master_json("KO", "EVENT", json!([ability_json("ACTIVATE_MAIN",
+            action_json("KO", query_json(r#""player":"OPPONENT","count":2"#), value_json(0)), "")])),
+    });
+    // (1 枚目の答え, 2 枚目で聞かれるか, 1 枚目が残るか, 2 枚目が残るか)
+    for (first, asks_second, keep1, keep2) in [(true, false, true, false), (false, true, false, true)] {
+        let (masters, mut s) = board_with_p2_deck(
+            cards.clone(),
+            json!([card_json("PR", "p2-pr", "p2"), card_json("V", "p2-v1", "p2"),
+                   card_json("V", "p2-v2", "p2")]),
+            1,
+        );
+        let [pr, v1, v2] = ["p2-pr", "p2-v1", "p2-v2"].map(|u| find(&s, u));
+        let ko_master = masters.index_of("KO").expect("KO");
+        let ko_id = masters.get(ko_master).ability_ids[0];
+        let ko_ref = NodeRef::root(ko_id, NodeRoot::Effect);
+        let Some(EffectNode::Action(ko)) = ko_ref.resolve(&masters.abilities).cloned() else {
+            panic!("KO のノード");
+        };
+        super::super::apply_action(
+            &mut s, &masters, Seat::P1, &ko, &ko_ref, &crate::effects::refs_of(&[v1, v2]), 0, None,
+        )
+        .expect("ko");
+        assert!(s.state().player(Seat::P2).field.contains(&v2), "2 枚目は 1 枚目の確認の後");
+        answer(&mut s, &masters, first);
+        assert_eq!(s.state().active_interaction().is_some(), asks_second, "first={first}");
+        if asks_second {
+            answer(&mut s, &masters, true);
+        }
+        let field = &s.state().player(Seat::P2).field;
+        assert_eq!(field.contains(&v1), keep1, "first={first}");
+        assert_eq!(field.contains(&v2), keep2, "first={first}");
+        assert!(s.state().card(pr).is_rest, "受け入れた 1 回だけ保護者がレストになった");
     }
 }
 
@@ -858,6 +1033,63 @@ fn an_optional_battle_ko_replacement_asks_before_replacing() {
     .expect("resume");
     assert!(!s.state().player(Seat::P2).field.contains(&target), "拒否なら KO される");
     assert!(s.state().active_battle.is_none());
+}
+
+/// バトル KO の任意の置換も、保護者が複数いれば 1 つ目を断ったあと次の保護者を聞く
+/// （効果除去の確認と同じ・2026-11-23）。両方断れば KO。
+#[test]
+fn declining_a_battle_ko_replacement_offers_the_next_protector() {
+    let mk = |raw: &str, sub: Value| {
+        let mut sub = sub;
+        sub["is_optional"] = json!(true);
+        ability_json(
+            "PASSIVE",
+            json!({"node": "GameAction", "type": "REPLACE_EFFECT", "target": null,
+                   "value": value_json(0), "duration": "INSTANT", "status": "EFFECT_KO,BATTLE_KO",
+                   "destination": null, "is_rest": null, "dest_position": null, "raw_text": raw,
+                   "sub_effect": sub, "is_optional": false, "delay": null, "face_up": null}),
+            raw,
+        )
+    };
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "PR": master_json("PR", "CHARACTER", json!([mk(
+            "自分のキャラがKOされる場合、代わりにこのキャラをレストにできる", rest_self_sub())])),
+        "PD": master_json("PD", "CHARACTER", json!([mk(
+            "自分のキャラがKOされる場合、代わりにカード1枚を引くことができる",
+            action_json("DRAW", Value::Null, value_json(1)))])),
+    });
+    for (second, kept) in [(false, false), (true, true)] {
+        let (masters, mut s) = board(
+            cards.clone(),
+            json!([card_json("V", "p1-a", "p1")]),
+            json!([card_json("V", "p2-v", "p2"), card_json("PR", "p2-pr", "p2"),
+                   card_json("PD", "p2-pd", "p2")]),
+            json!([]),
+        );
+        let (attacker, target, pr) = (find(&s, "p1-a"), find(&s, "p2-v"), find(&s, "p2-pr"));
+        s.edit().set_phase(Phase::BattleCounter);
+        s.edit().set_active_battle(Some(ActiveBattle {
+            attacker,
+            target,
+            attacker_owner: Seat::P1,
+            target_owner: Seat::P2,
+            counter_buff: 0,
+        }));
+        crate::rules::battle::resolve_attack(&mut s, &masters).expect("resolve");
+        let first = s.state().active_interaction().cloned().expect("1 つ目");
+        assert!(first.message.contains("PR"), "{}", first.message);
+        answer(&mut s, &masters, false);
+        let next = s.state().active_interaction().cloned().expect("断ったら次の保護者を聞く");
+        assert!(next.message.contains("PD"), "{}", next.message);
+        assert!(s.state().active_battle.is_some(), "戦闘はまだ解決前");
+        answer(&mut s, &masters, second);
+        assert!(s.state().active_interaction().is_none());
+        assert!(s.state().active_battle.is_none(), "戦闘後処理まで進む");
+        assert_eq!(s.state().player(Seat::P2).field.contains(&target), kept, "second={second}");
+        assert!(!s.state().card(pr).is_rest, "断った置換は実行されない");
+    }
 }
 
 /// カウンターステップの候補（`pending::counter_candidates`）: カウンター値を持つ手札に加えて、

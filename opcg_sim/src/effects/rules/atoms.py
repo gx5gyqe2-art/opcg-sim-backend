@@ -2842,6 +2842,9 @@ def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
         sel_b = _tier(m.group("f2"), m.group("t2"))
         sel_a.type = sel_b.type = ActionType.SELECT
         sel_a.target.save_id, sel_b.target.save_id = "_arr_a", "_arr_b"
+        # 2 ティア目で 1 ティア目に選んだカードを選び直せないようにする（OP06-056。両ティアの条件を
+        # 満たす 1 枚を二重に選ぶと、実際にはデッキの下へ 1 枚しか置けない）。
+        sel_b.target.flags.add("EXCLUDE_SAVED:_arr_a")
         put = GameAction(type=ActionType.DECK_BOTTOM, status="ARRANGE", raw_text=t,
                          target=TargetQuery(player=player, zone=Zone.FIELD, count=-1,
                                             select_mode="ALL", ref_id="_arr_a+_arr_b"))
