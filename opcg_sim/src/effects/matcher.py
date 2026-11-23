@@ -209,6 +209,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「特徴《A》と《B》を両方持つ」= 全ての特徴を持つ（AND・OP18-001/011/012）。traits は既定で
+    # 「どれか 1 つ」照合なので TRAITS_ALL を立てる（「《X》と【トリガー】を両方持つ」は特徴 1 つ＝不要）。
+    if len(tq.traits) >= 2 and re.search(_nfc(r'[》>』]と[《<『][^》>』]+[》>』]を両方持つ'), tgt_text):
+        tq.flags.add("TRAITS_ALL")
+
     # 「《X》(を含む特徴)を持たない」= その特徴を持たないカードに限る（OP13-064）。包含の traits には
     # 入れず LACKS_TRAIT[_PARTIAL]:X として matcher に渡す。
     for _lt in re.finditer(_nfc(r'[《<『]([^》>』]+)[》>』](を含む特徴)?を持たない'), tgt_text):
@@ -287,9 +292,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
     # 両立しない条件（斬かつ緑のイベント）で対象が常に空になっていた。属性句の直後に
     # 「か」が続く場合に OR とみなす（matcher が属性一致 or 残りフィルタ一致で照合）。
-    # 「イベントか特徴《X》を持つカード」（EB05-007）= 種類 OR 特徴。単純 AND ではイベントかつ
+    # 「イベントか特徴《X》を持つカード」（EB05-007）「ステージカードか特徴《W7》」（OP18-061）= 種類 OR 特徴。単純 AND ではイベントかつ
     # 《X》のカードしか数えなかった。matcher が種類一致 or 特徴一致で照合する。
-    if re.search(_nfc(r'(?:イベント|キャラ|ステージ)か特徴[《<『]'), tgt_text):
+    if re.search(_nfc(r'(?:イベント|キャラ|ステージ)(?:カード)?か特徴[《<『]'), tgt_text):
         tq.flags.add("TYPE_OR_TRAIT")
 
     if tq.attributes and (tq.card_type or tq.colors) and \
@@ -679,10 +684,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         _partial = "NAME_PARTIAL" in query.flags
         def _name_in(names):  # noqa: E306
             return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
+        # 「特徴《A》と《B》を両方持つ」（TRAITS_ALL・OP18-001/011/012）は全特徴の AND。既定は OR。
+        _q_all = all if "TRAITS_ALL" in query.flags else any
         def _trait_hit():  # noqa: E306
             if "TRAIT_PARTIAL" in query.flags:
-                return any(x in c for x in query.traits for c in card.master.traits)
-            return any(t in card.master.traits for t in query.traits)
+                return _q_all(any(x in c for c in card.master.traits) for x in query.traits)
+            return _q_all(t in card.master.traits for t in query.traits)
         def _excluded():  # noqa: E306
             if "REST_LEADER_ONLY" in query.flags and card.master.type.name == "LEADER":
                 return False

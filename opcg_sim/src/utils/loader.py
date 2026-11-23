@@ -29,7 +29,11 @@ def _extract_static_keywords(effect_text: str):
     t = unicodedata.normalize("NFC", effect_text)
     for k in _STATIC_KEYWORDS:
         for m in re.finditer(r'【' + _KEYWORD_TAG_PATTERNS.get(k, re.escape(k)) + r'】', t):
-            after = t[m.end():m.end() + 4]
+            # 「【A】と【B】を得る」「【A】か【B】か【C】を得る」（OP18-081/OP09-084/OP18-085）: 並んだ
+            # キーワードの末尾の述語を見る（先頭の【A】も付与・択一の対象であって固定キーワードではない）。
+            _rest = t[m.end():]
+            _chain = re.match(r'(?:(?:と|か|、)【[^】]+】)+', _rest)
+            after = _rest[_chain.end() if _chain else 0:][:4]
             if after.startswith("を得") or after.startswith("を発動") \
                     or after.startswith("を持") or after.startswith("を無効"):
                 continue

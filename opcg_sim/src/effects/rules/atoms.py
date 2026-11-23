@@ -623,6 +623,34 @@ def _leader_and_char_dual(ctx: ParseContext):
     return Sequence(actions=[leader, char])
 
 
+@rule("chars_and_filtered_leader_buff", priority=67)
+def _chars_and_filtered_leader_buff(ctx: ParseContext) -> Optional[EffectNode]:
+    """「自分のキャラ2枚までとパワー5000以下のリーダーを、このターン中、パワー+1000」（OP18-076）
+    → キャラ（N枚まで）への増減 ＋ 修飾つきリーダー（1枚）への増減の 2 アクション。
+
+    1 つの対象に合算すると、リーダーの修飾（パワー5000以下）がキャラにも掛かり、リーダーが
+    キャラの枚数枠に入っていた。修飾はリーダーだけに掛ける。"""
+    t = ctx.text
+    m = re.match(_nfc(r"^(?P<side>自分の|相手の)?(?P<chars>[^、を]*?キャラ[\d０-９]+枚(?:まで)?)と"
+                      r"(?P<lmod>[^、を]*?)リーダーを、(?P<tail>.+)$"), t)
+    if not m:
+        return None
+    sign_m = re.search(_nfc(rf"パワー({_SIGN})([\d０-９]+)"), m.group("tail"))
+    if not sign_m:
+        return None
+    side = m.group("side") or ""
+    char_res = _power_buff(ParseContext(text=side + m.group("chars") + _nfc("を、") + m.group("tail")))
+    leader_res = _power_buff(ParseContext(text=side + m.group("lmod") + _nfc("リーダーを、") + m.group("tail")))
+    if not isinstance(char_res, GameAction) or not isinstance(leader_res, GameAction):
+        return None
+    char_res.target.card_type = ["CHARACTER"]
+    leader_res.target.card_type = ["LEADER"]
+    leader_res.target.count = 1
+    leader_res.target.is_up_to = False
+    char_res.raw_text = leader_res.raw_text = t
+    return Sequence(actions=[char_res, leader_res])
+
+
 def _ko_protect_status(t: str) -> str:
     """「KOされない」の保護範囲: バトルでのみ＝BATTLE_KO・効果でのみ＝EFFECT_KO・修飾なしは両方
     （カンマ区切り。本文どおり「KOされない」は効果KOもバトルKOも防ぐ）。"""
@@ -895,6 +923,21 @@ _ATTR_GRANT_RE = re.compile(_nfc(r"と属性[(（]([斬打射特知])[)）]を�
 def _grant_keyword(ctx: ParseContext):
     """【キーワード】の付与。「【速攻:キャラ】と属性(斬)を得る」は属性の付与（status="ATTR:斬"）も続ける。"""
     act = _grant_keyword_base(ctx)
+    # 「【ダブルアタック】と【ブロッカー】を得る」（OP18-081）: 「と」で並んだキーワードはすべて付与する
+    # （従来は先頭の 1 つだけ）。同じ対象へ続けて付与する（選ぶ対象なら 1 度選んだものへ）。
+    kc = re.search(_nfc(r"((?:【[^】]+】と)+【[^】]+】)を得(?:る|て)"), ctx.text)
+    if isinstance(act, GameAction) and kc:
+        kws = [k for k in _KEYWORD_GRANT_RE.findall(kc.group(1))]
+        if len(kws) >= 2 and act.status == kws[0]:
+            tq = act.target
+            if tq is not None and tq.select_mode not in ("SOURCE", "ALL") and not tq.ref_id:
+                tq.save_id = "selected_card"
+                mk_tq = lambda: TargetQuery(ref_id="selected_card")
+            else:
+                mk_tq = lambda: copy.deepcopy(tq)
+            return Sequence(actions=[act] + [
+                GameAction(type=ActionType.GRANT_KEYWORD, target=mk_tq(), status=k,
+                           duration=act.duration, raw_text=ctx.text) for k in kws[1:]])
     am = _ATTR_GRANT_RE.search(ctx.text)
     if act is None or am is None or not isinstance(act, GameAction):
         return act
@@ -1303,24 +1346,35 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("手札") not in t and _nfc("トラッシュ") not in t:
         return None
-    if not re.search(_nfc(r"ライフの(上|下)に(?:[表裏]向きで)?加える"), t):
+    if not re.search(_nfc(r"ライフの(上か下|上|下)に(?:[表裏]向きで)?加える"), t):
         return None
     tq = parse_target(t)
     # 源ゾーン: parse_target が複数ゾーン（「手札かトラッシュ」ST13-003）を検出済みなら尊重する。
     # 単一ゾーンのときのみ手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
     if not isinstance(tq.zone, list):
         tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
-    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     # 「表向きで加える」→ 表向き、「裏向きで」→ 裏向き、明示なし→ゾーン既定(裏向き)。
     face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)
-    return GameAction(
-        type=ActionType.MOVE_CARD,
-        target=tq,
-        destination=Zone.LIFE,
-        dest_position=dest_position,
-        face_up=face_up,
-        raw_text=t,
-    )
+
+    def _move(position: str) -> GameAction:
+        return GameAction(
+            type=ActionType.MOVE_CARD,
+            target=tq,
+            destination=Zone.LIFE,
+            dest_position=position,
+            face_up=face_up,
+            raw_text=t,
+        )
+
+    # 「（自分の）手札から…を、自分のライフの上か下に表向きで加える」（OP18-099/100/101）:
+    # 上か下はプレイヤーが選ぶ（field_char_to_life と同じ Choice の形）。
+    if re.search(_nfc(r"ライフの上か下に"), t):
+        return Choice(
+            message="ライフの上か下に加える",
+            option_labels=["ライフの上に加える", "ライフの下に加える"],
+            options=[_move("TOP"), _move("BOTTOM")],
+        )
+    return _move("TOP" if _nfc("ライフの上") in t else "BOTTOM")
 
 
 @rule("life_to_trash", priority=68)
@@ -1423,6 +1477,10 @@ def _don_attach_leader_and_char(ctx: ParseContext) -> Optional[EffectNode]:
     # 「リーダーとキャラ（N枚／すべて）に…ドン…N枚ずつ」: AND 分配のみ対象。
     m = re.search(_nfc(r'リーダーと(?:、)?(?:自分の)?キャラ(すべて|全て|\d+枚)?'), t)
     if not m or _nfc("ずつ") not in t:
+        return None
+    # 「リーダーとキャラ合計N枚までに…1枚ずつ」（OP18-078）はリーダーとキャラから合計 N 枚を選ぶ
+    # 1 対象（分配ではない）＝generic の don_attach に任せる。
+    if re.search(_nfc(r'リーダーと(?:、)?(?:自分の)?キャラ合計'), t):
         return None
     # 受け手1体あたりの付与枚数（「ドン‼N枚ずつ」の N）。「キャラすべて」由来の
     # _don_count=99 退化を避けるため、「枚ずつ」直前の数値を専用に拾う。
@@ -1549,7 +1607,8 @@ def _active_char_and_don(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
     if not re.search(_nfc(r"アクティブに(する|できる)"), t):
         return None
-    m = re.search(_nfc(r'(.+?キャラ[^、。]*?まで)と((?:レストの)?ドン(?:!!|‼)[^、。]*?まで)'), t)
+    # 「特徴《W7》を持つカード1枚までとドン!!1枚まで」（OP18-031）＝場のカード（リーダー・キャラ・ステージ）も同じ形。
+    m = re.search(_nfc(r'(.+?(?:キャラ|カード)[^、。]*?まで)と((?:レストの)?ドン(?:!!|‼)[^、。]*?まで)'), t)
     if not m:
         return None
     char_part, don_part = m.group(1), m.group(2)
@@ -2124,7 +2183,8 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
     #   展開しており、【登場時】/【KO時】参照のトリガーが no-op だった）。
     ref = None
     for tag, trig in ((r"登場時", "ON_PLAY"), (r"KO時", "ON_KO"),
-                      (r"アタック時", "ON_ATTACK"), (r"起動メイン|メイン", "ACTIVATE_MAIN")):
+                      (r"アタック時", "ON_ATTACK"), (r"トリガー", "TRIGGER"),
+                      (r"起動メイン|メイン", "ACTIVATE_MAIN")):
         if re.search(_nfc(rf"【?(?:{tag})】?効果"), ctx.text):
             ref = trig
             break
@@ -2132,7 +2192,12 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
     # 発生源自身ではなく、選んだカードの【メイン】効果を発動する。発動するカードを選ぶ
     # ターゲットを付与する（従来は target 無しで発生源を再展開し、選択が脱落していた）。
     target = None
-    if re.search(_nfc(r'(トラッシュ|手札|デッキ).{0,30}効果を発動'), ctx.text):
+    if re.search(_nfc(r'公開したカードの'), ctx.text):
+        # 「公開したカードの【トリガー】効果を発動する」（OP18-105）: 直前の公開（reveal_hand が
+        # saved_targets["revealed_cards"] に保存）で公開したカードの能力を発動する。公開が 0 枚なら何もしない。
+        target = TargetQuery(select_mode="ALL", ref_id="revealed_cards", zone=Zone.HAND, player=Player.SELF,
+                             is_up_to=True, raw_text=ctx.text)
+    elif re.search(_nfc(r'(トラッシュ|手札|デッキ).{0,30}効果を発動'), ctx.text):
         sel = re.sub(_nfc(r'の[、,]?\s*【?(?:起動メイン|メイン)?】?効果を発動.*$'), '', ctx.text)
         target = parse_target(sel)
         if _nfc("トラッシュ") in sel:
@@ -2785,6 +2850,56 @@ def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
                              _tier(m.group("f2"), m.group("t2"))])
 
 
+# ---------------------------------------------------------------------------
+# 「（相手の）（元々の、）コスト6以下と5以下のキャラ1枚ずつまでを、〈動作〉」（OP18-051/064）:
+#   2 つの基準それぞれ 1 枚までを選ぶ＝SELECT(基準1)＋SELECT(基準2・1 で選んだカードを除く)を保存し、
+#   〈動作〉はその 2 枚へまとめて掛ける（ref_id）。〈動作〉は第 1 基準の単一対象の句として既存ルールで
+#   解析し、対象だけ選んだ 2 枚に差し替える（期間・並び替え・陣営の既定はそのルールのまま）。
+#   従来は第 1 基準の 1 対象だけになり、第 2 基準の 1 枚が脱落していた。
+#   登場（EB03-049/OP14-084）は dual_tier_play_from_trash、「〜1枚までと〜1枚までを」は dual_tier_removal。
+# ---------------------------------------------------------------------------
+_EACH_TIER_RE = re.compile(_nfc(
+    r"(?P<kind>コスト|パワー)(?P<n1>\d+)以下と(?:コスト|パワー)?(?P<n2>\d+)以下の"
+    r"(?P<noun>キャラ(?:カード)?|ステージ)(?P<cnt>[\d０-９]+)枚ずつ(?P<upto>まで)?"))
+
+
+@rule("each_tier_select", priority=75)
+def _each_tier_select(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    m = _EACH_TIER_RE.search(t)
+    if not m or _nfc("登場") in t:
+        return None
+    head, tail = t[:m.start()], t[m.end():]
+    cnt = m.group("cnt")
+    upto = _nfc("まで") if m.group("upto") else ""
+
+    def _tier_text(n: str) -> str:
+        return head + m.group("kind") + n + _nfc("以下の") + m.group("noun") + cnt + _nfc("枚") + upto
+
+    from .base import default_registry
+    inner_res = default_registry.apply(ParseContext(text=_tier_text(m.group("n1")) + tail, is_cost=ctx.is_cost))
+    if inner_res is None or not isinstance(inner_res.node, GameAction) or inner_res.node.target is None:
+        return None
+    act = inner_res.node
+    player = act.target.player
+
+    def _sel(n: str, save_id: str) -> GameAction:
+        tq = parse_target(_tier_text(n))
+        tq.player = player
+        tq.zone = Zone.FIELD
+        tq.is_up_to = bool(upto)
+        tq.save_id = save_id
+        return GameAction(type=ActionType.SELECT, target=tq, raw_text=t)
+
+    sel_a = _sel(m.group("n1"), "_each_a")
+    sel_b = _sel(m.group("n2"), "_each_b")
+    sel_b.target.flags.add("EXCLUDE_SAVED:_each_a")  # 同じカードを 2 つの基準で選ばない
+    act.raw_text = t
+    act.target = TargetQuery(player=player, zone=Zone.FIELD, count=-1, select_mode="ALL",
+                             ref_id="_each_a+_each_b")
+    return Sequence(actions=[sel_a, sel_b, act])
+
+
 _EACH_NAMES_RE = re.compile(_nfc(r"((?:「[^」]+」と)+「[^」]+」)それぞれ[\d０-９]+枚(?:ずつ)?(?:まで)?"))
 
 
@@ -2932,6 +3047,9 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     # それ以外は従来どおりトラッシュ優先（混在時の安全側）。
     if re.search(_nfc(r"手札かトラッシュ|トラッシュか手札"), t):
         tq.zone = [Zone.HAND, Zone.TRASH]
+    elif re.search(_nfc(r"デッキかトラッシュ|トラッシュかデッキ"), t):
+        # 「自分のデッキかトラッシュから…登場させる。その後、デッキをシャッフルする」（OP18-117）。
+        tq.zone = [Zone.DECK, Zone.TRASH]
     elif has_trash:
         tq.zone = Zone.TRASH
     elif has_hand:
@@ -3079,6 +3197,9 @@ def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 側の指定が無い「キャラすべてをトラッシュに置き」（OP18-117）は両者のキャラすべて。
+    if (re.match(_nfc(r"^キャラすべてを、?トラッシュに"), t.strip())):
+        tq.player = Player.ALL
     # 側・種類・ゾーンの無い「カードN枚までを、トラッシュに置く」は直前に見た（LOOK→TEMP）カードから選ぶ
     # （OP03-083。従来は場のカードが対象で、実行すると場のカードをトラッシュへ送った）。
     if re.match(_nfc(r"^カード[\d０-９]+枚(?:まで)?を、?トラッシュに置"), t.strip()):
@@ -3130,7 +3251,8 @@ def _active_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") in t:
         return None  # ドン!!のアクティブ化は don_set_active が担当
-    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる|し$)"), t.strip()):
+    # 「このリーダーをアクティブにしてもよい」（OP18-022）: 任意は parser の任意効果マーカーが拾う。
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる|し$|してもよい)"), t.strip()):
         return None
     return GameAction(
         type=ActionType.ACTIVE,

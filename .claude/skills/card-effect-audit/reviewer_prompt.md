@@ -20,7 +20,7 @@
 - 「〜を含む特徴」は対象（TargetQuery）の raw_text をエンジンの matcher が読んで部分一致にする＝traits 欄が完全一致形でも欠落ではない（matcher.py:143）。
 - 「〜できる／〜てもよい」の任意性は cost_optional・is_optional のほか、一部は raw_text をエンジンが直接読む。**ただし then 側の動作が本文で任意なのに強制実行になる形は ng**。
 - 置換効果（「代わりに」「〜される場合」）は status=LEAVE／BATTLE_KO と raw_text で処理され、中身は DEFERRED（プローブでは実行を確かめない）。
-- 【速攻:キャラ】【ブロック不可】は未処理（ng 済みの既知）。
+- 【速攻:キャラ】【ブロック不可】はエンジンで処理済み（rules/battle.rs・legal.rs。2026-10 の初回点検の時点では未処理だった）＝付与・キーワードが本文どおりなら ok にしてよい。
 - 「元々のコスト」に対応する欄はエンジンに無い（QUALIFIER_GAP が出る＝ng）。
 - 条件の「いない場合」は GE/EQ/LT のどれかで表現されうる。operator と value を読んで本文と真偽が合うか確かめる。
 - `show` は TargetQuery の非既定の欄を全て出す（is_vanilla・power_min/max・flags・count_dynamic・ref_id など）。ここに無い欄は「無い」と読んでよい。

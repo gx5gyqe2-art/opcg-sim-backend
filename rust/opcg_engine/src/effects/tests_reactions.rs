@@ -825,6 +825,38 @@ mod g2_trigger {
         assert_eq!(queued(&s), vec![(Seat::P1, holder), (Seat::P1, holder)]);
         assert_eq!(turn_event(&s, "NAVY_DISCARD"), Some(2));
     }
+
+    /// OP18-080: 「自分のリーダー「マーシャル・D・ティーチ」の効果で自分の手札が捨てられた時」は
+    /// 発生源が持ち主のリーダーで名前が一致するときだけ誘発する。
+    #[test]
+    fn named_own_leader_effect_discard_checks_the_source() {
+        let raw = "【自分のターン中】【ターン1回】自分のリーダー「マーシャル・D・ティーチ」の効果で自分の手札が捨てられた時、自分の他の「ヴァン・オーガー」がいない場合、カード1枚を引く。";
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let leader = b.leader(Seat::P1);
+        let opp_leader = b.leader(Seat::P2);
+        let other = b.put_field(Seat::P1, M_BIG);
+        let holder = b.put_field(Seat::P1, M_CHAR);
+        let (mut masters, state) = b.build();
+        give(&mut masters, M_CHAR, TriggerType::YourTurn, raw);
+        let mut s = Session::new(state);
+        // 名前が違うリーダー・キャラの効果・相手のリーダーの効果では誘発しない。
+        s.set_effect_actor(Some((Seat::P1, Some(leader))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        s.set_effect_actor(Some((Seat::P1, Some(other))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        assert!(queued(&s).is_empty());
+        masters.masters[crate::testkit::M_LEADER as usize].name = "マーシャル・D・ティーチ".into();
+        s.set_effect_actor(Some((Seat::P2, Some(opp_leader))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        assert!(queued(&s).is_empty(), "相手のリーダー（同名）の効果では誘発しない");
+        // 自分のリーダー「マーシャル・D・ティーチ」の効果で自分の手札が捨てられた＝誘発。
+        s.set_effect_actor(Some((Seat::P1, Some(leader))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P2).unwrap();
+        assert!(queued(&s).is_empty(), "相手の手札では誘発しない");
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(queued(&s), vec![(Seat::P1, holder)]);
+    }
 }
 
 /// OP16-079 型: 「自分のトラッシュから…キャラが登場した時、そのキャラは…【速攻】を得る」。

@@ -568,6 +568,9 @@ class EffectParser:
             norm_text = re.sub(
                 _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
                 r'\1\2\3', norm_text)
+            # 「公開したカードの【トリガー】効果を発動する」（OP18-105）: 参照先が【トリガー】で
+            # あることを保全する（タグ除去で消えると発生源自身の【メイン】の再展開に化ける）。
+            norm_text = re.sub(_nfc(r'(公開したカードの)【(トリガー)】(効果)'), r'\1\2\3', norm_text)
 
             # 「ルール上、…できず、ゲーム開始時、…」（OP13-079）: 前半はデッキ構築制限で
             # ランタイム効果ではない。残すと parse_target が後半の対象解析を汚染する
@@ -1301,7 +1304,15 @@ class EffectParser:
 
             actions = []
             if before_part:
-                before_node = self._parse_to_node(before_part, is_cost=True)
+                # 並列の「と」で動詞を共有する形（「自分の「ゴンベ」1枚とこのキャラをレストにできる」
+                # OP18-028）: 前半だけでは動詞が無く OTHER に落ちる。発生源の句の動詞部
+                # （「をレストにできる」等）を前半に補って解析する。ドン!!（「自分のドン!!1枚と」）は
+                # 前半だけで REST_DON になる従来の形のまま。
+                if head.endswith('と') and _nfc('ドン') not in before_part:
+                    _verb = re.sub(_nfc(r'^この(?:カード|キャラ|リーダー|ステージ)'), '', m.group(0))
+                    before_node = self._parse_to_node(head[:-1] + _verb, is_cost=True)
+                else:
+                    before_node = self._parse_to_node(before_part, is_cost=True)
                 if isinstance(before_node, Sequence):
                     actions.extend(before_node.actions)
                 elif before_node is not None:
@@ -1375,6 +1386,13 @@ class EffectParser:
                 _nfc(r'(?:した|された|受けた|なった|与えた|戻された|離れた|登場した|終了)時'), norm_text)
             if has_don_tag and not has_turn1 and not reactive_time:
                 return embedded or TriggerType.PASSIVE
+            # 【ターン1回】だけの「（自分の）〈ゾーン〉から…キャラが登場した時、」は起動メインではなく
+            # 他のキャラの登場への誘発（OP18-060「自分のトラッシュからキャラが登場した時」）。PASSIVE なら
+            # 再計算では動かず（反応型）、エンジンの enqueue_char_played_listeners が登場元を見て積む。
+            if (not has_don_tag and has_turn1 and embedded is None
+                    and re.search(_nfc(r'キャラが登場した時、'), norm_text)
+                    and not re.search(_nfc(r'この(?:キャラ|カード)が登場した時'), norm_text)):
+                return TriggerType.PASSIVE
             return embedded or TriggerType.ACTIVATE_MAIN
 
         # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
@@ -1607,10 +1625,18 @@ class EffectParser:
             # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
             # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
             _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
+            # 「〈…キャラすべて〉は、【X】を得て、パワー+N」（OP18-001）: 「すべて」の主語は後句にも掛かる
+            # （全体指定なので後句で引き直しても同じ集合）。枚数指定（1枚まで等）は同一対象の継承が要るので
+            # ここでは扱わない。
+            _all_subj_re = re.compile(_nfc(r'^(.+?(?:すべて|全て))は、?(?:[^、]*、)?【[^】]+】を得て$'))
             _carry_subj = None
             _carry_per = None
             for _pi, _p in enumerate(parts):
-                if _carry_subj and _bare_buff_re.match(_p):
+                if _carry_subj and _bare_buff_re.match(_p) and _carry_subj.endswith((_nfc('すべて'), _nfc('全て'))):
+                    _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
+                    _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
+                    parts[_pi] = _carry_subj + 'は、' + _dur + _p
+                elif _carry_subj and _bare_buff_re.match(_p):
                     _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
                     _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
                     _own_per = _per_re.match(_p) is not None
@@ -1621,8 +1647,12 @@ class EffectParser:
                     else:
                         parts[_pi] = _carry_subj + 'の' + _p
                 else:
+                    _am = _all_subj_re.match(_p)
                     _sm = _subj_re.search(_p)
-                    if _sm:
+                    if _am:
+                        _carry_subj = _am.group(1)
+                        _carry_per = None
+                    elif _sm:
                         _carry_subj = _sm.group(1)
                         _pm = _per_re.search(_p)
                         _carry_per = (_pm.group(1) + '、') if _pm else None
@@ -2411,6 +2441,32 @@ class EffectParser:
                 op = CompareOperator.GE if pow_m.group(2) == _nfc('以上') else CompareOperator.LE
                 return Condition(type=ConditionType.SOURCE_STATE, value=("POWER", thr), operator=op, player=p, raw_text=norm_text)
 
+        # 「自分のキャラがコストN以上（以下）のキャラのみ」（OP18-087）: 条件を満たさないキャラが 0 枚
+        # （FIELD_COUNT LT 1）。「のみ」は空でも成立（FIELD_ALL_TRAIT と同じ）。コストは今のコスト。
+        only_cost_m = re.search(_nfc(r'キャラが、?コスト(\d+)(以上|以下)のキャラのみ'), norm_text)
+        if only_cost_m and _nfc("特徴") not in norm_text:
+            n_c = int(only_cost_m.group(1))
+            tq_o = TargetQuery(player=Player.OPPONENT if norm_text.startswith(_nfc("相手")) else Player.SELF,
+                               card_type=["CHARACTER"], count=-1, select_mode="ALL", raw_text=norm_text)
+            if only_cost_m.group(2) == _nfc("以上"):
+                tq_o.cost_max = n_c - 1
+            else:
+                tq_o.cost_min = n_c + 1
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_o, operator=CompareOperator.LT,
+                             value=1, player=tq_o.player, raw_text=norm_text)
+
+        # 「自分の（コストN以上の）ステージがある／ない」（OP18-034・OP18-074）: 場のステージの枚数。
+        stage_m = re.fullmatch(_nfc(r'(自分|相手)の((?:コスト\d+(?:以上|以下)の)?)ステージが(ある|ない)(?:場合)?'),
+                               norm_text.strip())
+        if stage_m:
+            tq_s = parse_target(norm_text)
+            tq_s.card_type = ["STAGE"]
+            tq_s.player = Player.OPPONENT if stage_m.group(1) == _nfc("相手") else Player.SELF
+            has = stage_m.group(3) == _nfc("ある")
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_s,
+                             operator=CompareOperator.GE if has else CompareOperator.LT,
+                             value=1, player=tq_s.player, raw_text=norm_text)
+
         # FIELD_ALL_TRAIT: 場のキャラ全員が特定の特徴を持つ（「のみ」条件）
         if _nfc("のみ") in norm_text and _nfc("キャラ") in norm_text:
             # 特徴《X》（完全一致）
@@ -2589,6 +2645,10 @@ class EffectParser:
         項目が割れない/参照ゾーンが取れない場合は None（呼び出し側が従来解析へフォールバック）。
         """
         norm = _nfc(text)
+        # 「このキャラのパワーによって以下の効果をそれぞれ適用する。・N以上の場合、…」（OP18-004）:
+        # 基準は発生源自身のパワー（SOURCE_STATE("POWER", N) GE）。
+        if re.search(_nfc(r'このキャラのパワーによって'), norm):
+            return self._parse_apply_each_source_power(norm, is_cost)
         # 参照ゾーン（枚数の基準）と対象プレイヤーを head から判定。
         head_m = re.search(_nfc(r'(自分|相手|お互い)?の?(トラッシュ|ライフ|手札|デッキ)の枚数によって'), norm)
         if not head_m:
@@ -2635,6 +2695,26 @@ class EffectParser:
                     if_true=eff_node)
             cond = Condition(type=ctype, operator=CompareOperator.GE, value=thr,
                              player=cplayer, raw_text=opt)
+            branches.append(Branch(condition=cond, if_true=eff_node))
+        if not branches:
+            return None
+        return Sequence(actions=branches) if len(branches) > 1 else branches[0]
+
+    def _parse_apply_each_source_power(self, norm: str, is_cost: bool) -> Optional[EffectNode]:
+        """「このキャラのパワーによって以下の効果をそれぞれ適用する。・N以上の場合、…」を
+        Sequence[Branch[SOURCE_STATE(POWER) >= N] → 効果, …] にする（OP18-004・該当段を累積適用）。"""
+        m_end = re.search(_nfc(r'以下の効果を.{0,4}?適用する'), norm)
+        tail = norm[m_end.end():].lstrip(_nfc('。\n 　')) if m_end else ""
+        branches: List[EffectNode] = []
+        for opt in self._extract_options(tail):
+            cm = re.match(_nfc(r'\s*(\d+)以上(?:の)?(?:場合)?[、,]?\s*(.+)$'), opt, re.DOTALL)
+            if not cm:
+                continue
+            eff_node = self._parse_to_node(cm.group(2).strip().rstrip(_nfc('。')), is_cost)
+            if eff_node is None:
+                continue
+            cond = Condition(type=ConditionType.SOURCE_STATE, value=("POWER", int(cm.group(1))),
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=opt)
             branches.append(Branch(condition=cond, if_true=eff_node))
         if not branches:
             return None

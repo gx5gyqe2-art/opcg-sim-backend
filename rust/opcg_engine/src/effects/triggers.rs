@@ -2105,7 +2105,31 @@ pub fn on_hand_discarded_by_effect(
         let Some(pre) = clause_before(raw, "手札が捨てられた時") else {
             return false;
         };
-        pre.contains("効果で") && side_ok(side_of(&pre), owner, owner_of_hand)
+        // 「自分のリーダー「X」の効果で自分の手札が捨てられた時」（OP18-080）: 発生源が持ち主の
+        // リーダーで、名前が X のときだけ。主語判定（side_of）は発生源の句を除いた残りで行う。
+        let pre_side: String = if let Some(head) = clause_before(&pre, "の効果で") {
+            if head.contains("リーダー") {
+                let names = find_names(&head);
+                let leader = s.state().player(owner).leader;
+                let src_ok = match (source, leader) {
+                    (Some(src), Some(ld)) => {
+                        src == ld
+                            && (names.is_empty()
+                                || names.iter().any(|n| matches_name(masters, s.state().card(src).master, n)))
+                    }
+                    _ => false,
+                };
+                if !src_ok {
+                    return false;
+                }
+                pre.replacen(head.as_str(), "", 1)
+            } else {
+                pre.clone()
+            }
+        } else {
+            pre.clone()
+        };
+        pre.contains("効果で") && side_ok(side_of(&pre_side), owner, owner_of_hand)
     })
 }
 
