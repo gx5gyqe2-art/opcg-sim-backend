@@ -1151,6 +1151,10 @@ pub struct RemovalReplaceContinuation {
     pub value: i32,
     /// 除去アクションの `source_card`（効果の発生源）。
     pub effect_source: Option<CardIdx>,
+    /// 今聞いている置換（保護者・能力 index）。
+    pub offered: (CardIdx, Option<usize>),
+    /// 同じ除去でこれまでに断った置換。断ったら次の置換（別の保護者）を聞き、無ければ除去を続行する。
+    pub declined: Vec<(CardIdx, Option<usize>)>,
 }
 
 /// ARRANGE_DECK の continuation（Python の同名キー）。
@@ -1172,10 +1176,14 @@ pub enum ArrangeDest {
 }
 
 /// 任意のバトル KO 置換（`battle._suspend_for_battle_ko_replacement`）の continuation。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BattleKoContinuation {
     pub target_owner: Seat,
     pub life_lost: i32,
+    /// 今聞いている置換（保護者・能力 index）。
+    pub offered: (CardIdx, Option<usize>),
+    /// このバトル KO でこれまでに断った置換（断ったら次の保護者の置換を聞く）。
+    pub declined: Vec<(CardIdx, Option<usize>)>,
 }
 
 /// レスト置換（`effects::actions::rules::active_rest_replacement`）の continuation。

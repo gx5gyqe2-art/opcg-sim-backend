@@ -290,6 +290,7 @@ pub fn run_target_loop_with(
                     }
                     super::interact::suspend_for_removal_replacement(
                         s, masters, actor, node_ref, action, target, owner, value, source_card,
+                        repl.key(), Vec::new(),
                     );
                     s.edit().set_mgr_flag(
                         crate::journal::MgrFlagField::ReplacementSuspended,
