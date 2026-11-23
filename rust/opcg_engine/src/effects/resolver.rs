@@ -1798,10 +1798,26 @@ impl Resolver {
             } else {
                 Position::Bottom
             };
-            // 「持ち主が好きな順番で」: 相手の場のカードを並べるのはその持ち主（相手）。
-            let arranger = match action.target.as_ref() {
-                Some(q) if q.player == PlayerRef::Opponent && needs_reorder => actor.other(),
-                _ => actor,
+            // 「持ち主が好きな順番で」: 並べるのは置かれるカードの持ち主。対象の側の指定（相手の／無印）
+            // ではなく、実際に選ばれたカードの持ち主で決める（OP18-051 は両者のキャラが対象で、
+            // 相手のキャラ 2 枚なら相手が並べる）。持ち主が両者に分かれたとき、各持ち主の分が
+            // 1 枚ずつなら並べ替えは要らない（別々のデッキの下に 1 枚ずつ）＝通常の 1 枚ずつの配置に任せる。
+            let arranger = if needs_reorder {
+                let owners: Vec<_> = targets.iter().map(|&c| s.state().card(c).owner).collect();
+                let first = owners[0];
+                if owners.iter().all(|&o| o == first) {
+                    first
+                } else {
+                    let n_first = owners.iter().filter(|&&o| o == first).count();
+                    let n_other = owners.len() - n_first;
+                    if n_first <= 1 && n_other <= 1 && !needs_pos {
+                        return Ok(false);
+                    }
+                    // 両者に 2 枚以上ずつ混ざる形は DB に無い（最大で 1 枚ずつの 2 枚）。来たら従来どおり使い手。
+                    actor
+                }
+            } else {
+                actor
             };
             super::interact::suspend_for_arrange(
                 s,

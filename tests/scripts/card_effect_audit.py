@@ -132,6 +132,7 @@ _IGNORABLE = re.compile(
 _EDGE_HEAD = re.compile(r"^(?:[、。:・/,\s]|その後、?|[きしてり]、)+")
 _EDGE_TAIL = re.compile(r"(?:[、。:・/,\s]|その後、?)+$")
 _TURN_LIMIT_PHRASE = re.compile(r"^(?:このキャラは)?ターンに?1回、?$")
+_APPLY_EACH_LEAD = re.compile(r"によって以下の効果を.{0,4}?適用する$")
 _OPP_CHOICE_PHRASE = re.compile(r"^:?相手は以下から1つを選ぶ。?(?:\s*/\s*・)?$")
 _TRIGGER_PHRASE = re.compile(r"(時、?|時か|発動できる。?)$")
 _TAG_RE = re.compile(r"【([^】]*)】")
@@ -390,6 +391,11 @@ def static_checks(card: dict, parser_stats: dict) -> Tuple[List[dict], List[str]
                 a["type"] in ANY_EVENT_EVIDENCE for ab in abilities for a in flatten_actions(ab)):
             continue      # 「このカードの【カウンター】効果を発動する」の raw_text は種別名を落とす
         elif _TURN_LIMIT_PHRASE.match(piece) and "TURN_LIMIT" in conds:
+            continue
+        elif _APPLY_EACH_LEAD.search(piece) and any(
+                sum(1 for n in walk_nodes(ab) if n.get("node") == "Branch") >= 2 for ab in abilities):
+            # 「〈基準〉によって以下の効果をそれぞれ適用する」は各項目の分岐条件（基準と閾値）で
+            # 表現されている前置き（OP18-004・OP15-092）。項目ごとの分岐が 2 つ以上あれば覆われている。
             continue
         elif _OPP_CHOICE_PHRASE.match(piece) and any(
                 n.get("node") == "Choice" and n.get("player") == "OPPONENT"

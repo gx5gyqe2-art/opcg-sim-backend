@@ -1178,8 +1178,13 @@ class EffectParser:
         if any(isinstance(t, Branch) and not _then_branch(t) for t in tail):
             return effect_node
         # 漏れている実効果（非TEMP）が無ければ何もしない（無害なデッキ整理のみは据え置き）。
+        # ただし先頭が分岐でセットアップ（見る・公開）が無いときの後続の整理（「その後、デッキを
+        # シャッフルする」）は、条件が偽なら何も見ていない＝整理も起きないので分岐の内側に入れる
+        # （OP18-117「〜の場合、…デッキかトラッシュから登場させる。その後、デッキをシャッフルする」）。
         if not any(_h_is_genuine(t) for t in tail):
-            return effect_node
+            if branch_idx != 0 or not all(
+                    isinstance(t, GameAction) and t.type == ActionType.SHUFFLE for t in tail):
+                return effect_node
         branch = acts[branch_idx]
         inner = []
         if isinstance(branch.if_true, Sequence):
