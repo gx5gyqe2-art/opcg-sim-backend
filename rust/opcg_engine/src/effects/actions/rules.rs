@@ -552,6 +552,31 @@ pub fn find_replacement_by(
     status_values: &[&str],
     actor: Option<Seat>,
 ) -> Result<Option<Replacement>, EngineError> {
+    find_replacement_skipping(s, masters, card, status_values, actor, &[])
+}
+
+/// 置換 1 件の識別子（保護者・能力 index）。継続付与型は index が `None`。
+pub type ReplacementKey = (CardIdx, Option<usize>);
+
+impl Replacement {
+    /// この置換の識別子（[`ReplacementKey`]）。
+    pub fn key(&self) -> ReplacementKey {
+        (self.protector, self.ability_index)
+    }
+}
+
+/// [`find_replacement_by`] から `skip` の置換（任意の置換を断ったもの）を除いて探す版。
+///
+/// 任意の効果除去置換を断ったら、同じ除去に使える**次の**置換（別の保護者の「代わりに〜できる」）を
+/// 改めて聞くために使う（2026-11-23・保護者が複数いるとき先頭の 1 件しか聞かなかった）。
+pub fn find_replacement_skipping(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    skip: &[ReplacementKey],
+) -> Result<Option<Replacement>, EngineError> {
     if s.state().card(card).negated {
         return Ok(None);
     }
@@ -579,6 +604,9 @@ pub fn find_replacement_by(
         }
         let ids = &masters.get(s.state().card(protector).master).ability_ids;
         for (index, id) in ids.iter().enumerate() {
+            if skip.contains(&(protector, Some(index))) {
+                continue;
+            }
             let ab = ability(masters, *id)?;
             if ab.trigger != TriggerType::Passive {
                 continue;
@@ -675,7 +703,9 @@ pub fn find_replacement_by(
     // §11.8 #5）。場に残らないイベント由来のため `owner.granted_replacements` を参照する。
     // 付与対象は自分のキャラ（除去されるカード自身が自分のキャラであること）。
     // `ab`／`eff` は持たないのでターン制限・条件は付与時に消化済みとして扱う。
-    if masters.get(s.state().card(card).master).ty == CardType::Character {
+    if masters.get(s.state().card(card).master).ty == CardType::Character
+        && !skip.contains(&(card, None))
+    {
         let granted = s.state().player(owner).granted_replacements.clone();
         for g in &granted {
             if !status_values.contains(&g.status.as_str()) {
@@ -726,7 +756,20 @@ pub fn active_replacement_by(
     actor: Option<Seat>,
 ) -> Result<bool, EngineError> {
     let can_suspend = !status_values.contains(&"BATTLE_KO");
-    active_replacement_inner(s, masters, card, status_values, can_suspend, actor)
+    active_replacement_inner(s, masters, card, status_values, can_suspend, actor, &[])
+}
+
+/// [`active_replacement_by`] の `skip` 版（[`find_replacement_skipping`]）。
+pub fn active_replacement_skipping(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    skip: &[ReplacementKey],
+) -> Result<bool, EngineError> {
+    let can_suspend = !status_values.contains(&"BATTLE_KO");
+    active_replacement_inner(s, masters, card, status_values, can_suspend, actor, skip)
 }
 
 /// [`active_replacement`] の `can_suspend` を明示する版（バトル KO 経路は `false`）。
@@ -737,7 +780,7 @@ pub fn active_replacement_with(
     status_values: &[&str],
     can_suspend: bool,
 ) -> Result<bool, EngineError> {
-    active_replacement_inner(s, masters, card, status_values, can_suspend, None)
+    active_replacement_inner(s, masters, card, status_values, can_suspend, None, &[])
 }
 
 fn active_replacement_inner(
@@ -747,8 +790,9 @@ fn active_replacement_inner(
     status_values: &[&str],
     can_suspend: bool,
     actor: Option<Seat>,
+    skip: &[ReplacementKey],
 ) -> Result<bool, EngineError> {
-    let Some(found) = find_replacement_by(s, masters, card, status_values, actor)? else {
+    let Some(found) = find_replacement_skipping(s, masters, card, status_values, actor, skip)? else {
         return Ok(false);
     };
     let owner = s.state().card(card).owner;

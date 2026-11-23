@@ -183,3 +183,134 @@ def test_once_per_turn_ko_immunity_holds_against_the_first_opponent_effect_ko():
     p.answer(accept=True)
     p.resolve("P1", p.pending()["selectable_uuids"][:6])
     assert LUFFY_118 in p.ids("p2", "field")
+
+
+# --- 効果で場を離れる場合の任意の置換（「代わりに〜できる」）-------------------------------
+# 確認は守られる側（置換の持ち主）へ出る。受け入れれば代わりの動作をして除去を止め、断れば除去を続ける。
+# 置換の持ち主が複数いれば、断ったあと次の持ち主の置換を聞く（2026-11-23）。
+
+ROBIN_W7 = "OP18-031"       # 【相手のターン中】自分のキャラが相手の効果で場を離れる場合、代わりにこのキャラをレストにできる
+MARCO_17 = "OP17-015"       # 自分のキャラが相手の効果で場を離れる場合、代わりにこのキャラをKOできる
+MR8_MONDAY = "OP18-054"     # 【相手のターン中】【ターン1回】自分の『B・W』のキャラが相手の効果で場を離れる場合、代わりに手札1枚を捨てられる
+
+
+def _miss_all_sunday_kos_a_vanilla(extra_p2):
+    s = Scenario(turn=5)
+    s.put("p1", MISS_ALL_SUNDAY, "hand")
+    s.put("p2", VANILLA, "field")
+    for c in extra_p2:
+        s.put("p2", c, "field")
+    p = s.build()
+    victim = p.uuid("p2", "field", VANILLA)
+    p.play("P1", MISS_ALL_SUNDAY)
+    assert p.action() == "SEARCH_AND_SELECT"
+    p.resolve("P1", [victim])
+    return p, victim
+
+
+def _uuids(p, seat, zone):
+    return [c["uuid"] for c in p.zone(seat, zone)]
+
+
+def _rest_of(p, seat, card_id):
+    return next(c["is_rest"] for c in p.zone(seat, "field") if c["card_id"] == card_id)
+
+
+@pytest.mark.parametrize("accept", [True, False])
+def test_robin_w7_asks_on_an_opponent_effect_ko_and_rests_herself_only_when_accepted(accept):
+    p, victim = _miss_all_sunday_kos_a_vanilla([ROBIN_W7])
+    pe = p.pending()
+    assert pe["action"] == "CONFIRM_OPTIONAL" and pe["player_id"] == "P2", pe
+    assert victim in _uuids(p, "p2", "field"), "確認中はまだ場にいる"
+    p.answer(accept=accept)
+    p.settle(accept=False)                     # その後の「ドン!!を追加してもよい」は断る
+    assert (victim in _uuids(p, "p2", "field")) == accept
+    assert (victim in _uuids(p, "p2", "trash")) == (not accept)
+    assert _rest_of(p, "p2", ROBIN_W7) == accept, "断ればロビンはレストにならない（無償で守られない）"
+
+
+def test_declining_the_first_protector_offers_the_next_one():
+    """ロビン（レスト）とマルコ（自身を KO）が並ぶ。先に聞かれたロビンを断ると、マルコの置換を聞く。"""
+    p, victim = _miss_all_sunday_kos_a_vanilla([ROBIN_W7, MARCO_17])
+    first = p.pending()
+    assert first["action"] == "CONFIRM_OPTIONAL" and first["player_id"] == "P2"
+    assert "ニコ・ロビン" in first["message"], first["message"]
+    p.answer(accept=False)
+    second = p.pending()
+    assert second["action"] == "CONFIRM_OPTIONAL" and second["player_id"] == "P2", second
+    assert "マルコ" in second["message"], second["message"]
+    p.answer(accept=True)
+    p.settle(accept=False)
+    assert victim in _uuids(p, "p2", "field"), "マルコの置換で守られた"
+    assert MARCO_17 in p.ids("p2", "trash") and MARCO_17 not in p.ids("p2", "field")
+    assert not _rest_of(p, "p2", ROBIN_W7), "断ったロビンの置換は実行されない"
+
+
+def test_declining_every_protector_lets_the_ko_through():
+    p, victim = _miss_all_sunday_kos_a_vanilla([ROBIN_W7, MARCO_17])
+    asked = 0
+    while p.action() == "CONFIRM_OPTIONAL" and "代わりの効果" in p.pending()["message"]:
+        p.answer(accept=False)
+        asked += 1
+        assert asked <= 2
+    p.settle(accept=False)
+    assert asked == 2
+    assert victim in _uuids(p, "p2", "trash")
+    assert {ROBIN_W7, MARCO_17} <= set(p.ids("p2", "field")) and not _rest_of(p, "p2", ROBIN_W7)
+
+
+def test_robin_w7_against_a_ko_all_protects_only_one_character():
+    """カイドウの全体 KO（複数枚を同時に除去）: 1 枚ずつ確認が出る。ロビンは 1 度レストになったら
+    もう代わりの動作ができない＝守れるのは 1 枚だけ（2 枚目以降は聞かれずに KO）。"""
+    s = Scenario(p1_leader=KAIDO_LEADER, turn=5)
+    s.don["p1"] = 10
+    s.put("p1", KAIDO, "hand")
+    s.put("p2", VANILLA, "field")
+    s.put("p2", VANILLA, "field")
+    s.put("p2", ROBIN_W7, "field")
+    p = s.build()
+    p.play("P1", KAIDO)
+    p.answer(accept=True)
+    p.resolve("P1", p.pending()["selectable_uuids"][:6])
+    asked = 0
+    while p.action() == "CONFIRM_OPTIONAL":
+        assert p.pending()["player_id"] == "P2"
+        p.answer(accept=True)
+        asked += 1
+        assert asked <= 3
+    assert asked == 1, "レストになったロビンは 2 枚目以降を守れない"
+    field = p.ids("p2", "field")
+    assert len(field) == 1, field
+    assert ROBIN_W7 in field or ROBIN_W7 in p.ids("p2", "trash")
+    assert ROBIN_W7 not in field or _rest_of(p, "p2", ROBIN_W7)
+
+
+def test_mr8_monday_once_per_turn_is_not_used_up_by_a_decline():
+    """【ターン1回】: カイドウの全体 KO で 1 枚目を断り 2 枚目で受け入れる → 3 枚目は聞かれない。"""
+    s = Scenario(p1_leader=KAIDO_LEADER, turn=5)
+    s.don["p1"] = 10
+    s.put("p1", KAIDO, "hand")
+    s.put("p2", MISS_ALL_SUNDAY, "field")
+    s.put("p2", MISS_ALL_SUNDAY, "field")
+    s.put("p2", MR8_MONDAY, "field")
+    s.put("p2", VANILLA, "hand")
+    s.put("p2", VANILLA, "hand")
+    p = s.build()
+    p.play("P1", KAIDO)
+    p.answer(accept=True)
+    p.resolve("P1", p.pending()["selectable_uuids"][:6])
+    answers = [False, True]
+    asked = 0
+    for _ in range(8):
+        pe = p.pending()
+        if pe is None or pe["action"] == "MAIN_ACTION":
+            break
+        if pe["action"] == "CONFIRM_OPTIONAL":
+            assert pe["player_id"] == "P2"
+            p.answer(accept=answers[asked])
+            asked += 1
+        else:                                     # 捨てる手札の選択
+            p.resolve(pe["player_id"], pe["selectable_uuids"][:1])
+    assert asked == 2, "断った 1 回目は使用回数を消費しない＝2 枚目で改めて聞かれ、受け入れた後は聞かれない"
+    assert p.ids("p2", "field") == [MISS_ALL_SUNDAY]
+    assert p.hand_count("p2") == 1, "代わりに手札 1 枚を捨てた"

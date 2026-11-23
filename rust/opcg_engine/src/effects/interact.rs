@@ -286,6 +286,35 @@ pub fn suspend_for_optional_confirmation(
     Ok(())
 }
 
+/// 置換の確認文に添える「どのカードの代わりの効果か」（「「X」の」）。
+///
+/// 使える置換が 1 つだけ（断ったら除去される）なら何も添えない＝従来の文のまま。2 つ以上ある
+/// （今聞いている置換を断ると次の置換を聞く・または既に 1 つ断った）ときだけ、保護者の名前を添える。
+fn replacement_protector_note(
+    s: &Session,
+    masters: &MasterTable,
+    target: CardIdx,
+    offered: crate::effects::actions::rules::ReplacementKey,
+    declined: &[crate::effects::actions::rules::ReplacementKey],
+    statuses: &[&str],
+    actor: Option<Seat>,
+) -> String {
+    let mut skip = declined.to_vec();
+    skip.push(offered);
+    let more = !declined.is_empty()
+        || matches!(
+            crate::effects::actions::rules::find_replacement_skipping(
+                s, masters, target, statuses, actor, &skip,
+            ),
+            Ok(Some(_))
+        );
+    if more {
+        format!("「{}」の", card_name(s, masters, Some(offered.0)))
+    } else {
+        String::new()
+    }
+}
+
 /// Python `battle._suspend_for_battle_ko_replacement`（任意のバトル KO 置換の確認）。
 pub fn suspend_for_battle_ko_replacement(
     s: &mut Session,
@@ -293,20 +322,26 @@ pub fn suspend_for_battle_ko_replacement(
     target: CardIdx,
     target_owner: Seat,
     life_lost: i32,
+    offered: crate::effects::actions::rules::ReplacementKey,
+    declined: Vec<crate::effects::actions::rules::ReplacementKey>,
 ) {
     let name = card_name(s, masters, Some(target));
+    let which = replacement_protector_note(s, masters, target, offered, &declined, &["BATTLE_KO"], None);
+    let message = format!("「{name}」がバトルでKOされます。{which}代わりの効果を使用しますか？");
     let cont = Box::new(Continuation {
         source_card: Some(target),
         battle_ko: Some(BattleKoContinuation {
             target_owner,
             life_lost,
+            offered,
+            declined,
         }),
         ..Default::default()
     });
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::ConfirmOptional,
         player: target_owner,
-        message: format!("「{name}」がバトルでKOされます。代わりの効果を使用しますか？"),
+        message,
         candidates: Vec::new(),
         selectable: None,
         constraints: None,
@@ -366,8 +401,17 @@ pub fn suspend_for_removal_replacement(
     target_owner: Seat,
     value: i32,
     effect_source: Option<CardIdx>,
+    offered: crate::effects::actions::rules::ReplacementKey,
+    declined: Vec<crate::effects::actions::rules::ReplacementKey>,
 ) {
     let name = card_name(s, masters, Some(target));
+    let guard: &[&str] = if action_body.ty == super::ast::ActionType::Ko {
+        &["LEAVE", "EFFECT_KO"]
+    } else {
+        &["LEAVE"]
+    };
+    let which = replacement_protector_note(s, masters, target, offered, &declined, guard, Some(actor));
+    let message = format!("「{name}」が効果で場を離れます。{which}代わりの効果を使用しますか？");
     let cont = Box::new(Continuation {
         source_card: Some(target),
         removal_replace: Some(crate::model::RemovalReplaceContinuation {
@@ -376,13 +420,15 @@ pub fn suspend_for_removal_replacement(
             action_body: Box::new(action_body.clone()),
             value,
             effect_source,
+            offered,
+            declined,
         }),
         ..Default::default()
     });
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::ConfirmOptional,
         player: target_owner,
-        message: format!("「{name}」が効果で場を離れます。代わりの効果を使用しますか？"),
+        message,
         candidates: Vec::new(),
         selectable: None,
         constraints: None,
@@ -699,10 +745,34 @@ pub fn resolve_interaction(
         InteractionKind::ConfirmOptional => {
             let accepted = accepted_of(payload);
             // 任意バトル KO 置換（A）の確認。
-            if let Some(bk) = cont.battle_ko {
+            if let Some(bk) = cont.battle_ko.clone() {
                 s.edit().pop_interaction();
                 let target = source_card;
-                if accepted && super::actions::active_replacement(s, masters, target, &["BATTLE_KO"])? {
+                let replaced = if accepted {
+                    super::actions::rules::active_replacement_skipping(
+                        s, masters, target, &["BATTLE_KO"], None, &bk.declined,
+                    )?
+                } else {
+                    // 断った＝この置換を除いて次の置換（別の保護者）を探す（効果除去の確認と同じ）。
+                    let mut declined = bk.declined.clone();
+                    declined.push(bk.offered);
+                    match super::actions::rules::find_replacement_skipping(
+                        s, masters, target, &["BATTLE_KO"], None, &declined,
+                    )? {
+                        Some(next) if next.sub_is_optional => {
+                            suspend_for_battle_ko_replacement(
+                                s, masters, target, bk.target_owner, bk.life_lost, next.key(),
+                                declined,
+                            );
+                            return after_resolve(s, masters);
+                        }
+                        Some(_) => super::actions::rules::active_replacement_skipping(
+                            s, masters, target, &["BATTLE_KO"], None, &declined,
+                        )?,
+                        None => false,
+                    }
+                };
+                if replaced {
                     // 置換が成立＝本来の KO をスキップ
                 } else {
                     // §11.8 #7: Python `gm.move_card`（＝`actions::move_card`）を使う——
@@ -719,6 +789,13 @@ pub fn resolve_interaction(
                         "BATTLE",
                         None,
                     )?;
+                    // 置換を断った KO もバトルによる KO＝アタッカーの「KOした時」を積む
+                    // （置換の無い KO〔`rules::battle::resolve_attack`〕と同じ）。
+                    if let Some(b) = s.state().active_battle.clone() {
+                        super::triggers::enqueue_battle_ko_listeners(
+                            s, masters, b.attacker, b.attacker_owner,
+                        )?;
+                    }
                 }
                 crate::rules::battle::finish_attack(s, masters, target, bk.life_lost)?;
                 return Ok(());
@@ -751,8 +828,32 @@ pub fn resolve_interaction(
                     } else {
                         &["LEAVE"]
                     };
-                    let replaced = accepted
-                        && super::actions::active_replacement_by(s, masters, target, guard, Some(rr.actor))?;
+                    let replaced = if accepted {
+                        super::actions::rules::active_replacement_skipping(
+                            s, masters, target, guard, Some(rr.actor), &rr.declined,
+                        )?
+                    } else {
+                        // 断った＝この置換を除いて、同じ除去に使える次の置換を探す
+                        // （別の保護者の「代わりに〜できる」は改めて聞く・任意でなければそのまま実行）。
+                        let mut declined = rr.declined.clone();
+                        declined.push(rr.offered);
+                        match super::actions::rules::find_replacement_skipping(
+                            s, masters, target, guard, Some(rr.actor), &declined,
+                        )? {
+                            Some(next) if next.sub_is_optional => {
+                                let owner = s.state().card(target).owner;
+                                super::interact::suspend_for_removal_replacement(
+                                    s, masters, rr.actor, &rr.action, a, target, owner, rr.value,
+                                    rr.effect_source, next.key(), declined,
+                                );
+                                return after_resolve(s, masters);
+                            }
+                            Some(_) => super::actions::rules::active_replacement_skipping(
+                                s, masters, target, guard, Some(rr.actor), &declined,
+                            )?,
+                            None => false,
+                        }
+                    };
                     if !replaced {
                         // 断った（または置換不成立）＝本来の除去を続行（保護・置換は確認済み）。
                         super::actions::run_target_loop_with(

@@ -351,6 +351,8 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                         target,
                         target_owner,
                         life_lost,
+                        repl.key(),
+                        Vec::new(),
                     );
                     return Ok(());
                 }
